@@ -136,6 +136,54 @@ Development will follow a modular, feature-based architecture with an emphasis o
 
 ---
 
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) v20+
+- [Docker](https://www.docker.com/) (optional, for containerized setup)
+
+### Local Setup
+
+```bash
+cd backend
+npm install
+node index.js
+```
+
+The server will start on **http://localhost:3000**.
+
+> **Note:** Create a `.env` file in the `backend/` directory with the required environment variables (e.g., `DATABASE_URL`).
+
+### Docker Setup
+
+#### Build the image
+
+```bash
+cd backend
+docker build -t aan-backend .
+```
+
+#### Run the container
+
+```bash
+docker run -p 3000:3000 --env-file .env aan-backend
+```
+
+Or pass environment variables directly:
+
+```bash
+docker run -p 3000:3000 -e DATABASE_URL="your_connection_string" aan-backend
+```
+
+#### Interactive shell (debug)
+
+```bash
+docker run -it aan-backend sh
+```
+
+---
+
 ## Repository Structure
 
 ```text
