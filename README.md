@@ -1,14 +1,14 @@
 # Loan Management System (LMS)
 
-A production-grade **Loan Management System (LMS)** being developed for **Aan Finance & Investment Private Limited**, a Non-Banking Financial Company (NBFC) engaged in **secured** and **structured lending**.
+A production-grade **Loan Management System (LMS)** developed for **Aan Finance & Investment Private Limited**, a Non-Banking Financial Company (NBFC) engaged in **secured** and **structured lending**.
 
-Unlike traditional retail loan management systems, this application is designed to handle **highly customizable loan products**, configurable business rules, and complex repayment structures while maintaining security, auditability, and scalability.
+Unlike traditional retail loan systems, this application is designed to handle **highly customizable loan products**, configurable business rules, and complex repayment structures while maintaining security, auditability, and scalability.
 
 ---
 
 ## Project Overview
 
-The system serves as an **internal platform** for managing the complete lifecycle of loans, including:
+The system is an **internal enterprise platform** for managing the complete lifecycle of loans, including:
 
 * Borrower Management
 * Loan Management
@@ -23,7 +23,7 @@ The system serves as an **internal platform** for managing the complete lifecycl
 * Audit Trail
 * Role-Based Access Control
 
-This is an **internal enterprise application** and **does not include** customer-facing portals, mobile applications, or digital onboarding.
+It **does not** include customer-facing portals, mobile applications, or digital onboarding.
 
 ---
 
@@ -31,229 +31,190 @@ This is an **internal enterprise application** and **does not include** customer
 
 ### Backend
 
-* Node.js
-* TypeScript
-* Express.js
+* Node.js 20+
+* TypeScript (strict, ESM)
+* Express 5
 * Drizzle ORM
 * PostgreSQL (Supabase)
+* `tsx` runtime
 
 ### Authentication & Security
 
-* JWT Authentication
+* JWT access tokens (short-lived)
+* Opaque refresh tokens with server-side sessions
 * Role-Based Access Control (RBAC)
-* Argon2 Password Hashing
-* HTTPS / SSL
-* Rate Limiting
-* Input Validation
+* Argon2 password hashing
+* Helmet security headers
+* CORS allow-listing
+* Rate limiting (`express-rate-limit`)
+* Zod request validation
+* HTTP-only refresh cookies
 
-### Infrastructure
+### Tooling & Infrastructure
 
-* Supabase PostgreSQL
-* Redis
-* BullMQ (Background Jobs)
+* Drizzle Kit (migrations, studio, seed)
+* Pino structured logging
 * Docker
-* Nginx
-* GitHub Actions (Planned)
-
-### Storage
-
-* Supabase Storage (Initial)
-* AWS S3 / Cloudflare R2 (Future Support)
 
 ---
 
-## Planned Features
+## Folder Structure
 
-### Borrower Management
+```text
+Aan-Investment/
+├── README.md
+├── .gitignore
+└── backend/
+    ├── .env.example          # Environment variable template (no secrets)
+    ├── .dockerignore
+    ├── DockerFile
+    ├── drizzle.config.ts     # Drizzle Kit configuration
+    ├── package.json
+    ├── tsconfig.json
+    └── src/
+        ├── app.ts            # Express app assembly (middleware + routes)
+        ├── server.ts         # Process entry point, boot & graceful shutdown
+        ├── config/           # Validated, typed environment configuration
+        ├── common/           # Shared errors & crypto helpers
+        ├── middleware/       # cors, rate limit, request logging, validation, errors
+        ├── utils/            # Logger
+        ├── types/            # Express type augmentation
+        ├── auth/             # Authentication module
+        │   ├── constants.ts
+        │   ├── controllers/  # Request handlers
+        │   ├── services/     # Auth business logic
+        │   ├── repositories/ # Data access (users, roles, sessions, resets)
+        │   ├── routes/       # Route definitions
+        │   ├── middleware/    # authenticate (JWT guard)
+        │   ├── validators/    # Zod schemas
+        │   ├── utils/         # password, token, cookie helpers
+        │   └── types/
+        └── db/
+            ├── index.ts      # Postgres client & connection lifecycle
+            ├── schema/       # Drizzle table definitions (per domain)
+            ├── relations.ts
+            ├── migrations/   # Generated SQL migrations
+            └── seed/         # Seed scripts
+```
 
-* Borrower Profiles
-* Promoters
-* Guarantors
-* Internal Ratings
-* Relationship Managers
+---
 
-### Loan Management
+## Setup
 
-* Secured & Unsecured Loans
-* Multiple Loan Tranches
-* Loan Lifecycle Tracking
-* Structured Lending
+### Prerequisites
 
-### Interest Engine
+* [Node.js](https://nodejs.org/) v20+
+* A PostgreSQL database (Supabase recommended)
+* [Docker](https://www.docker.com/) (optional)
 
-* Multiple Interest Calculation Methods
-* Step-Up / Step-Down Interest
-* Event-Based Interest Changes
-* Penal Interest Rules
-* Custom Interest Formula Support
+### Local setup
 
-### Repayment Engine
+```bash
+cd backend
+npm install
+cp .env.example .env   # then fill in real values
+npm run db:migrate     # apply database migrations
+npm run dev            # start with hot reload
+```
 
-* EMI Loans
-* Bullet Repayment
-* Interest-Only Loans
-* Moratorium Periods
-* Custom Repayment Schedules
-* Schedule Versioning
+The server starts on **http://localhost:3000**. A liveness probe is available at `GET /health`.
 
-### Security Management
+---
 
-* Property Details
-* Mortgage Information
-* Insurance Tracking
-* LTV Monitoring
-* CERSAI & ROC Charge Records
+## Environment Variables
 
-### Collections
+Copy `backend/.env.example` to `backend/.env` and provide real values. **Never commit `.env`.**
 
-* Follow-up Tracking
-* Promise-to-Pay Records
-* Automated Reminder Scheduling
+| Variable                   | Required | Description                                                        |
+| -------------------------- | -------- | ------------------------------------------------------------------ |
+| `NODE_ENV`                 | No       | `development` \| `production` \| `test` (default `development`).    |
+| `PORT`                     | No       | HTTP port (default `3000`).                                        |
+| `DATABASE_URL`             | Yes      | Full PostgreSQL connection string (Supabase transaction pooler).   |
+| `SUPABASE_URL`             | No       | Supabase project URL.                                              |
+| `SUPABASE_PUBLISHABLE_KEY` | No       | Supabase publishable (anon) key.                                   |
+| `SUPABASE_SECRET_KEY`      | No       | Supabase secret (service) key.                                     |
+| `SUPABASE_JWKS_URL`        | No       | Supabase JWKS endpoint.                                            |
+| `JWT_ACCESS_SECRET`        | Yes      | HMAC secret signing access tokens (min 32 chars).                  |
+| `JWT_ACCESS_TTL`           | No       | Access-token lifetime (default `15m`).                             |
+| `REFRESH_TOKEN_TTL_DAYS`   | No       | Refresh-token validity in days (default `7`).                      |
+| `CORS_ORIGINS`             | Prod     | Comma-separated allowed origins. Required in production.           |
+| `LOG_LEVEL`                | No       | Pino log level (`debug` \| `info` \| `warn` \| `error`).           |
 
-### Reporting
+---
 
-* Portfolio MIS
-* Loan Statements
-* Interest Accrual Reports
-* Collection Reports
-* NPA Reports
-* Excel & PDF Export
+## Authentication API
 
-### Accounting
+All auth routes are mounted under `/auth`; the current-user route under `/users`.
 
-* Journal Entry Generation
-* Tally-Compatible Export
+| Method | Endpoint                | Auth            | Description                                             |
+| ------ | ----------------------- | --------------- | ------------------------------------------------------ |
+| POST   | `/auth/login`           | Public          | Authenticate with credentials; issues access token + refresh cookie. |
+| POST   | `/auth/refresh`         | Refresh cookie  | Rotate the session and issue a new access token.       |
+| POST   | `/auth/logout`          | Public          | Invalidate the current session (idempotent).           |
+| POST   | `/auth/forgot-password` | Public          | Request a password-reset token for an email.           |
+| POST   | `/auth/reset-password`  | Reset token     | Set a new password using a valid reset token.          |
+| GET    | `/users/me`             | Access token    | Return the authenticated user's profile.               |
+
+**Token model**
+
+* **Access tokens** are short-lived JWTs sent in the `Authorization: Bearer <token>` header.
+* **Refresh tokens** are opaque random strings stored server-side as sessions and delivered to the browser as an HTTP-only cookie; refresh rotates the session.
+* Passwords are hashed with **Argon2**; reset tokens are single-use and time-bound.
+
+---
+
+## Running the Backend
+
+```bash
+# Development (hot reload)
+npm run dev
+
+# Production
+npm start
+
+# Type-check without emitting
+npm run typecheck
+
+# Database
+npm run db:generate   # generate migrations from schema
+npm run db:migrate    # apply migrations
+npm run db:push       # push schema (dev)
+npm run db:studio     # Drizzle Studio
+npm run db:seed       # run seed script
+```
+
+### Docker
+
+```bash
+cd backend
+docker build -t aan-backend .
+docker run -p 3000:3000 --env-file .env aan-backend
+```
 
 ---
 
 ## Project Status
 
-🚧 **Current Stage:** Initial Project Setup
+**Current stage: Authentication infrastructure complete.**
 
-The repository currently contains the foundational architecture and project structure. Core modules and business logic will be implemented incrementally.
-
-Development will follow a modular, feature-based architecture with an emphasis on maintainability, security, and scalability.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v20+
-- [Docker](https://www.docker.com/) (optional, for containerized setup)
-
-### Local Setup
-
-```bash
-cd backend
-npm install
-node index.js
-```
-
-The server will start on **http://localhost:3000**.
-
-> **Note:** Create a `.env` file in the `backend/` directory with the required environment variables (e.g., `DATABASE_URL`).
-
-### Docker Setup
-
-#### Build the image
-
-```bash
-cd backend
-docker build -t aan-backend .
-```
-
-#### Run the container
-
-```bash
-docker run -p 3000:3000 --env-file .env aan-backend
-```
-
-Or pass environment variables directly:
-
-```bash
-docker run -p 3000:3000 -e DATABASE_URL="your_connection_string" aan-backend
-```
-
-#### Interactive shell (debug)
-
-```bash
-docker run -it aan-backend sh
-```
-
----
-
-## Repository Structure
-
-```text
-backend/
-├── src/
-│   ├── config/
-│   ├── db/
-│   ├── common/
-│   ├── modules/
-│   ├── jobs/
-│   ├── routes/
-│   ├── app.ts
-│   └── server.ts
-│
-├── tests/
-├── docs/
-└── scripts/
-```
+* Application bootstrap, configuration, logging, and graceful shutdown — implemented.
+* Database layer, schema, and migrations — implemented.
+* Full authentication module (login, refresh, logout, password reset, RBAC, session management) — implemented.
+* Core lending domain modules (borrowers, loans, interest, repayments, collections, reporting) — planned, built incrementally on this foundation.
 
 ---
 
 ## Development Principles
 
-This project follows several engineering principles:
-
-* Clean Architecture
-* Modular Design
-* Separation of Concerns
-* Type Safety
-* Secure by Default
-* Configurable Business Rules
-* Auditability
-* Production-Ready Code Standards
-
----
-
-## Development Workflow
-
-```text
-main
-│
-├── develop
-│
-├── feature/auth
-├── feature/borrowers
-├── feature/loans
-├── feature/interest-engine
-├── feature/payments
-├── feature/documents
-└── ...
-```
-
-Feature branches are merged into `develop` before being promoted to `main`.
-
----
-
-## Future Enhancements
-
-* Email Notifications
-* WhatsApp Reminders
-* Advanced Analytics Dashboard
-* Rule Engine UI
-* Multi-Tenant Support
-* Cloud Object Storage Migration
-* Monitoring & Observability
+* Clean, modular, feature-based architecture
+* Strict type safety
+* Secure by default
+* Configurable business rules
+* Full auditability
+* Production-ready standards
 
 ---
 
 ## License
 
-This repository contains proprietary software developed for **Aan Finance & Investment Private Limited**.
-
-Unauthorized distribution, reproduction, or commercial use is prohibited.
+Proprietary software developed for **Aan Finance & Investment Private Limited**. Unauthorized distribution, reproduction, or commercial use is prohibited.
