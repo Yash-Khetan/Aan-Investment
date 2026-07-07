@@ -8,7 +8,7 @@ import {
     index,
 } from "drizzle-orm/pg-core";
 
-import { timestamps } from "./shared";
+import { timestamps, reminderChannelEnum, notificationStatusEnum } from "./shared";
 import { users } from "./auth";
 
 /* ============================================================
@@ -37,6 +37,12 @@ export const notifications = pgTable("notifications", {
         length: 50,
     }),
 
+    channel: reminderChannelEnum("channel")
+        .notNull(),
+
+    status: notificationStatusEnum("status")
+        .notNull(),
+
     isRead: boolean("is_read")
         .default(false),
 
@@ -55,5 +61,11 @@ export const notifications = pgTable("notifications", {
 
     notifReadIdx: index("notif_read_idx")
         .on(table.userId, table.isRead),
+
+    notifChannelIdx: index("notif_channel_idx")
+        .on(table.channel),
+
+    notifStatusIdx: index("notif_status_idx")
+        .on(table.status),
 
 }));

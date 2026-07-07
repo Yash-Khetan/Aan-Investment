@@ -195,6 +195,15 @@ export const reminderChannelEnum = pgEnum("reminder_channel", [
 ]);
 
 /* ============================================================
+   NOTIFICATION STATUS
+============================================================ */
+
+export const notificationStatusEnum = pgEnum("notification_status", [
+    "SUCCESS",
+    "FAILED",
+]);
+
+/* ============================================================
    COLLECTION STATUS
 ============================================================ */
 

@@ -7,11 +7,17 @@ import "dotenv/config";
 import { notificationService } from "../index";
 
 async function main() {
-    const result = await notificationService.sendEmail({
-        to: String(process.env.SMTP_TO), // <-- put recipient email here
-        subject: "Test Email",
-        text: "This is a test email from the notifications module.",
-    });
+    const result = await notificationService.sendEmail(
+        {
+            to: String(process.env.SMTP_TO), // <-- put recipient email here
+            subject: "Test Email",
+            text: "This is a test email from the notifications module.",
+        },
+        {
+            userId: String(process.env.TEST_USER_ID),
+            title: "Test Email",
+        }
+    );
 
     console.log(result);
 }
