@@ -275,3 +275,13 @@ export const timestamps = {
         withTimezone: true,
     }),
 };
+
+
+/* ============================================================
+   PENAL INTEREST BASE
+============================================================ */
+
+export const penalInterestBaseEnum = pgEnum("penal_interest_base", [
+    "ENTIRE_OUTSTANDING",
+    "OVERDUE_INSTALLMENT_ONLY",
+]);
