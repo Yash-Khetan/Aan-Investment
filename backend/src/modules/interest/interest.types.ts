@@ -17,3 +17,25 @@ export type InterestBasis =
   | "FIXED_MONTHLY"
   | "FULL_MONTH"
   | "CUSTOM";
+
+  export interface InterestRuleRow {
+  id: string;
+  interestConfigId: string;
+  fromMonth: number | null;
+  toMonth: number | null;
+  rate: string; // numeric comes back as string from drizzle/postgres
+  triggerEvent: string | null;
+}
+
+export interface EffectiveRateInput {
+  baseRate: number;
+  rules: InterestRuleRow[];
+  loanAgeInMonths: number;
+  activeEvents: string[]; // e.g. ["PAYMENT_DELAYED", "LOAN_EXTENDED"]
+}
+
+export interface EffectiveRateResult {
+  rate: number;
+  appliedRuleId: string | null; // null if base rate applied, no rule matched
+  reason: "BASE_RATE" | "TIME_SLAB" | "EVENT_TRIGGERED";
+}
