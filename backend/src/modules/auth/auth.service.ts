@@ -4,13 +4,13 @@ import {
     sessionRepository,
     passwordResetRepository,
     type UserRecord,
-} from "../repositories";
+} from "./auth.repository";
 import {
     passwordUtil,
     signAccessToken,
     generateRefreshToken,
     hashRefreshToken,
-} from "../utils";
+} from "./auth.utils";
 import { randomToken, sha256Hex } from "../../common/crypto";
 import {
     UnauthorizedError,
@@ -22,18 +22,18 @@ import {
     RESET_TOKEN_BYTES,
     RESET_TOKEN_TTL_MINUTES,
     INVALID_CREDENTIALS_MESSAGE,
-} from "../constants";
+} from "./auth.constants";
 import type {
     LoginInput,
     ForgotPasswordInput,
     ResetPasswordInput,
-} from "../validators";
+} from "./auth.validators";
 import type {
     RequestContext,
     PublicUser,
     LoginResult,
     ForgotPasswordResult,
-} from "../types";
+} from "./auth.types";
 
 /** Map a raw DB user row + roles to the safe client projection. */
 function toPublicUser(user: UserRecord, roles: string[]): PublicUser {
@@ -52,11 +52,6 @@ function toPublicUser(user: UserRecord, roles: string[]): PublicUser {
  * Composes repositories (data) + utils (crypto/JWT). Contains NO SQL and NO
  * HTTP. Dependencies are injected (defaulting to the singletons) so this class
  * is unit-testable with mocks.
- *
- * NOTE on atomicity: some methods perform multiple writes (e.g. create session
- * + stamp last-login). Wrapping them in a DB transaction would require touching
- * Drizzle here, which this layer must not do; that orchestration can be added
- * later behind a repository/unit-of-work abstraction.
  */
 export class AuthService {
     constructor(
@@ -68,10 +63,6 @@ export class AuthService {
 
     /**
      * login — authenticate credentials and start a session.
-     * Repos: users.findByEmail, roles.findRoleNamesForUser, sessions.create,
-     *        users.updateLastLoginAt.
-     * Utils: passwordUtil.verify, signAccessToken, generateRefreshToken.
-     * Returns: { user, accessToken, refreshToken(raw) }.
      * Errors: 401 (unknown email or wrong password — same message);
      *         403 (account disabled, only revealed after password verifies).
      */
@@ -104,10 +95,6 @@ export class AuthService {
      * refresh — exchange a valid refresh token for a NEW token pair (rotation).
      * The presented token is invalidated and replaced, so a stolen-and-reused
      * old token cannot yield fresh access.
-     * Repos: sessions.findByTokenHash, sessions.deleteByTokenHash,
-     *        users.findById, roles.findRoleNamesForUser, sessions.create.
-     * Utils: hashRefreshToken, signAccessToken, generateRefreshToken.
-     * Returns: a new { user, accessToken, refreshToken(raw) }.
      * Errors: 401 (unknown/expired token, or user gone/disabled).
      */
     async refresh(rawRefreshToken: string, ctx: RequestContext): Promise<LoginResult> {
@@ -148,8 +135,6 @@ export class AuthService {
     /**
      * logout — end the session tied to the given refresh token. Idempotent:
      * an unknown token is a no-op (still a "successful" logout).
-     * Repos: sessions.deleteByTokenHash. Utils: hashRefreshToken.
-     * Returns: void.
      */
     async logout(rawRefreshToken: string): Promise<void> {
         const tokenHash = hashRefreshToken(rawRefreshToken);
@@ -160,10 +145,7 @@ export class AuthService {
      * forgotPassword — issue a single-use, time-limited reset token.
      * To avoid account enumeration, this reveals nothing: if no active account
      * matches, it returns an empty result and the controller still responds 200.
-     * Repos: users.findByEmail, resets.deleteAllForUser, resets.create.
-     * Utils: randomToken, sha256Hex.
-     * Returns: { resetToken(raw), expiresAt } to be EMAILED (never HTTP-returned),
-     *          or {} when there is no matching account.
+     * Returns: { resetToken(raw), expiresAt } to be EMAILED (never HTTP-returned).
      */
     async forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult> {
         const user = await this.users.findByEmail(input.email);
@@ -186,10 +168,6 @@ export class AuthService {
     /**
      * resetPassword — consume a reset token and set a new password, then kill all
      * existing sessions so every device must re-authenticate.
-     * Repos: resets.findByTokenHash, users.updatePasswordHash, resets.markUsed,
-     *        resets.deleteAllForUser, sessions.deleteAllForUser.
-     * Utils: sha256Hex, passwordUtil.hash.
-     * Returns: void.
      * Errors: 400 (token unknown, already used, or expired).
      */
     async resetPassword(input: ResetPasswordInput): Promise<void> {
@@ -208,8 +186,6 @@ export class AuthService {
     /**
      * getCurrentUser — load the sanitized profile behind an authenticated id.
      * Powers GET /users/me; the id comes from the verified access token.
-     * Repos: users.findById, roles.findRoleNamesForUser.
-     * Returns: PublicUser.
      * Errors: 404 (user not found / soft-deleted since the token was issued).
      */
     async getCurrentUser(userId: string): Promise<PublicUser> {

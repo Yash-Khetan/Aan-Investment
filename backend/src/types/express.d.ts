@@ -6,7 +6,7 @@
  * - `req.user`: the authenticated identity attached by the authenticate
  *   middleware after a valid access token. Undefined on public routes.
  */
-import type { AuthenticatedUser } from "../auth/types";
+import type { AuthenticatedUser } from "../modules/auth/auth.types";
 
 declare global {
     namespace Express {

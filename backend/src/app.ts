@@ -7,7 +7,7 @@ import { requestLogger } from "./middleware/requestLogger";
 import { apiRateLimiter } from "./middleware/rateLimit";
 import { notFound } from "./middleware/notFound";
 import { errorHandler } from "./middleware/errorHandler";
-import { authRouter, userRouter } from "./auth";
+import { authRouter, userRouter } from "./modules/auth";
 
 /**
  * Builds and returns the Express application.

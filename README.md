@@ -79,16 +79,18 @@ Aan-Investment/
         ├── middleware/       # cors, rate limit, request logging, validation, errors
         ├── utils/            # Logger
         ├── types/            # Express type augmentation
-        ├── auth/             # Authentication module
-        │   ├── constants.ts
-        │   ├── controllers/  # Request handlers
-        │   ├── services/     # Auth business logic
-        │   ├── repositories/ # Data access (users, roles, sessions, resets)
-        │   ├── routes/       # Route definitions
-        │   ├── middleware/    # authenticate (JWT guard)
-        │   ├── validators/    # Zod schemas
-        │   ├── utils/         # password, token, cookie helpers
-        │   └── types/
+        ├── modules/          # Feature modules (one folder per domain)
+        │   └── auth/         # Authentication module — the template for future modules
+        │       ├── auth.constants.ts
+        │       ├── auth.types.ts        # Shared DTOs / contracts
+        │       ├── auth.validators.ts   # Zod schemas + inferred input types
+        │       ├── auth.repository.ts   # Data access (users, roles, sessions, resets)
+        │       ├── auth.service.ts      # Business logic (use-case layer)
+        │       ├── auth.controller.ts   # HTTP request handlers
+        │       ├── auth.middleware.ts   # authenticate (JWT guard)
+        │       ├── auth.utils.ts        # password, token, cookie helpers
+        │       ├── auth.routes.ts       # Route definitions
+        │       └── index.ts             # Public surface (routers + authenticate)
         └── db/
             ├── index.ts      # Postgres client & connection lifecycle
             ├── schema/       # Drizzle table definitions (per domain)

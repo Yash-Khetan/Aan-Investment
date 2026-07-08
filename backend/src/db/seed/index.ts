@@ -15,11 +15,7 @@ import { logger } from "../../utils/logger";
 
 /** The canonical system roles. Mirrors the `user_role` enum in schema/shared.ts. */
 const SYSTEM_ROLES: { name: string; description: string }[] = [
-    { name: "SUPER_ADMIN", description: "Full, unrestricted system access." },
-    { name: "ADMIN", description: "Administrative access across the platform." },
     { name: "MANAGER", description: "Manages teams, approvals and oversight." },
-    { name: "RELATIONSHIP_MANAGER", description: "Owns borrower relationships and loans." },
-    { name: "OPERATIONS", description: "Day-to-day loan operations and processing." },
     { name: "VIEWER", description: "Read-only access." },
 ];
 

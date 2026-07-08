@@ -1,15 +1,15 @@
 /**
- * types/ — shared TypeScript contracts for auth (no runtime code).
+ * Shared TypeScript contracts for auth (no runtime code).
  *
- * These DTOs cross layer boundaries: utils produce them, services pass them,
- * controllers/middleware consume them.
+ * These DTOs cross layer boundaries: utils produce them, the service passes
+ * them, controllers/middleware consume them.
  */
 
 /** Claims embedded inside an access-token JWT. */
 export interface AccessTokenPayload {
     /** Subject — the user's id. */
     sub: string;
-    /** Role names, embedded so RBAC (Phase 5) needs no DB lookup on the hot path. */
+    /** Role names, embedded so RBAC needs no DB lookup on the hot path. */
     roles: string[];
 }
 
@@ -21,7 +21,7 @@ export interface DecodedAccessToken extends AccessTokenPayload {
     exp: number;
 }
 
-/** Identity the authenticate middleware will attach to req.user (later step). */
+/** Identity the authenticate middleware attaches to req.user. */
 export interface AuthenticatedUser {
     id: string;
     roles: string[];
@@ -35,12 +35,6 @@ export interface GeneratedRefreshToken {
     tokenHash: string;
     /** Absolute expiry — stored in userSessions.expiresAt. */
     expiresAt: Date;
-}
-
-/** The token pair returned by login / refresh (later steps). */
-export interface TokenPair {
-    accessToken: string;
-    refreshToken: string;
 }
 
 /** Per-request context captured onto a session (audit/security trail). */
@@ -67,8 +61,8 @@ export interface LoginResult {
 
 /**
  * Result of forgotPassword: the RAW reset token to be EMAILED to the user.
- * The controller must email it — it must NEVER be returned in the HTTP response.
- * Undefined when no matching active account exists (caller still responds 200).
+ * It must NEVER be returned in the HTTP response. Undefined when no matching
+ * active account exists (caller still responds 200).
  */
 export interface ForgotPasswordResult {
     resetToken?: string;

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 /**
  * Generic cryptographic helpers shared by authentication.
@@ -20,12 +20,4 @@ export function randomToken(bytes: number): string {
  */
 export function sha256Hex(input: string): string {
     return createHash("sha256").update(input).digest("hex");
-}
-
-/** Constant-time comparison of two hex digests — avoids timing side-channels. */
-export function timingSafeEqualHex(a: string, b: string): boolean {
-    const bufA = Buffer.from(a, "hex");
-    const bufB = Buffer.from(b, "hex");
-    if (bufA.length !== bufB.length) return false;
-    return timingSafeEqual(bufA, bufB);
 }

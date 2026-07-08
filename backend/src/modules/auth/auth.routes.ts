@@ -1,21 +1,19 @@
 import { Router } from "express";
 import { validate } from "../../middleware/validate";
-import { authenticate } from "../middleware";
+import { authenticate } from "./auth.middleware";
 import {
     loginSchema,
     refreshSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
-} from "../validators";
-import * as controller from "../controllers";
+} from "./auth.validators";
+import * as controller from "./auth.controller";
 
 /**
- * authRouter — mounted at /auth. Middleware per route and WHY:
- *
+ * authRouter — mounted at /auth.
  *  POST /login            validate(loginSchema)          → reject bad shape (422)
- *                         (public: you can't be logged in yet)
  *  POST /refresh          validate(refreshSchema)        → optional body token;
- *                         (public: authenticated by the refresh COOKIE, not JWT)
+ *                         authenticated by the refresh COOKIE, not a JWT
  *  POST /logout           (none)                         → uses the cookie; safe
  *                         to call unauthenticated, idempotent
  *  POST /forgot-password  validate(forgotPasswordSchema) → valid email shape
@@ -39,9 +37,7 @@ authRouter.post(
 
 /**
  * userRouter — mounted at /users.
- *
  *  GET /me   authenticate → PROTECTED: requires a valid access-token JWT.
- *            authenticate sets req.user, which the controller reads.
  */
 export const userRouter = Router();
 

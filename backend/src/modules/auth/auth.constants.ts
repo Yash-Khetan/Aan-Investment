@@ -23,7 +23,7 @@ export const ARGON2_OPTIONS: Options = {
 /** Entropy for opaque refresh tokens. 48 bytes = 384 bits. */
 export const REFRESH_TOKEN_BYTES = 48;
 
-/** Name of the httpOnly cookie that will carry the refresh token (later step). */
+/** Name of the httpOnly cookie that carries the refresh token. */
 export const REFRESH_COOKIE_NAME = "lms_refresh_token";
 
 /** Entropy (bytes) for opaque password-reset tokens. 32 bytes = 256 bits. */

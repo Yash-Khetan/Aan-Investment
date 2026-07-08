@@ -2,8 +2,8 @@ import { z } from "zod";
 
 /**
  * Zod schemas for auth inputs. Consumed by the generic validate() middleware at
- * the route edge (later step). Each schema also exports its inferred TS type so
- * services/controllers share one source of truth.
+ * the route edge. Each schema also exports its inferred TS type so the service
+ * and controllers share one source of truth.
  */
 
 /**

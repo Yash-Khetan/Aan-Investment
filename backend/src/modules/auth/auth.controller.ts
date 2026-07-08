@@ -1,10 +1,10 @@
 import type { Request, RequestHandler } from "express";
-import { authService } from "../services";
+import { authService } from "./auth.service";
 import {
     setRefreshCookie,
     clearRefreshCookie,
     readRefreshCookie,
-} from "../utils/cookie";
+} from "./auth.utils";
 import { config } from "../../config";
 import { UnauthorizedError } from "../../common/errors";
 import type {
@@ -12,8 +12,8 @@ import type {
     RefreshInput,
     ForgotPasswordInput,
     ResetPasswordInput,
-} from "../validators";
-import type { RequestContext } from "../types";
+} from "./auth.validators";
+import type { RequestContext } from "./auth.types";
 
 /**
  * Auth controllers — thin HTTP adapters. Each: read validated input / cookie /
