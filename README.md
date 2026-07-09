@@ -72,8 +72,6 @@ Aan-Investment/
     ├── drizzle.config.ts     # Drizzle Kit configuration
     ├── package.json
     ├── tsconfig.json
-    ├── docs/                 # Deep-dive implementation notes for maintainers
-    │   └── forgot-password.md
     └── src/
         ├── app.ts            # Express app assembly (middleware + routes)
         ├── server.ts         # Process entry point, boot & graceful shutdown
