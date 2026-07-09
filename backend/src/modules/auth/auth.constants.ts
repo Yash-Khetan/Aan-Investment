@@ -35,3 +35,13 @@ export const RESET_TOKEN_TTL_MINUTES = 30;
 /** Generic credential error message — identical for unknown email OR bad
  *  password, so attackers can't enumerate which accounts exist. */
 export const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+
+/**
+ * Role granted to every self-registered account. Resolved to an id at runtime
+ * through the role repository (never hardcoded), and seeded by db/seed.
+ * VIEWER is the least-privileged system role: read-only.
+ */
+export const DEFAULT_ROLE_NAME = "VIEWER";
+
+/** 409 message for a registration against an email that already exists. */
+export const EMAIL_ALREADY_EXISTS_MESSAGE = "Email already exists";

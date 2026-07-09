@@ -8,6 +8,7 @@ import { apiRateLimiter } from "./middleware/rateLimit";
 import { notFound } from "./middleware/notFound";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRouter, userRouter } from "./modules/auth";
+import { devResetPasswordRouter } from "./dev/resetPasswordPage";
 
 /**
  * Builds and returns the Express application.
@@ -65,6 +66,13 @@ export function createApp(): Application {
     // Feature routes.
     app.use("/auth", authRouter); //  /auth/login, /logout, /refresh, /forgot-password, /reset-password
     app.use("/users", userRouter); //  /users/me (protected)
+
+    // TEMPORARY: renders the page the forgot-password email links to, until a
+    // real front-end owns it. Never mounted in production — there the reset URL
+    // must point at the front-end, not at this API.
+    if (!config.isProduction) {
+        app.use(devResetPasswordRouter); //  GET /reset-password, GET /reset-password.js
+    }
 
     // Must come after all routes.
     app.use(notFound);

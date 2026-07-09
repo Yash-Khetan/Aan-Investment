@@ -5,7 +5,12 @@
  */
 
 export { notificationService } from "./services/notification.service";
-export type { NotificationRecordMeta } from "./services/notification.service";
+
+export type {
+    NotificationChannel,
+    NotificationRecordMeta,
+    NotificationStatus,
+} from "./types/notification.types";
 
 export type { EmailOptions, EmailAttachment, EmailResult } from "./types/email.types";
 export type { SMSResult } from "./types/sms.types";

@@ -27,6 +27,4 @@ export interface EmailResult {
     accepted: string[];
     /** Recipient addresses the mail server rejected. */
     rejected: string[];
-    /** Raw SMTP response line from the mail server. */
-    response: string;
 }

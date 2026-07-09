@@ -1,13 +1,9 @@
 import twilio from "twilio";
 import type { Twilio } from "twilio";
+import { config } from "../../../config";
 import { ProviderConfigError } from "./errors";
 
-/**
- * Lazily-initialized, shared Twilio REST client used by both the SMS
- * and WhatsApp services. Reading `process.env` at call time (rather
- * than at module load) ensures this works regardless of when `dotenv`
- * is configured relative to this module being imported.
- */
+/** Lazily-initialized, shared Twilio REST client used by both the SMS and WhatsApp services. */
 let client: Twilio | null = null;
 
 export function getTwilioClient(): Twilio {
@@ -15,14 +11,14 @@ export function getTwilioClient(): Twilio {
         return client;
     }
 
-    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+    const { accountSid, authToken } = config.notifications.twilio;
 
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+    if (!accountSid || !authToken) {
         throw new ProviderConfigError(
-            "Twilio is not configured. Missing one or more required environment variables: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN."
+            "Twilio is not configured. Missing one or more required environment variables: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN.",
         );
     }
 
-    client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    client = twilio(accountSid, authToken);
     return client;
 }

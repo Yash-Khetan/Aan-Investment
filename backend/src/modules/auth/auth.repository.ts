@@ -6,6 +6,8 @@ import {
     userRoles,
     userSessions,
     passwordResetTokens,
+    permissions,
+    rolePermissions,
 } from "../../db/schema";
 
 /**
@@ -16,8 +18,24 @@ import {
  * tests can pass a mock. No business logic lives here — just queries.
  */
 
+/** The Drizzle transaction handle handed to the `db.transaction()` callback. */
+type Transaction = Parameters<Parameters<(typeof defaultDb)["transaction"]>[0]>[0];
+
 /** The database executor: the singleton `db` or a transaction handle. */
-type DB = typeof defaultDb;
+type DB = typeof defaultDb | Transaction;
+
+/**
+ * True when `err` is a Postgres unique-constraint violation (SQLSTATE 23505).
+ * Lets the service turn a lost insert race into a clean 409 instead of a 500 —
+ * the DB's unique index, not our pre-check, is the real authority.
+ */
+export function isUniqueViolation(err: unknown): boolean {
+    return (
+        typeof err === "object" &&
+        err !== null &&
+        (err as { code?: unknown }).code === "23505"
+    );
+}
 
 /* ------------------------------------------------------------------ *
  * Users
@@ -26,8 +44,31 @@ type DB = typeof defaultDb;
 /** A row of the `users` table, inferred from the Drizzle schema. */
 export type UserRecord = typeof users.$inferSelect;
 
+/** Input for creating a user. `passwordHash` is an argon2id PHC string. */
+export interface CreateUserInput {
+    firstName: string;
+    lastName: string;
+    email: string;
+    passwordHash: string;
+}
+
 export class UserRepository {
     constructor(private readonly db: DB = defaultDb) {}
+
+    /** Rebind this repository to a transaction handle (or another executor). */
+    withDb(db: DB): UserRepository {
+        return new UserRepository(db);
+    }
+
+    /**
+     * Insert a new user. Throws a unique violation (23505) if the email is
+     * already taken — including by a soft-deleted account, since `user_email_idx`
+     * spans every row. Callers translate that with `isUniqueViolation`.
+     */
+    async create(input: CreateUserInput): Promise<UserRecord> {
+        const [row] = await this.db.insert(users).values(input).returning();
+        return row;
+    }
 
     /** Find a non-deleted user by email (exact match, as stored). */
     async findByEmail(email: string): Promise<UserRecord | undefined> {
@@ -47,6 +88,14 @@ export class UserRepository {
             .where(and(eq(users.id, id), isNull(users.deletedAt)))
             .limit(1);
         return row;
+    }
+
+    /** List all non-deleted users (admin capability; guarded by RBAC). */
+    async listAll(): Promise<UserRecord[]> {
+        return this.db
+            .select()
+            .from(users)
+            .where(isNull(users.deletedAt));
     }
 
     /** Stamp the last successful login time. */
@@ -78,6 +127,32 @@ export type RoleRecord = typeof roles.$inferSelect;
 export class RoleRepository {
     constructor(private readonly db: DB = defaultDb) {}
 
+    /** Rebind this repository to a transaction handle (or another executor). */
+    withDb(db: DB): RoleRepository {
+        return new RoleRepository(db);
+    }
+
+    /**
+     * Look a role up by its unique name. Used to resolve the default role at
+     * registration time so no role id is ever hardcoded in the codebase.
+     */
+    async findByName(name: string): Promise<RoleRecord | undefined> {
+        const [row] = await this.db
+            .select()
+            .from(roles)
+            .where(and(eq(roles.name, name), eq(roles.isActive, true)))
+            .limit(1);
+        return row;
+    }
+
+    /** Grant a role to a user. Idempotent: a re-grant is a no-op. */
+    async assignRoleToUser(userId: string, roleId: string): Promise<void> {
+        await this.db
+            .insert(userRoles)
+            .values({ userId, roleId })
+            .onConflictDoNothing({ target: [userRoles.userId, userRoles.roleId] });
+    }
+
     /**
      * Return the ACTIVE role names assigned to a user. Called on login/refresh
      * to embed roles in the access token — the seam RBAC depends on.
@@ -93,6 +168,38 @@ export class RoleRepository {
 }
 
 export const roleRepository = new RoleRepository();
+
+/* ------------------------------------------------------------------ *
+ * Permissions (RBAC)
+ *
+ * Resolves the effective permission set for a user by walking
+ *   user_roles → roles (active only) → role_permissions → permissions.
+ * This is the data seam the authorization layer reads. No business logic.
+ * ------------------------------------------------------------------ */
+
+/** A row of the `permissions` table. */
+export type PermissionRecord = typeof permissions.$inferSelect;
+
+export class PermissionRepository {
+    constructor(private readonly db: DB = defaultDb) {}
+
+    /**
+     * Return the DISTINCT permission names granted to a user through all of
+     * their ACTIVE roles. Empty array if the user has no roles/permissions.
+     */
+    async findPermissionNamesForUser(userId: string): Promise<string[]> {
+        const rows = await this.db
+            .selectDistinct({ name: permissions.name })
+            .from(userRoles)
+            .innerJoin(roles, eq(userRoles.roleId, roles.id))
+            .innerJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+            .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+            .where(and(eq(userRoles.userId, userId), eq(roles.isActive, true)));
+        return rows.map((r) => r.name);
+    }
+}
+
+export const permissionRepository = new PermissionRepository();
 
 /* ------------------------------------------------------------------ *
  * Sessions (refresh-token store)

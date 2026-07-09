@@ -1,7 +1,8 @@
+import { config } from "../../../config";
+import { logger } from "../../../utils/logger";
 import type { SMSResult } from "../types/sms.types";
 import { ProviderConfigError, SMSDeliveryError } from "../utils/errors";
 import { assertValidPhoneNumber, assertNonEmptyMessage } from "../utils/validators";
-import { notificationLogger } from "../utils/logger";
 import { getTwilioClient } from "../utils/twilioClient";
 
 /**
@@ -16,42 +17,37 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<SMS
     assertValidPhoneNumber(phoneNumber);
     assertNonEmptyMessage(message, "SMS");
 
-    const from = process.env.TWILIO_PHONE_NUMBER;
+    const from = config.notifications.twilio.smsFrom;
     if (!from) {
         throw new ProviderConfigError(
-            "SMS service is not configured. Missing required environment variable: TWILIO_PHONE_NUMBER."
+            "SMS service is not configured. Missing required environment variable: TWILIO_PHONE_NUMBER.",
         );
     }
 
     try {
         const client = getTwilioClient();
 
-        const result = await client.messages.create({
-            to: phoneNumber,
-            from,
-            body: message,
-        });
+        const result = await client.messages.create({ to: phoneNumber, from, body: message });
 
-        notificationLogger.success("SMS", phoneNumber);
+        logger.info("Notification dispatched", {
+            channel: "SMS",
+            status: "SUCCESS",
+            sid: result.sid,
+            providerStatus: result.status,
+        });
 
         return {
             success: result.status !== "failed" && result.status !== "undelivered",
             sid: result.sid,
             status: result.status,
-            to: result.to,
-            from: result.from ?? from,
-            providerResponse: result.toJSON() as Record<string, unknown>,
         };
     } catch (error) {
-        notificationLogger.failure("SMS", phoneNumber, error);
-
         if (error instanceof ProviderConfigError) {
             throw error;
         }
 
-        throw new SMSDeliveryError(
-            `Failed to send SMS to "${phoneNumber}": ${error instanceof Error ? error.message : "Unknown error"}`,
-            error
-        );
+        logger.error("Notification failed", { channel: "SMS", status: "FAILED", err: error });
+
+        throw new SMSDeliveryError("Failed to send SMS.", error);
     }
 }

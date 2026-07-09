@@ -22,6 +22,12 @@ function optional(name: string, fallback: string): string {
     return value === undefined || value === "" ? fallback : value;
 }
 
+/** Read an optional var with no default; `null` when unset or empty. */
+function nullable(name: string): string | null {
+    const value = process.env[name];
+    return value === undefined || value === "" ? null : value;
+}
+
 /** Parse a string env var into a strict integer, or throw a clear error. */
 function toInt(name: string, raw: string): number {
     const n = Number(raw);
@@ -56,6 +62,15 @@ if (!VALID_ENVS.includes(nodeEnvRaw as NodeEnv)) {
     );
 }
 const nodeEnv = nodeEnvRaw as NodeEnv;
+
+/**
+ * SMTP/Twilio credentials are OPTIONAL at boot: a deployment that never sends
+ * notifications must still start. The notifications module checks these at send
+ * time and throws ProviderConfigError if the channel it needs is unconfigured.
+ */
+const smtpPortRaw = nullable("SMTP_PORT");
+const smtpPort = smtpPortRaw === null ? null : toInt("SMTP_PORT", smtpPortRaw);
+const smtpSecureRaw = nullable("SMTP_SECURE");
 
 export const config = {
     env: nodeEnv,
@@ -111,6 +126,35 @@ export const config = {
              * the userSessions.expiresAt timestamp.
              */
             ttlDays: toInt("REFRESH_TOKEN_TTL_DAYS", optional("REFRESH_TOKEN_TTL_DAYS", "7")),
+        },
+    },
+
+    /**
+     * Notification providers. Every value is nullable — the notifications module
+     * validates the subset it needs at send time, per channel. Nothing here is
+     * ever logged or returned to a client.
+     */
+    notifications: {
+        email: {
+            host: nullable("SMTP_HOST"),
+            port: smtpPort,
+            /**
+             * Implicit TLS. Port 465 is TLS-on-connect; 587 uses STARTTLS and
+             * must be `false`. Explicit SMTP_SECURE wins over the port default.
+             */
+            secure: smtpSecureRaw === null ? smtpPort === 465 : smtpSecureRaw === "true",
+            user: nullable("SMTP_USER"),
+            pass: nullable("SMTP_PASS"),
+            /** Envelope + header From address. */
+            from: nullable("SMTP_FROM"),
+        },
+        twilio: {
+            accountSid: nullable("TWILIO_ACCOUNT_SID"),
+            authToken: nullable("TWILIO_AUTH_TOKEN"),
+            /** E.164 sender for SMS. */
+            smsFrom: nullable("TWILIO_PHONE_NUMBER"),
+            /** E.164 sender for WhatsApp (the "whatsapp:" prefix is added for you). */
+            whatsappFrom: nullable("TWILIO_WHATSAPP_NUMBER"),
         },
     },
 

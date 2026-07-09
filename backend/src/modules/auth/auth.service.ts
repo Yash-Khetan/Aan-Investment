@@ -3,8 +3,10 @@ import {
     roleRepository,
     sessionRepository,
     passwordResetRepository,
+    isUniqueViolation,
     type UserRecord,
 } from "./auth.repository";
+import { db as defaultDb } from "../../db";
 import {
     passwordUtil,
     signAccessToken,
@@ -12,6 +14,7 @@ import {
     hashRefreshToken,
 } from "./auth.utils";
 import { randomToken, sha256Hex } from "../../common/crypto";
+import { escapeHtml } from "../../common/html";
 import { notificationService } from "../notifications";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
@@ -20,13 +23,17 @@ import {
     ForbiddenError,
     BadRequestError,
     NotFoundError,
+    ConflictError,
 } from "../../common/errors";
 import {
     RESET_TOKEN_BYTES,
     RESET_TOKEN_TTL_MINUTES,
     INVALID_CREDENTIALS_MESSAGE,
+    DEFAULT_ROLE_NAME,
+    EMAIL_ALREADY_EXISTS_MESSAGE,
 } from "./auth.constants";
 import type {
+    RegisterInput,
     LoginInput,
     ForgotPasswordInput,
     ResetPasswordInput,
@@ -34,8 +41,8 @@ import type {
 import type {
     RequestContext,
     PublicUser,
+    RegisteredUser,
     LoginResult,
-    ForgotPasswordResult,
 } from "./auth.types";
 
 /** Map a raw DB user row + roles to the safe client projection. */
@@ -62,7 +69,59 @@ export class AuthService {
         private readonly roles = roleRepository,
         private readonly sessions = sessionRepository,
         private readonly resets = passwordResetRepository,
+        /** Only used to open the registration transaction; all SQL stays in repos. */
+        private readonly db = defaultDb,
     ) {}
+
+    /**
+     * register — create an account and grant it the default role. Atomic: the
+     * user row and its role grant commit together, so a failure can never leave
+     * a permission-less orphan account behind.
+     *
+     * Registration does NOT log the user in — no tokens, no session, no cookie.
+     * The client follows up with POST /auth/login.
+     *
+     * Errors: 409 (email already registered).
+     */
+    async register(input: RegisterInput): Promise<RegisteredUser> {
+        // Fast path: answer the common duplicate case without paying for a hash.
+        // Not authoritative on its own — the unique index below closes the race.
+        const existing = await this.users.findByEmail(input.email);
+        if (existing) throw new ConflictError(EMAIL_ALREADY_EXISTS_MESSAGE);
+
+        // Resolved by NAME, so no role id is ever baked into the code. A missing
+        // role means the database was never seeded: a 500 (bug), not a 4xx.
+        const role = await this.roles.findByName(DEFAULT_ROLE_NAME);
+        if (!role) {
+            throw new Error(
+                `Default role "${DEFAULT_ROLE_NAME}" is missing. Run the database seed.`,
+            );
+        }
+
+        const passwordHash = await passwordUtil.hash(input.password);
+
+        try {
+            const user = await this.db.transaction(async (tx) => {
+                const created = await this.users.withDb(tx).create({
+                    firstName: input.firstName,
+                    lastName: input.lastName,
+                    email: input.email,
+                    passwordHash,
+                });
+                await this.roles.withDb(tx).assignRoleToUser(created.id, role.id);
+                return created;
+            });
+
+            return { id: user.id, email: user.email, roles: [role.name] };
+        } catch (error) {
+            // Two requests for the same email raced past the pre-check, or the
+            // email belongs to a soft-deleted account. Either way: 409, not 500.
+            if (isUniqueViolation(error)) {
+                throw new ConflictError(EMAIL_ALREADY_EXISTS_MESSAGE);
+            }
+            throw error;
+        }
+    }
 
     /**
      * login — authenticate credentials and start a session.
@@ -145,14 +204,14 @@ export class AuthService {
     }
 
     /**
-     * forgotPassword — issue a single-use, time-limited reset token.
+     * forgotPassword — issue a single-use, time-limited reset token and email it.
      * To avoid account enumeration, this reveals nothing: if no active account
-     * matches, it returns an empty result and the controller still responds 200.
-     * Returns: { resetToken(raw), expiresAt } to be EMAILED (never HTTP-returned).
+     * matches it is a silent no-op, and the controller still responds 200.
+     * The raw token leaves this process ONLY inside the email body.
      */
-    async forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult> {
+    async forgotPassword(input: ForgotPasswordInput): Promise<void> {
         const user = await this.users.findByEmail(input.email);
-        if (!user || !user.isActive) return {};
+        if (!user || !user.isActive) return;
 
         // Invalidate any previous reset tokens for this user.
         await this.resets.deleteAllForUser(user.id);
@@ -169,17 +228,16 @@ export class AuthService {
         // Non-blocking: a delivery failure (e.g. SMTP not configured) must not
         // break the enumeration-safe flow, so we log and still succeed.
         await this.sendResetEmail(user, rawToken);
-
-        return { resetToken: rawToken, expiresAt };
     }
 
     /** Build and dispatch the password-reset email through the notifications module. */
-    private async sendResetEmail(
-        user: UserRecord,
-        rawToken: string,
-    ): Promise<void> {
+    private async sendResetEmail(user: UserRecord, rawToken: string): Promise<void> {
         const resetLink = `${config.app.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
         const ttlMinutes = RESET_TOKEN_TTL_MINUTES;
+
+        // firstName is user-controlled and reaches an HTML document. Escaping it
+        // here keeps `<a href=…>` in the body ours, not the account holder's.
+        const safeName = escapeHtml(user.firstName);
 
         try {
             await notificationService.sendEmail(
@@ -193,13 +251,21 @@ export class AuthService {
                         `${resetLink}\n\n` +
                         `If you didn't request this, you can safely ignore this email.`,
                     html:
-                        `<p>Hi ${user.firstName},</p>` +
+                        `<p>Hi ${safeName},</p>` +
                         `<p>We received a request to reset your password. Use the link below to choose a new one. ` +
                         `This link expires in ${ttlMinutes} minutes.</p>` +
                         `<p><a href="${resetLink}">Reset your password</a></p>` +
                         `<p>If you didn't request this, you can safely ignore this email.</p>`,
                 },
-                { userId: user.id, title: "Password reset requested", link: resetLink },
+                // `message` and `link` are what get PERSISTED. Both are deliberately
+                // tokenless: the single-use raw token lives only in the email body
+                // above, never in the notifications table.
+                {
+                    userId: user.id,
+                    title: "Password reset requested",
+                    message: `A password reset link was emailed to you. It expires in ${ttlMinutes} minutes.`,
+                    link: config.app.passwordResetUrl,
+                },
             );
         } catch (error) {
             logger.error("Failed to send password-reset email", { err: error, userId: user.id });
@@ -222,6 +288,19 @@ export class AuthService {
         await this.resets.markUsed(record.id);
         await this.resets.deleteAllForUser(record.userId);
         await this.sessions.deleteAllForUser(record.userId);
+    }
+
+    /**
+     * listUsers — sanitized list of all users. Backs the RBAC-protected
+     * GET /users route (requires the "user:read" permission).
+     */
+    async listUsers(): Promise<PublicUser[]> {
+        const rows = await this.users.listAll();
+        return Promise.all(
+            rows.map(async (u) =>
+                toPublicUser(u, await this.roles.findRoleNamesForUser(u.id)),
+            ),
+        );
     }
 
     /**

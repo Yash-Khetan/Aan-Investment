@@ -15,8 +15,48 @@ import { z } from "zod";
  */
 const email = z.preprocess(
     (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
-    z.email("Invalid email address"),
+    z.email("Invalid email address").max(255, "Email must be at most 255 characters"),
 );
+
+/**
+ * A person's name: trimmed, non-empty, and within the column width (150).
+ * `label` is interpolated into the messages so both name fields read naturally.
+ */
+const personName = (label: string) =>
+    z.preprocess(
+        (v) => (typeof v === "string" ? v.trim() : v),
+        z
+            .string()
+            .min(1, `${label} is required`)
+            .max(150, `${label} must be at most 150 characters`),
+    );
+
+/**
+ * Rules for a password we are about to STORE (register / reset). Shared so the
+ * policy has exactly one definition:
+ *   min 8   → basic brute-force resistance;
+ *   max 128 → guard against DoS via absurdly long argon2 inputs;
+ *   ≥1 letter and ≥1 number → minimum composition, rejects trivial secrets.
+ */
+const strongPassword = z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password must be at most 128 characters")
+    .regex(/[A-Za-z]/, "Password must contain at least one letter")
+    .regex(/[0-9]/, "Password must contain at least one number");
+
+/**
+ * REGISTER — create a new account. Names are trimmed, the email is normalized
+ * exactly as it is on login (so the two agree on identity), and the password
+ * must satisfy the storage policy above.
+ */
+export const registerSchema = z.object({
+    firstName: personName("First name"),
+    lastName: personName("Last name"),
+    email,
+    password: strongPassword,
+});
+export type RegisterInput = z.infer<typeof registerSchema>;
 
 /**
  * LOGIN — email + a non-empty password.
@@ -46,18 +86,11 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 /**
  * RESET PASSWORD — the opaque reset token plus the new password.
  *  - token: required, non-empty (identifies the reset request).
- *  - newPassword rules (enforced here because this SETS a new credential):
- *      min 8   → basic brute-force resistance;
- *      max 128 → guard against DoS via absurdly long argon2 inputs;
- *      ≥1 letter and ≥1 number → minimum composition, rejects trivial secrets.
+ *  - newPassword: the shared storage policy (see `strongPassword`), enforced
+ *    here because this SETS a new credential.
  */
 export const resetPasswordSchema = z.object({
     token: z.string().min(1, "Reset token is required"),
-    newPassword: z
-        .string()
-        .min(8, "Password must be at least 8 characters")
-        .max(128, "Password must be at most 128 characters")
-        .regex(/[A-Za-z]/, "Password must contain at least one letter")
-        .regex(/[0-9]/, "Password must contain at least one number"),
+    newPassword: strongPassword,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

@@ -1,12 +1,11 @@
 import { db } from "../../../db";
 import { notifications } from "../../../db/schema";
-import type { NotificationChannel } from "../utils/logger";
-
-export type NotificationStatus = "SUCCESS" | "FAILED";
+import type { NotificationChannel, NotificationStatus } from "../types/notification.types";
 
 export interface SaveNotificationInput {
     userId: string;
     title: string;
+    /** Summary safe to store at rest — never the rendered body. */
     message?: string;
     channel: NotificationChannel;
     status: NotificationStatus;

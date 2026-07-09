@@ -7,6 +7,7 @@ import {
 } from "./auth.utils";
 import { UnauthorizedError } from "../../common/errors";
 import type {
+    RegisterInput,
     LoginInput,
     RefreshInput,
     ForgotPasswordInput,
@@ -25,6 +26,14 @@ import type { RequestContext } from "./auth.types";
 function requestContext(req: Request): RequestContext {
     return { ipAddress: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
+
+export const register: RequestHandler = async (req, res) => {
+    const input = req.valid.body as RegisterInput;
+    const user = await authService.register(input);
+    // 201 + the new resource. No cookie and no access token: registration and
+    // login are separate steps, so the client must authenticate explicitly.
+    res.status(201).json({ success: true, data: user });
+};
 
 export const login: RequestHandler = async (req, res) => {
     const input = req.valid.body as LoginInput;
@@ -79,6 +88,11 @@ export const resetPassword: RequestHandler = async (req, res) => {
         success: true,
         data: { message: "Password has been reset. Please log in again." },
     });
+};
+
+export const listUsers: RequestHandler = async (_req, res) => {
+    const users = await authService.listUsers();
+    res.status(200).json({ success: true, data: { users } });
 };
 
 export const getCurrentUser: RequestHandler = async (req, res) => {

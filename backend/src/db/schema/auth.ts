@@ -49,6 +49,71 @@ export const roles = pgTable("roles", {
 }));
 
 /* ============================================================
+   PERMISSIONS
+============================================================ */
+
+export const permissions = pgTable("permissions", {
+
+    id: uuid("id")
+        .defaultRandom()
+        .primaryKey(),
+
+    /** Machine-readable permission key, e.g. "user:read", "loan:create". */
+    name: varchar("name", {
+        length: 150,
+    }).notNull(),
+
+    description: text("description"),
+
+    createdAt: timestamp("created_at", {
+        withTimezone: true,
+    }).defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+        withTimezone: true,
+    }).defaultNow()
+
+}, (table) => ({
+
+    permissionNameIdx: uniqueIndex("permission_name_idx")
+        .on(table.name)
+
+}));
+
+/* ============================================================
+   ROLE PERMISSIONS  (roles ⇄ permissions join)
+============================================================ */
+
+export const rolePermissions = pgTable("role_permissions", {
+
+    id: uuid("id")
+        .defaultRandom()
+        .primaryKey(),
+
+    roleId: uuid("role_id")
+        .references(() => roles.id, {
+            onDelete: "cascade"
+        })
+        .notNull(),
+
+    permissionId: uuid("permission_id")
+        .references(() => permissions.id, {
+            onDelete: "cascade"
+        })
+        .notNull(),
+
+    assignedAt: timestamp("assigned_at", {
+        withTimezone: true,
+    }).defaultNow(),
+
+}, (table) => ({
+
+    rolePermissionIdx: uniqueIndex("role_permission_idx")
+        .on(table.roleId, table.permissionId)
+
+}));
+
+/* ============================================================
    USERS
 ============================================================ */
 

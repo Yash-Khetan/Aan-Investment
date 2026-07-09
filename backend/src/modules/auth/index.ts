@@ -7,3 +7,5 @@
  */
 export { authRouter, userRouter } from "./auth.routes";
 export { authenticate } from "./auth.middleware";
+export { authorize, authorizeAny } from "./authorize.middleware";
+export { authorizationService } from "./authorization.service";

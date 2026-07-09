@@ -52,19 +52,19 @@ export interface PublicUser {
     roles: string[];
 }
 
+/**
+ * Result of registration. Deliberately narrower than PublicUser and carries NO
+ * tokens: registering does not start a session, the client must call /auth/login.
+ */
+export interface RegisteredUser {
+    id: string;
+    email: string;
+    roles: string[];
+}
+
 /** Result of login/refresh: sanitized user + tokens (raw refresh for the cookie). */
 export interface LoginResult {
     user: PublicUser;
     accessToken: string;
     refreshToken: string;
-}
-
-/**
- * Result of forgotPassword: the RAW reset token to be EMAILED to the user.
- * It must NEVER be returned in the HTTP response. Undefined when no matching
- * active account exists (caller still responds 200).
- */
-export interface ForgotPasswordResult {
-    resetToken?: string;
-    expiresAt?: Date;
 }
