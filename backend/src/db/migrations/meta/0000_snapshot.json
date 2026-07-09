@@ -1,5 +1,5 @@
 {
-  "id": "91719a9e-a588-4eec-b8f7-a33605185a06",
+  "id": "0c20954b-8e2b-4001-b4ad-1ff1d98be03a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -4316,6 +4316,20 @@
           "primaryKey": false,
           "notNull": false
         },
+        "channel": {
+          "name": "channel",
+          "type": "reminder_channel",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "notification_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "is_read": {
           "name": "is_read",
           "type": "boolean",
@@ -4383,6 +4397,36 @@
             },
             {
               "expression": "is_read",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notif_channel_idx": {
+          "name": "notif_channel_idx",
+          "columns": [
+            {
+              "expression": "channel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notif_status_idx": {
+          "name": "notif_status_idx",
+          "columns": [
+            {
+              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4632,6 +4676,14 @@
       "values": [
         "SECURED",
         "UNSECURED"
+      ]
+    },
+    "public.notification_status": {
+      "name": "notification_status",
+      "schema": "public",
+      "values": [
+        "SUCCESS",
+        "FAILED"
       ]
     },
     "public.payment_mode": {

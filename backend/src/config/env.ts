@@ -63,6 +63,15 @@ export const config = {
     isDevelopment: nodeEnv === "development",
     isTest: nodeEnv === "test",
 
+    app: {
+        /**
+         * Base URL of the front-end password-reset page. The forgot-password
+         * flow appends `?token=…` and emails the resulting link. Configurable
+         * via APP_PASSWORD_RESET_URL; defaults to a local dev URL.
+         */
+        passwordResetUrl: optional("APP_PASSWORD_RESET_URL", "http://localhost:3000/reset-password"),
+    },
+
     server: {
         port: toInt("PORT", optional("PORT", "3000")),
         /** Seconds to allow in-flight requests to drain during shutdown. */

@@ -9,6 +9,7 @@ CREATE TYPE "public"."interest_basis" AS ENUM('ACTUAL_365', 'ACTUAL_360', 'THIRT
 CREATE TYPE "public"."interest_rule_type" AS ENUM('NORMAL', 'STEP_UP', 'STEP_DOWN', 'EVENT_BASED', 'CUSTOM');--> statement-breakpoint
 CREATE TYPE "public"."loan_status" AS ENUM('PENDING', 'ACTIVE', 'OVERDUE', 'NPA', 'CLOSED', 'WRITTEN_OFF');--> statement-breakpoint
 CREATE TYPE "public"."loan_type" AS ENUM('SECURED', 'UNSECURED');--> statement-breakpoint
+CREATE TYPE "public"."notification_status" AS ENUM('SUCCESS', 'FAILED');--> statement-breakpoint
 CREATE TYPE "public"."payment_mode" AS ENUM('NEFT', 'RTGS', 'IMPS', 'UPI', 'CHEQUE', 'CASH', 'BANK_TRANSFER', 'OTHER');--> statement-breakpoint
 CREATE TYPE "public"."payment_status" AS ENUM('PENDING', 'PARTIAL', 'SUCCESS', 'FAILED', 'CANCELLED');--> statement-breakpoint
 CREATE TYPE "public"."penal_interest_type" AS ENUM('PERCENTAGE', 'FIXED_AMOUNT');--> statement-breakpoint
@@ -482,6 +483,8 @@ CREATE TABLE "notifications" (
 	"title" varchar(255) NOT NULL,
 	"message" text,
 	"type" varchar(50),
+	"channel" "reminder_channel" NOT NULL,
+	"status" "notification_status" NOT NULL,
 	"is_read" boolean DEFAULT false,
 	"read_at" timestamp with time zone,
 	"link" text,
@@ -606,4 +609,6 @@ CREATE INDEX "audit_action_idx" ON "audit_logs" USING btree ("action");--> state
 CREATE INDEX "audit_created_idx" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "notif_user_idx" ON "notifications" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "notif_read_idx" ON "notifications" USING btree ("user_id","is_read");--> statement-breakpoint
+CREATE INDEX "notif_channel_idx" ON "notifications" USING btree ("channel");--> statement-breakpoint
+CREATE INDEX "notif_status_idx" ON "notifications" USING btree ("status");--> statement-breakpoint
 CREATE UNIQUE INDEX "setting_key_idx" ON "system_settings" USING btree ("key");

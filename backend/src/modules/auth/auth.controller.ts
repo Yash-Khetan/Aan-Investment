@@ -5,7 +5,6 @@ import {
     clearRefreshCookie,
     readRefreshCookie,
 } from "./auth.utils";
-import { config } from "../../config";
 import { UnauthorizedError } from "../../common/errors";
 import type {
     LoginInput,
@@ -60,16 +59,15 @@ export const logout: RequestHandler = async (req, res) => {
 
 export const forgotPassword: RequestHandler = async (req, res) => {
     const input = req.valid.body as ForgotPasswordInput;
-    const result = await authService.forgotPassword(input);
+    // The service issues the token and emails the reset link via the
+    // notifications module. Enumeration-safe: always the same generic response,
+    // and the raw token is never returned over HTTP.
+    await authService.forgotPassword(input);
 
-    // Enumeration-safe: always the same generic response. In production the raw
-    // token is emailed; in dev we surface it to make the flow testable.
-    const devResetToken = config.isProduction ? undefined : result.resetToken;
     res.status(200).json({
         success: true,
         data: {
             message: "If an account exists for that email, a reset link has been sent.",
-            ...(devResetToken ? { devResetToken } : {}),
         },
     });
 };

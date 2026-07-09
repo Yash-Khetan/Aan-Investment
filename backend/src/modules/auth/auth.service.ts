@@ -12,6 +12,9 @@ import {
     hashRefreshToken,
 } from "./auth.utils";
 import { randomToken, sha256Hex } from "../../common/crypto";
+import { notificationService } from "../notifications";
+import { config } from "../../config";
+import { logger } from "../../utils/logger";
 import {
     UnauthorizedError,
     ForbiddenError,
@@ -162,7 +165,45 @@ export class AuthService {
             expiresAt,
         });
 
+        // Deliver the reset link via the notifications module's email API.
+        // Non-blocking: a delivery failure (e.g. SMTP not configured) must not
+        // break the enumeration-safe flow, so we log and still succeed.
+        await this.sendResetEmail(user, rawToken);
+
         return { resetToken: rawToken, expiresAt };
+    }
+
+    /** Build and dispatch the password-reset email through the notifications module. */
+    private async sendResetEmail(
+        user: UserRecord,
+        rawToken: string,
+    ): Promise<void> {
+        const resetLink = `${config.app.passwordResetUrl}?token=${encodeURIComponent(rawToken)}`;
+        const ttlMinutes = RESET_TOKEN_TTL_MINUTES;
+
+        try {
+            await notificationService.sendEmail(
+                {
+                    to: user.email,
+                    subject: "Reset your password",
+                    text:
+                        `Hi ${user.firstName},\n\n` +
+                        `We received a request to reset your password. Use the link below to choose a new one. ` +
+                        `This link expires in ${ttlMinutes} minutes.\n\n` +
+                        `${resetLink}\n\n` +
+                        `If you didn't request this, you can safely ignore this email.`,
+                    html:
+                        `<p>Hi ${user.firstName},</p>` +
+                        `<p>We received a request to reset your password. Use the link below to choose a new one. ` +
+                        `This link expires in ${ttlMinutes} minutes.</p>` +
+                        `<p><a href="${resetLink}">Reset your password</a></p>` +
+                        `<p>If you didn't request this, you can safely ignore this email.</p>`,
+                },
+                { userId: user.id, title: "Password reset requested", link: resetLink },
+            );
+        } catch (error) {
+            logger.error("Failed to send password-reset email", { err: error, userId: user.id });
+        }
     }
 
     /**
