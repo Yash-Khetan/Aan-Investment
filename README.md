@@ -301,6 +301,19 @@ List query parameters: `page`, `limit`, `sortBy`, `sortOrder`, `search`,
 Response envelope: `{ success, data, meta? }` on success;
 `{ success: false, error: { code, message, details? } }` on error.
 
+### Borrower API
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/v1/borrowers` | Create a borrower (optional `promoters[]` / `guarantors[]`, inserted transactionally) |
+| GET | `/api/v1/borrowers` | List (pagination, filtering, search, sorting) |
+| GET | `/api/v1/borrowers/:id` | Get a borrower with its promoters and guarantors |
+| PUT | `/api/v1/borrowers/:id` | Update borrower master fields |
+| DELETE | `/api/v1/borrowers/:id` | Soft-delete a borrower |
+
+Borrower list parameters: `page`, `limit`, `sortBy`, `sortOrder`, `search`
+(name / code / PAN / GST), `status`, `constitution`, `relationshipManagerId`.
+
 ### Backend module structure
 
 ```text
@@ -310,7 +323,9 @@ backend/src/
 ├── config/env.ts     Validated environment config
 ├── common/           errors, http helpers, middleware (validate, errorHandler)
 ├── routes/index.ts   /api/v1 aggregator
-└── modules/loan/     controller · service · repository · routes · validators · types · constants
+└── modules/
+    ├── loan/         controller · service · repository · routes · validators · types · constants
+    └── borrower/     controller · service · repository · routes · validators · types · constants
 ```
 
 ---
