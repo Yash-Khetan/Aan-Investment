@@ -10,6 +10,17 @@
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+/**
+ * In-memory access token, set by AuthContext after login/refresh. Kept out of
+ * localStorage so an XSS payload can't read it directly; lost on hard reload,
+ * which is why AuthContext silently calls /auth/refresh on mount.
+ */
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -36,8 +47,10 @@ async function parseErrorBody(res: Response): Promise<{ message: string; code?: 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    credentials: "include", // send the httpOnly refresh cookie on /auth/* calls
     headers: {
       ...(init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init?.headers,
     },
   });

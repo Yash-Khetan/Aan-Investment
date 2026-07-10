@@ -112,6 +112,9 @@ export class AuthService {
                 return created;
             });
 
+            // Best-effort: a delivery failure must never fail registration itself.
+            await this.sendWelcomeEmail(user);
+
             return { id: user.id, email: user.email, roles: [role.name] };
         } catch (error) {
             // Two requests for the same email raced past the pre-check, or the
@@ -120,6 +123,35 @@ export class AuthService {
                 throw new ConflictError(EMAIL_ALREADY_EXISTS_MESSAGE);
             }
             throw error;
+        }
+    }
+
+    /** Build and dispatch the welcome email through the notifications module. */
+    private async sendWelcomeEmail(user: UserRecord): Promise<void> {
+        const safeName = escapeHtml(user.firstName);
+
+        try {
+            await notificationService.sendEmail(
+                {
+                    to: user.email,
+                    subject: "Welcome to Aan Investment LMS",
+                    text:
+                        `Hi ${user.firstName},\n\n` +
+                        `Your account has been created. You can sign in any time to get started.\n\n` +
+                        `Welcome aboard!`,
+                    html:
+                        `<p>Hi ${safeName},</p>` +
+                        `<p>Your account has been created. You can sign in any time to get started.</p>` +
+                        `<p>Welcome aboard!</p>`,
+                },
+                {
+                    userId: user.id,
+                    title: "Welcome to Aan Investment LMS",
+                    message: "A welcome email was sent after account registration.",
+                },
+            );
+        } catch (error) {
+            logger.error("Failed to send welcome email", { err: error, userId: user.id });
         }
     }
 

@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../features/auth/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard" },
@@ -10,6 +11,14 @@ const NAV_ITEMS = [
 ];
 
 export function Layout() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -32,7 +41,19 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto px-5 py-4 text-xs text-slate-400">dev-c-integration</div>
+        <div className="mt-auto border-t border-slate-100 px-5 py-4">
+          {user && (
+            <div className="mb-2 truncate text-xs font-medium text-slate-600" title={user.email}>
+              {user.firstName} {user.lastName ?? ""}
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-xs font-medium text-slate-400 transition-colors hover:text-slate-700"
+          >
+            Log out
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto">
