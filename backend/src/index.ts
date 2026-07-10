@@ -8,6 +8,7 @@ import { collectionsRouter } from "./modules/collections";
 import { documentRouter } from "./modules/document-vault";
 import { reportsRouter } from "./modules/reports";
 import dashboardRouter from "./modules/dashboard/routes/dashboard.routes.js";
+import { lookupRouter } from "./routes/lookup.routes.js";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -25,6 +26,7 @@ app.use("/collections", collectionsRouter);
 app.use("/reports", reportsRouter);
 app.use("/accounting", accountingExportRouter);
 app.use("/dashboard", dashboardRouter);
+app.use("/lookup", lookupRouter);
 
 app.use((req, res) => {
     res.status(404).json({

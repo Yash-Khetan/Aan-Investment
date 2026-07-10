@@ -38,6 +38,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "seed": "tsx src/db/seed/fullSeed.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
