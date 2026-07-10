@@ -131,7 +131,7 @@ npm run db:seed        # seed system roles, permissions and grants (required)
 npm run dev            # start with hot reload
 ```
 
-`db:seed` is **not optional**: it creates the `MANAGER` and `VIEWER` roles and the permission catalogue. `POST /auth/register` resolves the default role by name, so registration fails against an unseeded database. The seed is idempotent — running it twice changes nothing.
+`db:seed` is **not optional**: it creates the `EMPLOYEE` role and the permission catalogue. `POST /auth/register` resolves the default role by name, so registration fails against an unseeded database. The seed is idempotent — running it twice changes nothing.
 
 The server starts on **http://localhost:3000**. A liveness probe is available at `GET /health`.
 
@@ -177,7 +177,7 @@ All auth routes are mounted under `/auth`; the current-user route under `/users`
 
 | Method | Endpoint                  | Auth           | Description                                                          |
 | ------ | ------------------------- | -------------- | -------------------------------------------------------------------- |
-| POST   | `/auth/register`        | Public         | Create an account with the default `VIEWER` role. Issues no tokens.  |
+| POST   | `/auth/register`        | Public         | Create an account with the default `EMPLOYEE` role. Issues no tokens. |
 | POST   | `/auth/login`           | Public         | Authenticate with credentials; issues access token + refresh cookie. |
 | POST   | `/auth/refresh`         | Refresh cookie | Rotate the session and issue a new access token.                     |
 | POST   | `/auth/logout`          | Public         | Invalidate the current session (idempotent).                         |
@@ -204,7 +204,7 @@ Routes validate shape, controllers adapt HTTP, the service owns the rules, the r
 Body `{ firstName, lastName, email, password }`. Names are trimmed, the email is trimmed and lowercased, and the password must be 8–128 characters with at least one letter and one number. Duplicate email → **409**; malformed body → **422**.
 
 ```json
-{ "success": true, "data": { "id": "…", "email": "…", "roles": ["VIEWER"] } }
+{ "success": true, "data": { "id": "…", "email": "…", "roles": ["EMPLOYEE"] } }
 ```
 
 Returns **201 Created**. Registration deliberately does **not** log the user in — no access token, no refresh cookie, no session. The client calls `POST /auth/login` afterwards. The user row and its default-role grant are written in a **single transaction**, so an account can never exist without a role. The unique index on `users.email` is the authority on duplicates: a lost race between two concurrent registrations surfaces as the same 409, not a 500.
@@ -259,12 +259,15 @@ Passwords are hashed with **Argon2id** (memory-hard: 19 MiB, 2 passes), whose PH
 
 Authentication answers *who are you*; authorization answers *what may you do*. They are separate layers and never duplicate each other's work.
 
-Permissions resolve through four tables: `user_roles → roles (active only) → role_permissions → permissions`. The seed defines two system roles:
+Permissions resolve through four tables: `user_roles → roles (active only) → role_permissions → permissions`. The LMS is internal to Aan Finance & Investment, so the seed defines a single business role:
 
-| Role      | Permissions                                             |
-| --------- | ------------------------------------------------------- |
-| `MANAGER` | `user:read`, `user:write`, `loan:read`, `loan:create` |
-| `VIEWER`  | `user:read`, `loan:read` — the default for new accounts |
+| Role       | Permissions                                                                        |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `EMPLOYEE` | `user:read`, `user:write`, `loan:read`, `loan:create` — the default for new accounts |
+
+`EMPLOYEE` holds the entire permission catalogue. Further roles (`ADMIN`, `AUDITOR`, `CREDIT_MANAGER`, `COLLECTION_OFFICER`) can be introduced by adding rows to `SYSTEM_ROLES` and `ROLE_PERMISSIONS` in `backend/src/db/seed/index.ts` — the authorization layer needs no change.
+
+An earlier design shipped `MANAGER` and `VIEWER` roles. The seed now retires them: any user still holding one is migrated to `EMPLOYEE` before the role rows are deleted, so nobody loses access. Because `user_roles.role_id` has no `ON DELETE CASCADE`, the memberships must be removed before the role itself — `retireLegacyRoles()` does this in order. On a database that never had them, the step is a no-op.
 
 Guards compose on a route, `authenticate` always first:
 
