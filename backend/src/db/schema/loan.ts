@@ -88,6 +88,8 @@ export const loans = pgTable("loans", {
 
     purpose: text("purpose"),
 
+    approvalNotes: text("approval_notes"),
+
     remarks: text("remarks"),
 
     /* ── Status ── */

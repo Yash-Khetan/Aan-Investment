@@ -240,6 +240,81 @@ Feature branches are merged into `develop` before being promoted to `main`.
 
 ---
 
+## Loan Module
+
+The Loan Module manages **loan master data and lifecycle** only. Interest,
+repayment, payments, collateral, documents, collections, reporting and
+accounting are separate modules and are intentionally **not** implemented here —
+the Loan Module simply stores and exposes fields such as `interestRate`,
+`tenureMonths` and `repaymentType`, leaving all calculations to their owning
+modules.
+
+### Running the backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env      # then fill in DATABASE_URL
+npm run dev               # tsx watch → http://localhost:3000
+```
+
+Scripts:
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start with watch (tsx) |
+| `npm start` | Start once (tsx) |
+| `npm run build` / `npm run typecheck` | Type-check (`tsc --noEmit`) |
+| `npm run db:generate` / `npm run db:migrate` | Drizzle Kit migrations |
+
+On boot the server verifies the database connection (`SELECT 1`) and logs
+`Database connected` before accepting requests.
+
+### Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Postgres / Supabase connection string |
+| `NODE_ENV` | no | `development` \| `test` \| `production` (default `development`) |
+| `PORT` | no | HTTP port (default `3000`) |
+
+Placeholders live in `backend/.env.example`. **Never commit `.env`** — it is
+gitignored.
+
+### API
+
+Base path: **`/api/v1`**. Health check: `GET /health`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/v1/loans` | Create a loan |
+| GET | `/api/v1/loans` | List (pagination, filtering, search, sorting) |
+| GET | `/api/v1/loans/:id` | Get a loan by id |
+| PUT | `/api/v1/loans/:id` | Update a loan |
+| DELETE | `/api/v1/loans/:id` | Soft-delete a loan |
+
+List query parameters: `page`, `limit`, `sortBy`, `sortOrder`, `search`,
+`status`, `loanType`, `securityType`, `borrowerId`, `relationshipManagerId`,
+`minSanctionedAmount`, `maxSanctionedAmount`, `sanctionDateFrom`,
+`sanctionDateTo`.
+
+Response envelope: `{ success, data, meta? }` on success;
+`{ success: false, error: { code, message, details? } }` on error.
+
+### Backend module structure
+
+```text
+backend/src/
+├── app.ts            Express app factory
+├── server.ts         HTTP bootstrap + DB health check
+├── config/env.ts     Validated environment config
+├── common/           errors, http helpers, middleware (validate, errorHandler)
+├── routes/index.ts   /api/v1 aggregator
+└── modules/loan/     controller · service · repository · routes · validators · types · constants
+```
+
+---
+
 ## Future Enhancements
 
 * Email Notifications
