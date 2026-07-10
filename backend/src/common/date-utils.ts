@@ -12,7 +12,7 @@ export function diffInMonths(start: Date, end: Date): number {
   );
 }
 
-export function daysInMonth30360(date: Date): number {
+export function daysInMonth30360(_date: Date): number {
   // 30/360 convention: every month treated as 30 days
   return 30;
 }

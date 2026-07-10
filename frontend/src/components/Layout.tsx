@@ -1,0 +1,54 @@
+import { Link, NavLink, Outlet } from "react-router-dom";
+
+const NAV_ITEMS = [
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/reports", label: "Reports" },
+  { to: "/accounting", label: "Accounting Export" },
+  { to: "/collateral", label: "Collateral" },
+  { to: "/collections", label: "Collections" },
+  { to: "/documents", label: "Documents" },
+];
+
+export function Layout() {
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+        <Link to="/" className="block px-5 py-5">
+          <div className="text-sm font-semibold uppercase tracking-wide text-slate-400">Aan Investment</div>
+          <div className="text-lg font-semibold text-slate-900">LMS</div>
+        </Link>
+        <nav className="flex flex-col gap-0.5 px-3">
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="mt-auto px-5 py-4 text-xs text-slate-400">dev-c-integration</div>
+      </aside>
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-7xl px-8 py-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function PageHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="mb-6">
+      <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+    </div>
+  );
+}

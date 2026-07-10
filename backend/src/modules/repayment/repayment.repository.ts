@@ -31,7 +31,7 @@ export async function getInstallmentsForSchedule(scheduleId: string) {
  * Returns the next version number for a loan's schedule history
  * (1 if no schedule exists yet).
  */
-async function getNextVersionNumber(loanId: string): Promise<number> {
+export async function getNextVersionNumber(loanId: string): Promise<number> {
   const rows = await db
     .select({ version: repaymentSchedules.version })
     .from(repaymentSchedules)
