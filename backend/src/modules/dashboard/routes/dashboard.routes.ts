@@ -4,7 +4,7 @@ import {
     getDashboardCollections,
     getDashboardPortfolio,
     getDashboardSummary,
-} from "../modules/dashboard/dashboard.controller.js";
+} from "../dashboard.controller.js";
 
 const router = Router();
 
