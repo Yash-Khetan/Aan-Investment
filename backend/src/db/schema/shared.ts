@@ -56,19 +56,6 @@ export const constitutionEnum = pgEnum("constitution", [
 ]);
 
 /* ============================================================
-   USER ROLES
-============================================================ */
-
-export const roleEnum = pgEnum("user_role", [
-    "SUPER_ADMIN",
-    "ADMIN",
-    "MANAGER",
-    "RELATIONSHIP_MANAGER",
-    "OPERATIONS",
-    "VIEWER",
-]);
-
-/* ============================================================
    INTEREST BASIS
 ============================================================ */
 

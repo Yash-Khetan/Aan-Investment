@@ -39,9 +39,10 @@ export const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
 /**
  * Role granted to every self-registered account. Resolved to an id at runtime
  * through the role repository (never hardcoded), and seeded by db/seed.
- * VIEWER is the least-privileged system role: read-only.
+ * EMPLOYEE is the only business role today: the LMS is internal, so every
+ * registered user is a member of staff with full operational access.
  */
-export const DEFAULT_ROLE_NAME = "VIEWER";
+export const DEFAULT_ROLE_NAME = "EMPLOYEE";
 
 /** 409 message for a registration against an email that already exists. */
 export const EMAIL_ALREADY_EXISTS_MESSAGE = "Email already exists";

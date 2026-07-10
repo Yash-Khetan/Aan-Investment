@@ -1,4 +1,5 @@
-import { db, closeDb, roles, permissions, rolePermissions } from "../index";
+import { inArray } from "drizzle-orm";
+import { db, closeDb, roles, permissions, rolePermissions, userRoles } from "../index";
 import { logger } from "../../utils/logger";
 
 /**
@@ -14,10 +15,17 @@ import { logger } from "../../utils/logger";
  *    closes the pool when done so the process can exit.
  */
 
-/** The canonical system roles. Mirrors the `user_role` enum in schema/shared.ts. */
+/**
+ * The canonical system roles. The LMS is internal to Aan Finance & Investment
+ * and serves a handful of staff, so a single operational role is enough today.
+ * Additional roles (ADMIN, AUDITOR, CREDIT_MANAGER, COLLECTION_OFFICER) can be
+ * added here plus in ROLE_PERMISSIONS without touching the RBAC engine.
+ */
 const SYSTEM_ROLES: { name: string; description: string }[] = [
-    { name: "MANAGER", description: "Manages teams, approvals and oversight." },
-    { name: "VIEWER", description: "Read-only access." },
+    {
+        name: "EMPLOYEE",
+        description: "Internal employee. Full operational access to the LMS.",
+    },
 ];
 
 /** The canonical permission catalogue (RBAC). Keys are "resource:action". */
@@ -29,13 +37,21 @@ const PERMISSIONS: { name: string; description: string }[] = [
 ];
 
 /**
- * Which permissions each role is granted. MANAGER gets everything; VIEWER is
- * read-only. Keep this the single source of truth for role→permission grants.
+ * Which permissions each role is granted. Keep this the single source of truth
+ * for role→permission grants. EMPLOYEE is granted the whole catalogue: every
+ * internal user must be able to operate the LMS end to end. Future roles get an
+ * explicit subset listed here.
  */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-    MANAGER: ["user:read", "user:write", "loan:read", "loan:create"],
-    VIEWER: ["user:read", "loan:read"],
+    EMPLOYEE: PERMISSIONS.map((p) => p.name),
 };
+
+/**
+ * Roles that used to be seeded and no longer exist in the business model.
+ * Databases seeded before the EMPLOYEE-only model still carry them, so the seed
+ * retires them: holders are moved to EMPLOYEE first, then the rows are dropped.
+ */
+const RETIRED_ROLES = ["MANAGER", "VIEWER"];
 
 async function seedRoles(): Promise<void> {
     const result = await db
@@ -106,11 +122,58 @@ async function seedRolePermissions(): Promise<void> {
     );
 }
 
+/**
+ * Drop roles that are no longer part of the business model. Runs after the
+ * grants so EMPLOYEE is guaranteed to exist and be fully permissioned before
+ * anyone is moved onto it. `user_roles.role_id` has no ON DELETE CASCADE, so
+ * the memberships must go before the role itself.
+ */
+async function retireLegacyRoles(): Promise<void> {
+    const legacy = await db
+        .select({ id: roles.id, name: roles.name })
+        .from(roles)
+        .where(inArray(roles.name, RETIRED_ROLES));
+
+    if (legacy.length === 0) return;
+
+    const [employee] = await db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(inArray(roles.name, ["EMPLOYEE"]));
+
+    if (!employee) throw new Error("EMPLOYEE role missing; cannot retire legacy roles.");
+
+    const legacyIds = legacy.map((r) => r.id);
+
+    // Move every holder of a retired role onto EMPLOYEE. Nobody loses access.
+    const holders = await db
+        .selectDistinct({ userId: userRoles.userId })
+        .from(userRoles)
+        .where(inArray(userRoles.roleId, legacyIds));
+
+    if (holders.length > 0) {
+        await db
+            .insert(userRoles)
+            .values(holders.map((h) => ({ userId: h.userId, roleId: employee.id })))
+            .onConflictDoNothing({ target: [userRoles.userId, userRoles.roleId] });
+    }
+
+    await db.delete(userRoles).where(inArray(userRoles.roleId, legacyIds));
+    // role_permissions.role_id cascades, so the grants go with the role.
+    await db.delete(roles).where(inArray(roles.id, legacyIds));
+
+    logger.info(
+        `Retired ${legacy.length} legacy role(s): ${legacy.map((r) => r.name).join(", ")}. ` +
+            `Migrated ${holders.length} user(s) to EMPLOYEE.`,
+    );
+}
+
 async function main(): Promise<void> {
     logger.info("Seeding database...");
     await seedRoles();
     await seedPermissions();
     await seedRolePermissions();
+    await retireLegacyRoles();
     logger.info("Seeding finished successfully.");
 }
 
