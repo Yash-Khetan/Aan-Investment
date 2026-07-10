@@ -14,6 +14,7 @@ import {
     interestBasisEnum,
     interestRuleTypeEnum,
     penalInterestTypeEnum,
+    penalInterestBaseEnum,
     money,
     timestamps,
 } from "./shared";
@@ -134,6 +135,9 @@ export const penalInterestRules = pgTable("penal_interest_rules", {
     }),
 
     penalAmount: money("penal_amount"),
+
+    penalBase: penalInterestBaseEnum("penal_base")
+        .default("OVERDUE_INSTALLMENT_ONLY"),
 
     gracePeriodDays: integer("grace_period_days")
         .default(0),
