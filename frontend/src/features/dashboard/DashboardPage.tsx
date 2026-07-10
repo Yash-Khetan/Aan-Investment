@@ -1,16 +1,51 @@
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "../../components/Layout";
 import { Card, StatCard } from "../../components/ui/Card";
-import { Badge } from "../../components/ui/Badge";
 import { LoadingState, ErrorState } from "../../components/ui/States";
+import { HorizontalBarChart, type BarDatum } from "../../components/charts/HorizontalBarChart";
+import { Meter } from "../../components/charts/Meter";
+import { StatusLegend } from "../../components/charts/StatusLegend";
+import { LOAN_STATUS_ROLE, COLLECTION_STATUS_ROLE } from "../../components/charts/palette";
 import { formatCurrency, formatNumber } from "../../lib/format";
 import { getDashboardSummary } from "./api";
+
+const AT_RISK_STATUSES = new Set(["OVERDUE", "NPA", "WRITTEN_OFF"]);
 
 export function DashboardPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: getDashboardSummary,
   });
+
+  const portfolioBars: BarDatum[] =
+    data?.portfolio.byStatus.map((row) => ({
+      key: row.status,
+      label: row.status.replace(/_/g, " "),
+      value: row.outstandingPrincipal,
+      displayValue: formatCurrency(row.outstandingPrincipal),
+      detail: `${row.loanCount} loan${row.loanCount === 1 ? "" : "s"}`,
+      role: LOAN_STATUS_ROLE[row.status] ?? "warning",
+    })) ?? [];
+
+  const collectionsBars: BarDatum[] =
+    data?.collections.byStatus.map((row) => ({
+      key: row.status,
+      label: row.status.replace(/_/g, " "),
+      value: row.overdueAmount,
+      displayValue: formatCurrency(row.overdueAmount),
+      detail: `${row.caseCount} case${row.caseCount === 1 ? "" : "s"}`,
+      role: COLLECTION_STATUS_ROLE[row.status] ?? "warning",
+    })) ?? [];
+
+  const atRiskOutstanding =
+    data?.portfolio.byStatus
+      .filter((row) => AT_RISK_STATUSES.has(row.status))
+      .reduce((sum, row) => sum + row.outstandingPrincipal, 0) ?? 0;
+
+  const atRiskPct =
+    data && data.portfolio.totals.totalOutstanding > 0
+      ? (atRiskOutstanding / data.portfolio.totals.totalOutstanding) * 100
+      : 0;
 
   return (
     <div>
@@ -30,31 +65,32 @@ export function DashboardPage() {
               <StatCard label="Outstanding" value={formatCurrency(data.portfolio.totals.totalOutstanding)} />
             </div>
 
-            <Card className="mt-4 p-4">
-              <div className="mb-3 text-sm font-medium text-slate-600">By Status</div>
-              <div className="flex flex-col gap-2">
-                {data.portfolio.byStatus.map((row) => {
-                  const pct =
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card className="p-4 lg:col-span-2">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-medium text-slate-600">Outstanding by Status</div>
+                  <StatusLegend roles={["good", "warning", "critical"]} />
+                </div>
+                <HorizontalBarChart data={portfolioBars} />
+              </Card>
+
+              <Card className="flex flex-col justify-center gap-4 p-4">
+                <Meter
+                  label="Portfolio at Risk"
+                  pct={atRiskPct}
+                  sub={`${formatCurrency(atRiskOutstanding)} across Overdue, NPA & Written-Off loans`}
+                />
+                <Meter
+                  label="Overdue Installments"
+                  pct={
                     data.portfolio.totals.totalLoans > 0
-                      ? Math.round((row.loanCount / data.portfolio.totals.totalLoans) * 100)
-                      : 0;
-                  return (
-                    <div key={row.status} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0">
-                        <Badge status={row.status} />
-                      </div>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-slate-700" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="w-16 shrink-0 text-right text-xs text-slate-500">{row.loanCount} loans</div>
-                      <div className="w-32 shrink-0 text-right text-xs text-slate-500">
-                        {formatCurrency(row.outstandingPrincipal)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+                      ? (data.collections.overdueInstallments.count / data.portfolio.totals.totalLoans) * 100
+                      : 0
+                  }
+                  sub={`${formatNumber(data.collections.overdueInstallments.count)} installments · ${formatCurrency(data.collections.overdueInstallments.totalAmount)}`}
+                />
+              </Card>
+            </div>
           </section>
 
           <section>
@@ -71,20 +107,12 @@ export function DashboardPage() {
             </div>
 
             <Card className="mt-4 p-4">
-              <div className="mb-3 text-sm font-medium text-slate-600">Cases by Status</div>
-              <div className="flex flex-wrap gap-3">
-                {data.collections.byStatus.map((row) => (
-                  <div key={row.status} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2">
-                    <Badge status={row.status} />
-                    <span className="text-xs text-slate-500">
-                      {row.caseCount} case{row.caseCount === 1 ? "" : "s"} · {formatCurrency(row.overdueAmount)}
-                    </span>
-                  </div>
-                ))}
-                {data.collections.byStatus.length === 0 && (
-                  <span className="text-sm text-slate-400">No open collection cases.</span>
-                )}
-              </div>
+              <div className="mb-3 text-sm font-medium text-slate-600">Overdue Amount by Case Status</div>
+              {collectionsBars.length > 0 ? (
+                <HorizontalBarChart data={collectionsBars} />
+              ) : (
+                <span className="text-sm text-slate-400">No open collection cases.</span>
+              )}
             </Card>
           </section>
         </div>

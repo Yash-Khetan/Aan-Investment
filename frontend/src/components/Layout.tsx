@@ -1,7 +1,7 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", end: true },
+  { to: "/dashboard", label: "Dashboard" },
   { to: "/reports", label: "Reports" },
   { to: "/accounting", label: "Accounting Export" },
   { to: "/collateral", label: "Collateral" },
@@ -13,16 +13,15 @@ export function Layout() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="px-5 py-5">
+        <Link to="/" className="block px-5 py-5">
           <div className="text-sm font-semibold uppercase tracking-wide text-slate-400">Aan Investment</div>
           <div className="text-lg font-semibold text-slate-900">LMS</div>
-        </div>
+        </Link>
         <nav className="flex flex-col gap-0.5 px-3">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
               className={({ isActive }) =>
                 `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
