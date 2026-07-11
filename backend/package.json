@@ -43,6 +43,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "dev:index": "tsx watch src/index.ts",
+    "start:index": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
