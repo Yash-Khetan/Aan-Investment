@@ -272,3 +272,15 @@ export const penalInterestBaseEnum = pgEnum("penal_interest_base", [
     "ENTIRE_OUTSTANDING",
     "OVERDUE_INSTALLMENT_ONLY",
 ]);
+
+
+/* ============================================================
+   PAYMENT WATERFALL BUCKET TYPE
+============================================================ */
+
+export const waterfallBucketTypeEnum = pgEnum("waterfall_bucket_type", [
+    "PENALTY",
+    "INTEREST",
+    "PRINCIPAL",
+    "SPECIFIC_TRANCHE",
+]);

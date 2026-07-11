@@ -14,3 +14,4 @@ export * from "./report";
 export * from "./audit";
 export * from "./notification";
 export * from "./system";
+export * from "./paymentWaterfall";
