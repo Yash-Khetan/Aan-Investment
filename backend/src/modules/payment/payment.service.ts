@@ -1,6 +1,7 @@
 import { getCurrentWaterfallSteps, createPaymentWithAllocation } from "./payment.repository";
 import { applyWaterfall } from "./waterfallEngine";
 import { WaterfallStep } from "./payment.types";
+import { recordPaymentEntries } from "../accounting/accounting.service";
 
 const DEFAULT_ORDER: WaterfallStep[] = ["PENALTY", "INTEREST", "PRINCIPAL"];
 
@@ -44,6 +45,15 @@ export async function recordPayment(input: {
     penaltyApplied: result.penaltyApplied,
     interestApplied: result.interestApplied,
     principalApplied: result.principalApplied,
+  });
+
+  await recordPaymentEntries({
+    loanId: input.loanId,
+    paymentId: saved.payment.id,
+    entryDate: input.paymentDate,
+    principalApplied: result.principalApplied,
+    interestApplied: result.interestApplied,
+    penaltyApplied: result.penaltyApplied,
   });
 
   return { ...saved, waterfallResult: result };
