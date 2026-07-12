@@ -16,6 +16,11 @@ import {
 import { randomToken, sha256Hex } from "../../common/crypto";
 import { escapeHtml } from "../../common/html";
 import { notificationService } from "../notifications";
+// Imported from the concrete files rather than the module barrel: the barrel also
+// pulls in auditRouter → auth.middleware, and there is no reason to drag the HTTP
+// layer into the service graph.
+import { auditService } from "../audit/audit.service";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
 import {
@@ -71,6 +76,12 @@ export class AuthService {
         private readonly resets = passwordResetRepository,
         /** Only used to open the registration transaction; all SQL stays in repos. */
         private readonly db = defaultDb,
+        /**
+         * Cross-cutting audit trail. Injected like everything else so tests can
+         * assert on what was recorded. Its `record()` never throws, so an audit
+         * failure can never turn a successful login into a 500.
+         */
+        private readonly audit = auditService,
     ) {}
 
     /**
@@ -82,8 +93,11 @@ export class AuthService {
      * The client follows up with POST /auth/login.
      *
      * Errors: 409 (email already registered).
+     *
+     * Audited as CREATE on USER. The actor is the new account itself —
+     * registration is unauthenticated, so there is no other identity to blame.
      */
-    async register(input: RegisterInput): Promise<RegisteredUser> {
+    async register(input: RegisterInput, ctx: RequestContext = {}): Promise<RegisteredUser> {
         // Fast path: answer the common duplicate case without paying for a hash.
         // Not authoritative on its own — the unique index below closes the race.
         const existing = await this.users.findByEmail(input.email);
@@ -110,6 +124,24 @@ export class AuthService {
                 });
                 await this.roles.withDb(tx).assignRoleToUser(created.id, role.id);
                 return created;
+            });
+
+            await this.audit.record({
+                ...ctx,
+                userId: user.id,
+                entityType: AUDIT_ENTITY.USER,
+                entityId: user.id,
+                action: "CREATE",
+                // No previous value: the account did not exist. The password hash is
+                // not passed, and would be redacted by the service even if it were.
+                newValue: {
+                    id: user.id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email,
+                    roles: [role.name],
+                },
+                description: "Account registered",
             });
 
             return { id: user.id, email: user.email, roles: [role.name] };
@@ -149,6 +181,17 @@ export class AuthService {
             userAgent: ctx.userAgent,
         });
         await this.users.updateLastLoginAt(user.id);
+
+        // LOGIN carries no before/after state — the record IS the event. IP and
+        // user-agent come from ctx and are what make it useful for security review.
+        await this.audit.record({
+            ...ctx,
+            userId: user.id,
+            entityType: AUDIT_ENTITY.USER,
+            entityId: user.id,
+            action: "LOGIN",
+            description: "User logged in",
+        });
 
         return { user: toPublicUser(user, roles), accessToken, refreshToken: refresh.token };
     }
@@ -197,10 +240,28 @@ export class AuthService {
     /**
      * logout — end the session tied to the given refresh token. Idempotent:
      * an unknown token is a no-op (still a "successful" logout).
+     *
+     * The session is resolved BEFORE it is deleted, because the session row is
+     * the only thing that tells us whose logout this was: /auth/logout is not
+     * behind `authenticate`, so there is no req.user to read. An unknown token
+     * audits nothing — there is no identity to attribute it to.
      */
-    async logout(rawRefreshToken: string): Promise<void> {
+    async logout(rawRefreshToken: string, ctx: RequestContext = {}): Promise<void> {
         const tokenHash = hashRefreshToken(rawRefreshToken);
+        const session = await this.sessions.findByTokenHash(tokenHash);
+
         await this.sessions.deleteByTokenHash(tokenHash);
+
+        if (session) {
+            await this.audit.record({
+                ...ctx,
+                userId: session.userId,
+                entityType: AUDIT_ENTITY.USER,
+                entityId: session.userId,
+                action: "LOGOUT",
+                description: "User logged out",
+            });
+        }
     }
 
     /**
@@ -276,8 +337,13 @@ export class AuthService {
      * resetPassword — consume a reset token and set a new password, then kill all
      * existing sessions so every device must re-authenticate.
      * Errors: 400 (token unknown, already used, or expired).
+     *
+     * Audited as UPDATE on USER. Neither the old nor the new password (or hash)
+     * is recorded — an audit row is permanent and readable over HTTP, so what
+     * gets stored is the FACT of the change, not the secret that changed. This is
+     * the one place the SRS's "previous value" is deliberately left null.
      */
-    async resetPassword(input: ResetPasswordInput): Promise<void> {
+    async resetPassword(input: ResetPasswordInput, ctx: RequestContext = {}): Promise<void> {
         const record = await this.resets.findByTokenHash(sha256Hex(input.token));
         if (!record || record.used || record.expiresAt.getTime() <= Date.now()) {
             throw new BadRequestError("Invalid or expired reset token");
@@ -288,6 +354,19 @@ export class AuthService {
         await this.resets.markUsed(record.id);
         await this.resets.deleteAllForUser(record.userId);
         await this.sessions.deleteAllForUser(record.userId);
+
+        await this.audit.record({
+            ...ctx,
+            userId: record.userId,
+            entityType: AUDIT_ENTITY.USER,
+            entityId: record.userId,
+            action: "UPDATE",
+            newValue: {
+                passwordChangedAt: new Date().toISOString(),
+                allSessionsRevoked: true,
+            },
+            description: "Password reset using an emailed reset token",
+        });
     }
 
     /**

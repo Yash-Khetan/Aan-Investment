@@ -22,14 +22,20 @@ import type { RequestContext } from "./auth.types";
  * error handler by Express 5.
  */
 
-/** Capture request context (IP + user-agent) for the session audit trail. */
+/**
+ * Capture request context (IP + user-agent) for the session AND audit trails.
+ *
+ * The service layer has no `req`, so the actor's origin is captured here, at the
+ * HTTP edge, and threaded down explicitly. Every module that wants to be audited
+ * does exactly this — see modules/audit/index.ts.
+ */
 function requestContext(req: Request): RequestContext {
     return { ipAddress: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
 
 export const register: RequestHandler = async (req, res) => {
     const input = req.valid.body as RegisterInput;
-    const user = await authService.register(input);
+    const user = await authService.register(input, requestContext(req));
     // 201 + the new resource. No cookie and no access token: registration and
     // login are separate steps, so the client must authenticate explicitly.
     res.status(201).json({ success: true, data: user });
@@ -61,7 +67,7 @@ export const refresh: RequestHandler = async (req, res) => {
 
 export const logout: RequestHandler = async (req, res) => {
     const token = readRefreshCookie(req);
-    if (token) await authService.logout(token); // delete DB session (idempotent)
+    if (token) await authService.logout(token, requestContext(req)); // delete DB session (idempotent)
     clearRefreshCookie(res); // remove the cookie
     res.status(200).json({ success: true, data: { message: "Logged out" } });
 };
@@ -83,7 +89,7 @@ export const forgotPassword: RequestHandler = async (req, res) => {
 
 export const resetPassword: RequestHandler = async (req, res) => {
     const input = req.valid.body as ResetPasswordInput;
-    await authService.resetPassword(input);
+    await authService.resetPassword(input, requestContext(req));
     res.status(200).json({
         success: true,
         data: { message: "Password has been reset. Please log in again." },

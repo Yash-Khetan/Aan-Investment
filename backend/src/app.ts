@@ -8,6 +8,7 @@ import { apiRateLimiter } from "./middleware/rateLimit";
 import { notFound } from "./middleware/notFound";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRouter, userRouter } from "./modules/auth";
+import { auditRouter } from "./modules/audit";
 import { devResetPasswordRouter } from "./dev/resetPasswordPage";
 import { interestRouter } from "./modules/interest/interest.routes";
 import { repaymentRouter } from "./modules/repayment/repayment.routes";
@@ -71,6 +72,11 @@ export function createApp(): Application {
 
     app.use("/interest-rules", interestRouter); //  POST /, GET /:loanId, POST /:loanId/calculate
     app.use("/repayment-schedules", repaymentRouter); //  POST /, GET /:loanId
+
+    // Audit is READ-ONLY on purpose: entries are written by the business services
+    // themselves via auditService.record(...), never by a client. Each employee
+    // sees only their own trail.
+    app.use("/audit", auditRouter); //  GET / (own records), GET /:id (own record)
 
     // TEMPORARY: renders the page the forgot-password email links to, until a
     // real front-end owns it. Never mounted in production — there the reset URL
