@@ -36,6 +36,10 @@ export const borrowers = pgTable("borrowers", {
         length: 255,
     }).notNull(),
 
+    groupName: varchar("group_name", {
+        length: 255,
+    }),
+
     constitution: constitutionEnum("constitution")
         .notNull(),
 
