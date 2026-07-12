@@ -22,6 +22,7 @@ import { documentRouter } from "./modules/document-vault";
 import { reportsRouter } from "./modules/reports";
 import dashboardRouter from "./modules/dashboard/routes/dashboard.routes.js";
 import { lookupRouter } from "./routes/lookup.routes.js";
+import apiRouter from "./routes/index";
 
 /**
  * Single composition root & process entry point.
@@ -93,6 +94,7 @@ function createApp(): Application {
     app.use("/accounting", accountingExportRouter);
     app.use("/dashboard", dashboardRouter);
     app.use("/lookup", lookupRouter);
+    app.use("/api/v1", apiRouter); //  /api/v1/borrowers, /api/v1/loans
 
     // TEMPORARY: renders the page the forgot-password email links to, until a
     // real front-end owns it. Never mounted in production — there the reset URL

@@ -12,6 +12,9 @@ export class AppError extends Error {
     /** HTTP status code to send to the client. */
     public readonly statusCode: number;
 
+    /** Machine-readable error identifier (e.g. "NOT_FOUND"). */
+    public readonly code: string;
+
     /** True for expected failures we can safely describe to the client. */
     public readonly isOperational: boolean;
 
@@ -21,16 +24,17 @@ export class AppError extends Error {
     constructor(
         message: string,
         statusCode = 500,
-        options: { isOperational?: boolean; details?: unknown } = {},
+        options: { code?: string; isOperational?: boolean; details?: unknown } = {},
     ) {
         super(message);
         this.name = this.constructor.name;
         this.statusCode = statusCode;
+        this.code = options.code ?? "ERROR";
         this.isOperational = options.isOperational ?? true;
         this.details = options.details;
 
         // Keep the stack trace pointing at the throw site, not this constructor.
-        Error.captureStackTrace(this, this.constructor);
+        Error.captureStackTrace?.(this, this.constructor);
     }
 }
 
@@ -41,42 +45,42 @@ export class AppError extends Error {
 
 export class BadRequestError extends AppError {
     constructor(message = "Bad Request", details?: unknown) {
-        super(message, 400, { details });
+        super(message, 400, { code: "BAD_REQUEST", details });
     }
 }
 
 export class UnauthorizedError extends AppError {
     constructor(message = "Unauthorized", details?: unknown) {
-        super(message, 401, { details });
+        super(message, 401, { code: "UNAUTHORIZED", details });
     }
 }
 
 export class ForbiddenError extends AppError {
     constructor(message = "Forbidden", details?: unknown) {
-        super(message, 403, { details });
+        super(message, 403, { code: "FORBIDDEN", details });
     }
 }
 
 export class NotFoundError extends AppError {
     constructor(message = "Not Found", details?: unknown) {
-        super(message, 404, { details });
+        super(message, 404, { code: "NOT_FOUND", details });
     }
 }
 
 export class ConflictError extends AppError {
     constructor(message = "Conflict", details?: unknown) {
-        super(message, 409, { details });
+        super(message, 409, { code: "CONFLICT", details });
     }
 }
 
 export class ValidationError extends AppError {
     constructor(message = "Validation Failed", details?: unknown) {
-        super(message, 422, { details });
+        super(message, 422, { code: "VALIDATION_ERROR", details });
     }
 }
 
 export class TooManyRequestsError extends AppError {
     constructor(message = "Too Many Requests", details?: unknown) {
-        super(message, 429, { details });
+        super(message, 429, { code: "TOO_MANY_REQUESTS", details });
     }
 }

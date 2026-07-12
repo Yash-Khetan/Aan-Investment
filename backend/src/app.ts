@@ -11,6 +11,7 @@ import { authRouter, userRouter } from "./modules/auth";
 import { devResetPasswordRouter } from "./dev/resetPasswordPage";
 import { interestRouter } from "./modules/interest/interest.routes";
 import { repaymentRouter } from "./modules/repayment/repayment.routes";
+import apiRouter from "./routes/index";
 
 /**
  * Builds and returns the Express application.
@@ -71,6 +72,8 @@ export function createApp(): Application {
 
     app.use("/interest-rules", interestRouter); //  POST /, GET /:loanId, POST /:loanId/calculate
     app.use("/repayment-schedules", repaymentRouter); //  POST /, GET /:loanId
+
+    app.use("/api/v1", apiRouter); //  /api/v1/borrowers, /api/v1/loans
 
     // TEMPORARY: renders the page the forgot-password email links to, until a
     // real front-end owns it. Never mounted in production — there the reset URL

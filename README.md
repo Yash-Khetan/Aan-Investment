@@ -332,7 +332,8 @@ docker run -p 3000:3000 --env-file .env aan-backend
 * Database layer, schema, and migrations — implemented.
 * Full authentication module (register, login, refresh, logout, forgot/reset password, RBAC, session management) — implemented.
 * Notifications module (email, SMS, WhatsApp) with persistence — implemented.
-* Core lending domain modules (borrowers, loans, interest, repayments, collections, reporting) — planned, built incrementally on this foundation.
+* Borrower and Loan master modules (CRUD, validation, nested promoters/guarantors) — implemented.
+* Interest engine, repayment engine, collateral, collections, documents, reports, accounting export, dashboard — implemented; see the module list under `backend/src/modules/`.
 
 A dev-only page at `GET /reset-password` stands in for the front-end reset form. It is mounted **only** when `NODE_ENV !== "production"` and holds no business logic; delete `src/dev/` once a real front-end owns that page.
 
@@ -340,12 +341,137 @@ A dev-only page at `GET /reset-password` stands in for the front-end reset form.
 
 ## Development Principles
 
+This project follows several engineering principles:
+
 * Clean, modular, feature-based architecture
+* Separation of concerns
 * Strict type safety
 * Secure by default
 * Configurable business rules
 * Full auditability
 * Production-ready standards
+
+---
+
+## Development Workflow
+
+```text
+main
+│
+├── develop
+│
+├── feature/auth
+├── feature/borrowers
+├── feature/loans
+├── feature/interest-engine
+├── feature/payments
+├── feature/documents
+└── ...
+```
+
+Feature branches are merged into `develop` before being promoted to `main`.
+
+---
+
+## Loan Module
+
+The Loan Module manages **loan master data and lifecycle** only. Interest,
+repayment, payments, collateral, documents, collections, reporting and
+accounting are separate modules and are intentionally **not** implemented here —
+the Loan Module simply stores and exposes fields such as `interestRate`,
+`tenureMonths` and `repaymentType`, leaving all calculations to their owning
+modules.
+
+### Running the backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env      # then fill in DATABASE_URL
+npm run dev               # tsx watch → http://localhost:3000
+```
+
+Scripts:
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start with watch (tsx) |
+| `npm start` | Start once (tsx) |
+| `npm run build` / `npm run typecheck` | Type-check (`tsc --noEmit`) |
+| `npm run db:generate` / `npm run db:migrate` | Drizzle Kit migrations |
+
+On boot the server verifies the database connection (`SELECT 1`) and logs
+`Database connected` before accepting requests.
+
+### Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Postgres / Supabase connection string |
+| `NODE_ENV` | no | `development` \| `test` \| `production` (default `development`) |
+| `PORT` | no | HTTP port (default `3000`) |
+
+Placeholders live in `backend/.env.example`. **Never commit `.env`** — it is
+gitignored.
+
+### API
+
+Base path: **`/api/v1`**. Health check: `GET /health`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/v1/loans` | Create a loan |
+| GET | `/api/v1/loans` | List (pagination, filtering, search, sorting) |
+| GET | `/api/v1/loans/:id` | Get a loan by id |
+| PUT | `/api/v1/loans/:id` | Update a loan |
+| DELETE | `/api/v1/loans/:id` | Soft-delete a loan |
+
+List query parameters: `page`, `limit`, `sortBy`, `sortOrder`, `search`,
+`status`, `loanType`, `securityType`, `borrowerId`, `relationshipManagerId`,
+`minSanctionedAmount`, `maxSanctionedAmount`, `sanctionDateFrom`,
+`sanctionDateTo`.
+
+Response envelope: `{ success, data, meta? }` on success;
+`{ success: false, error: { code, message, details? } }` on error.
+
+### Borrower API
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/v1/borrowers` | Create a borrower (optional `promoters[]` / `guarantors[]`, inserted transactionally) |
+| GET | `/api/v1/borrowers` | List (pagination, filtering, search, sorting) |
+| GET | `/api/v1/borrowers/:id` | Get a borrower with its promoters and guarantors |
+| PUT | `/api/v1/borrowers/:id` | Update borrower master fields |
+| DELETE | `/api/v1/borrowers/:id` | Soft-delete a borrower |
+
+Borrower list parameters: `page`, `limit`, `sortBy`, `sortOrder`, `search`
+(name / code / PAN / GST), `status`, `constitution`, `relationshipManagerId`.
+
+### Backend module structure
+
+```text
+backend/src/
+├── app.ts            Express app factory
+├── server.ts         HTTP bootstrap + DB health check
+├── config/env.ts     Validated environment config
+├── common/           errors, http helpers, middleware (validate, errorHandler)
+├── routes/index.ts   /api/v1 aggregator
+└── modules/
+    ├── loan/         controller · service · repository · routes · validators · types · constants
+    └── borrower/     controller · service · repository · routes · validators · types · constants
+```
+
+---
+
+## Future Enhancements
+
+* Email Notifications
+* WhatsApp Reminders
+* Advanced Analytics Dashboard
+* Rule Engine UI
+* Multi-Tenant Support
+* Cloud Object Storage Migration
+* Monitoring & Observability
 
 ---
 

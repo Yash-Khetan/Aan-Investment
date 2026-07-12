@@ -202,3 +202,6 @@ if (config.auth.refreshToken.ttlDays <= 0) {
 }
 
 export type Config = typeof config;
+
+/** Convenience re-export so modules can import just this flag. */
+export const isProduction = config.isProduction;
