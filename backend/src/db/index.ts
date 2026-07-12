@@ -54,7 +54,7 @@ export async function verifyDbConnection(): Promise<void> {
 }
 
 /**
- * Close the pool during graceful shutdown. `server.ts` calls this after the
+ * Close the pool during graceful shutdown. `index.ts` calls this after the
  * HTTP server stops accepting connections, so we never yank the pool out from
  * under an in-flight query.
  */

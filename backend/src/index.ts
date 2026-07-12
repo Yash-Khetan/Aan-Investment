@@ -32,6 +32,9 @@ import apiRouter from "./routes/index";
  * so there is exactly one place that assembles the API — no risk of a route
  * or middleware existing in one entry point but not another.
  *
+ * This is the ONLY entry point (`src/index.ts`) — there is no separate
+ * app-builder module to keep in sync.
+ *
  * Middleware order is intentional:
  *   1. Security / parsing (helmet, cors, logging, rate limit) — prepare every request
  *   2. Routes                                                  — do the work

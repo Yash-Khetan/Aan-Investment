@@ -13,7 +13,7 @@ import { Router } from "express";
  * the API. Every rule — token validity, expiry, single-use, the password policy,
  * argon2id hashing, session revocation — stays in AuthService.resetPassword.
  *
- * app.ts mounts this ONLY when `!config.isProduction`. Delete this folder once
+ * index.ts mounts this ONLY when `!config.isProduction`. Delete this folder once
  * the front-end owns the reset page.
  *
  * The script lives at its own URL rather than inline because helmet's default

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
 import { Card, StatCard } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { HorizontalBarChart, type BarDatum } from "../../components/charts/HorizontalBarChart";
 import { Meter } from "../../components/charts/Meter";
@@ -49,7 +51,16 @@ export function DashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="Read-only portfolio and collections overview." />
+      <PageHeader title="Dashboard" description="Portfolio and collections overview." />
+
+      <div className="mb-6 flex gap-3">
+        <Link to="/borrowers/new">
+          <Button>+ New Borrower</Button>
+        </Link>
+        <Link to="/loans/new">
+          <Button variant="secondary">+ New Loan</Button>
+        </Link>
+      </div>
 
       {isLoading && <LoadingState label="Loading dashboard..." />}
       {isError && <ErrorState message={error instanceof Error ? error.message : "Failed to load dashboard."} />}

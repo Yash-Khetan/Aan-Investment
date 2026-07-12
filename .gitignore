@@ -59,6 +59,9 @@ coverage/
 tmp/
 temp/
 
+# Personal punch-list tracker (not product code)
+punchlist/
+
 # Drizzle
 drizzle/meta/
 

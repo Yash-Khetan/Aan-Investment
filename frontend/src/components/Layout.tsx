@@ -3,6 +3,8 @@ import { useAuth } from "../features/auth/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/borrowers", label: "Borrowers" },
+  { to: "/loans", label: "Loans" },
   { to: "/reports", label: "Reports" },
   { to: "/accounting", label: "Accounting Export" },
   { to: "/collateral", label: "Collateral" },
