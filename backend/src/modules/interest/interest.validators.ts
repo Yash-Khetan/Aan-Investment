@@ -19,7 +19,11 @@ export const createInterestConfigSchema = z.object({
   ruleType: z.enum(ruleTypeValues).optional(),
   effectiveFrom: z.string().date(),
   remarks: z.string().optional(),
-});
+  customFormula: z.string().optional(),
+}).refine(
+  (data) => data.interestBasis !== "CUSTOM" || !!data.customFormula,
+  { message: "customFormula is required when interestBasis is CUSTOM", path: ["customFormula"] }
+);
 
 export const loanIdParamSchema = z.object({
   loanId: z.string().uuid(),

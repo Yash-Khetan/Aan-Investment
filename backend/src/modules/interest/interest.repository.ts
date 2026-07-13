@@ -56,6 +56,7 @@ export async function createInterestConfigRevision(input: {
   ruleType?: string;
   effectiveFrom: string;
   remarks?: string;
+  customFormula?: string;
 }) {
   return db.transaction(async (tx) => {
     const previous = await tx
@@ -81,6 +82,7 @@ export async function createInterestConfigRevision(input: {
         effectiveFrom: input.effectiveFrom,
         isCurrent: true,
         remarks: input.remarks,
+        customFormula: input.customFormula,
       })
       .returning();
 

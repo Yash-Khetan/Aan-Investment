@@ -10,6 +10,7 @@ import { detectActiveEvents } from "./eventDetector";
 import { InstallmentSnapshot } from "./eventDetector.types";
 import { InterestRuleRow } from "./interest.types";
 import { PenalInterestRuleRow } from "./penalInterest.types";
+import { evaluateCustomFormula } from "./strategies/custom.strategy";
 
 export interface CalculateInterestInput {
   loanId: string;
@@ -80,17 +81,34 @@ export async function calculateInterestForLoan(
     activeEvents,
   });
 
-  const strategy = interestStrategyRegistry[config.interestBasis as keyof typeof interestStrategyRegistry];
-  if (!strategy) {
-    throw new Error(`No strategy registered for interest basis: ${config.interestBasis}`);
-  }
+  let baseInterest: number;
 
-  const baseInterest = strategy.calculate({
-    principal: input.outstandingPrincipal,
-    annualRate: effectiveRate,
-    periodStart: new Date(config.effectiveFrom),
-    periodEnd: input.asOfDate,
-  });
+  if (config.interestBasis === "CUSTOM") {
+    if (!config.customFormula) {
+      throw new Error(
+        `Loan ${input.loanId} has interestBasis CUSTOM but no customFormula configured.`
+      );
+    }
+
+    baseInterest = evaluateCustomFormula(config.customFormula, {
+      principal: input.outstandingPrincipal,
+      annualRate: effectiveRate,
+      periodStart: new Date(config.effectiveFrom),
+      periodEnd: input.asOfDate,
+    });
+  } else {
+    const strategy = interestStrategyRegistry[config.interestBasis as keyof typeof interestStrategyRegistry];
+    if (!strategy) {
+      throw new Error(`No strategy registered for interest basis: ${config.interestBasis}`);
+    }
+
+    baseInterest = strategy.calculate({
+      principal: input.outstandingPrincipal,
+      annualRate: effectiveRate,
+      periodStart: new Date(config.effectiveFrom),
+      periodEnd: input.asOfDate,
+    });
+  }
 
   const penalRuleRow = await getCurrentPenalRule(input.loanId);
 
