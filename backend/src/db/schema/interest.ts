@@ -55,8 +55,11 @@ export const interestConfigs = pgTable("interest_configs", {
 
     isCurrent: boolean("is_current")
         .default(true),
+remarks: text("remarks"),
 
-    remarks: text("remarks"),
+    /* Only populated when interestBasis = CUSTOM. Evaluated safely via
+       mathjs, not raw eval — see modules/interest/strategies/custom.strategy.ts */
+    customFormula: text("custom_formula"),
 
     ...timestamps,
 
