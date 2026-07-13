@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { recordPayment } from "./payment.service";
+import { getLoanPaymentHistory, recordPayment } from "./payment.service";
 
 export const createPayment: RequestHandler = async (req, res, next) => {
   try {
@@ -21,6 +21,16 @@ export const createPayment: RequestHandler = async (req, res, next) => {
     const result = await recordPayment(body);
 
     res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listPayments: RequestHandler = async (req, res, next) => {
+  try {
+    const { loanId } = req.valid!.params as { loanId: string };
+    const payments = await getLoanPaymentHistory(loanId);
+    res.json({ success: true, data: payments });
   } catch (err) {
     next(err);
   }

@@ -100,3 +100,8 @@ export async function createPaymentWithAllocation(input: {
     return { payment, allocation };
   });
 }
+
+export async function getPaymentsForLoan(loanId: string) {
+  const { eq, desc } = await import("drizzle-orm");
+  return db.select().from(payments).where(eq(payments.loanId, loanId)).orderBy(desc(payments.paymentDate));
+}

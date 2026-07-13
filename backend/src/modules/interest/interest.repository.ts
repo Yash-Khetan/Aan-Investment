@@ -89,3 +89,87 @@ export async function createInterestConfigRevision(input: {
     return created;
   });
 }
+
+
+export async function createInterestRule(input: {
+  interestConfigId: string;
+  fromMonth?: number;
+  toMonth?: number;
+  rate: string;
+  triggerEvent?: string;
+  remarks?: string;
+}) {
+  const [created] = await db
+    .insert(interestRules)
+    .values({
+      interestConfigId: input.interestConfigId,
+      fromMonth: input.fromMonth,
+      toMonth: input.toMonth,
+      rate: input.rate,
+      triggerEvent: input.triggerEvent,
+      remarks: input.remarks,
+    })
+    .returning();
+
+  if (!created) {
+    throw new Error("Failed to create interest rule.");
+  }
+
+  return created;
+}
+
+export async function deleteInterestRule(ruleId: string) {
+  await db.delete(interestRules).where(eq(interestRules.id, ruleId));
+}
+
+export async function createPenalRule(input: {
+  loanId: string;
+  penalType: string;
+  penalRate?: string;
+  penalAmount?: string;
+  penalBase?: string;
+  gracePeriodDays?: number;
+  remarks?: string;
+}) {
+  return db.transaction(async (tx) => {
+    const previous = await tx
+      .select()
+      .from(penalInterestRules)
+      .where(and(eq(penalInterestRules.loanId, input.loanId), eq(penalInterestRules.isCurrent, true)))
+      .limit(1);
+
+    if (previous[0]) {
+      await tx
+        .update(penalInterestRules)
+        .set({ isCurrent: false })
+        .where(eq(penalInterestRules.id, previous[0].id));
+    }
+
+    const [created] = await tx
+      .insert(penalInterestRules)
+      .values({
+        loanId: input.loanId,
+        penalType: input.penalType as any,
+        penalRate: input.penalRate,
+        penalAmount: input.penalAmount,
+        penalBase: (input.penalBase ?? "OVERDUE_INSTALLMENT_ONLY") as any,
+        gracePeriodDays: input.gracePeriodDays ?? 0,
+        isCurrent: true,
+        remarks: input.remarks,
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error("Failed to create penal rule.");
+    }
+
+    return created;
+  });
+}
+
+export async function getPenalRulesForLoan(loanId: string) {
+  return db
+    .select()
+    .from(penalInterestRules)
+    .where(eq(penalInterestRules.loanId, loanId));
+}

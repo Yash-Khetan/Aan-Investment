@@ -1,4 +1,4 @@
-import { getCurrentWaterfallSteps, createPaymentWithAllocation } from "./payment.repository";
+import { getCurrentWaterfallSteps, createPaymentWithAllocation, getPaymentsForLoan } from "./payment.repository";
 import { applyWaterfall } from "./waterfallEngine";
 import { WaterfallStep } from "./payment.types";
 import { recordPaymentEntries } from "../accounting/accounting.service";
@@ -61,4 +61,8 @@ export async function recordPayment(input: {
   });
 
   return { ...saved, waterfallResult: result };
+}
+
+export async function getLoanPaymentHistory(loanId: string) {
+  return getPaymentsForLoan(loanId);
 }

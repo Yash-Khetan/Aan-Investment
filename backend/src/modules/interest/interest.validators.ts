@@ -46,3 +46,31 @@ export const calculateInterestSchema = z.object({
     )
     .default([]),
 });
+
+
+export const createInterestRuleSchema = z.object({
+  interestConfigId: z.string().uuid(),
+  fromMonth: z.coerce.number().int().nonnegative().optional(),
+  toMonth: z.coerce.number().int().nonnegative().optional(),
+  rate: z.coerce.number().nonnegative(),
+  triggerEvent: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const ruleIdParamSchema = z.object({
+  ruleId: z.string().uuid(),
+});
+
+export const createPenalRuleSchema = z.object({
+  loanId: z.string().uuid(),
+  penalType: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
+  penalRate: z.coerce.number().nonnegative().optional(),
+  penalAmount: z.coerce.number().nonnegative().optional(),
+  penalBase: z.enum(["ENTIRE_OUTSTANDING", "OVERDUE_INSTALLMENT_ONLY"]).optional(),
+  gracePeriodDays: z.coerce.number().int().nonnegative().optional(),
+  remarks: z.string().optional(),
+});
+
+export const configIdParamSchema = z.object({
+  configId: z.string().uuid(),
+});

@@ -69,5 +69,18 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 
 export async function getJournalEntriesForLoan(loanId: string) {
   const { eq } = await import("drizzle-orm");
-  return db.select().from(journalEntries).where(eq(journalEntries.loanId, loanId));
+
+  const entries = await db.select().from(journalEntries).where(eq(journalEntries.loanId, loanId));
+
+  const entriesWithLines = await Promise.all(
+    entries.map(async (entry) => {
+      const lines = await db
+        .select()
+        .from(journalEntryLines)
+        .where(eq(journalEntryLines.journalEntryId, entry.id));
+      return { ...entry, lines };
+    })
+  );
+
+  return entriesWithLines;
 }

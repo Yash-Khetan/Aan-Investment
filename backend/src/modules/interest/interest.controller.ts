@@ -1,7 +1,8 @@
 import type { RequestHandler } from "express";
 import { NotFoundError } from "../../common/errors";
-import { createInterestConfigRevision, getCurrentInterestConfig } from "./interest.repository";
 import { calculateInterestForLoan } from "./interest.service";
+
+import { createInterestConfigRevision, getCurrentInterestConfig, createInterestRule, deleteInterestRule, createPenalRule, getPenalRulesForLoan, getInterestRulesForConfig } from "./interest.repository";
 
 export const createInterestConfig: RequestHandler = async (req, res, next) => {
   try {
@@ -72,6 +73,91 @@ export const calculateInterest: RequestHandler = async (req, res, next) => {
     });
 
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createRule: RequestHandler = async (req, res, next) => {
+  try {
+    const body = req.valid!.body as {
+      interestConfigId: string;
+      fromMonth?: number;
+      toMonth?: number;
+      rate: number;
+      triggerEvent?: string;
+      remarks?: string;
+    };
+
+    const rule = await createInterestRule({
+      interestConfigId: body.interestConfigId,
+      fromMonth: body.fromMonth,
+      toMonth: body.toMonth,
+      rate: String(body.rate),
+      triggerEvent: body.triggerEvent,
+      remarks: body.remarks,
+    });
+
+    res.status(201).json({ success: true, data: rule });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const removeRule: RequestHandler = async (req, res, next) => {
+  try {
+    const { ruleId } = req.valid!.params as { ruleId: string };
+    await deleteInterestRule(ruleId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createPenalty: RequestHandler = async (req, res, next) => {
+  try {
+    const body = req.valid!.body as {
+      loanId: string;
+      penalType: string;
+      penalRate?: number;
+      penalAmount?: number;
+      penalBase?: string;
+      gracePeriodDays?: number;
+      remarks?: string;
+    };
+
+    const rule = await createPenalRule({
+      loanId: body.loanId,
+      penalType: body.penalType,
+      penalRate: body.penalRate !== undefined ? String(body.penalRate) : undefined,
+      penalAmount: body.penalAmount !== undefined ? String(body.penalAmount) : undefined,
+      penalBase: body.penalBase,
+      gracePeriodDays: body.gracePeriodDays,
+      remarks: body.remarks,
+    });
+
+    res.status(201).json({ success: true, data: rule });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const listRules: RequestHandler = async (req, res, next) => {
+  try {
+    const { configId } = req.valid!.params as { configId: string };
+    const rules = await getInterestRulesForConfig(configId);
+    res.json({ success: true, data: rules });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listPenalRules: RequestHandler = async (req, res, next) => {
+  try {
+    const { loanId } = req.valid!.params as { loanId: string };
+    const rules = await getPenalRulesForLoan(loanId);
+    res.json({ success: true, data: rules });
   } catch (err) {
     next(err);
   }

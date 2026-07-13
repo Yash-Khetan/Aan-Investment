@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validate } from "../../middleware/validate";
 import { authenticate } from "../auth/auth.middleware";
-import { recordPaymentSchema } from "./payment.validators";
+import { loanIdParamSchema, recordPaymentSchema } from "./payment.validators";
 import * as controller from "./payment.controller";
 
 /**
@@ -15,4 +15,11 @@ paymentRouter.post(
   authenticate,
   validate({ body: recordPaymentSchema }),
   controller.createPayment
+);
+
+paymentRouter.get(
+  "/:loanId",
+  authenticate,
+  validate({ params: loanIdParamSchema }),
+  controller.listPayments
 );

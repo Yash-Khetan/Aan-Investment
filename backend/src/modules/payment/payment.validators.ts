@@ -18,3 +18,7 @@ export const recordPaymentSchema = z.object({
   outstandingInterest: z.coerce.number().nonnegative().default(0),
   outstandingPrincipal: z.coerce.number().nonnegative(),
 });
+
+export const loanIdParamSchema = z.object({
+  loanId: z.string().uuid(),
+});
