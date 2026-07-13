@@ -18,6 +18,10 @@ import { EditBorrowerPage } from "./features/borrowers/EditBorrowerPage";
 import { LoansPage } from "./features/loans/LoansPage";
 import { CreateLoanPage } from "./features/loans/CreateLoanPage";
 import { EditLoanPage } from "./features/loans/EditLoanPage";
+import { InterestEnginePage } from "./features/interest/InterestEnginePage";
+import { RepaymentEnginePage } from "./features/repayment/RepaymentEnginePage";
+import { PaymentsPage } from "./features/payments/PaymentsPage";
+import { AccountingLedgerPage } from "./features/accounting-entries/AccountingLedgerPage";
 
 export default function App() {
   return (
@@ -36,8 +40,12 @@ export default function App() {
           <Route path="/loans" element={<LoansPage />} />
           <Route path="/loans/new" element={<CreateLoanPage />} />
           <Route path="/loans/:id/edit" element={<EditLoanPage />} />
+          <Route path="/interest" element={<InterestEnginePage />} />
+          <Route path="/repayment" element={<RepaymentEnginePage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/accounting" element={<AccountingPage />} />
+          <Route path="/accounting-entries" element={<AccountingLedgerPage />} />
           <Route path="/collateral" element={<CollateralPage />} />
           <Route path="/collections" element={<CollectionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
