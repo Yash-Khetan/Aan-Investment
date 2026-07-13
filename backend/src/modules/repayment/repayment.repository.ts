@@ -82,6 +82,9 @@ export async function createScheduleRevision(input: {
         remarks: input.remarks,
       })
       .returning();
+      if (!schedule) {
+      throw new Error("Failed to create repayment schedule.");
+    }
 
     if (input.generatedInstallments.length > 0) {
       await tx.insert(installments).values(

@@ -24,6 +24,11 @@ import dashboardRouter from "./modules/dashboard/routes/dashboard.routes.js";
 import { lookupRouter } from "./routes/lookup.routes.js";
 import apiRouter from "./routes/index";
 
+
+import { paymentRouter } from "./modules/payment/payment.routes";
+import { accountingRouter } from "./modules/accounting/accounting.routes";
+
+
 /**
  * Single composition root & process entry point.
  *
@@ -89,6 +94,9 @@ function createApp(): Application {
 
     app.use("/interest-rules", interestRouter); //  POST /, GET /:loanId, POST /:loanId/calculate
     app.use("/repayment-schedules", repaymentRouter); //  POST /, GET /:loanId
+
+    app.use("/payments", paymentRouter); //  POST /
+    app.use("/accounting-entries", accountingRouter); //  POST /disbursement, POST /write-off, GET /:loanId
 
     app.use("/documents", documentRouter);
     app.use("/collateral", collateralRouter);
