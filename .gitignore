@@ -51,6 +51,16 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# Temporary / debug scratch files
+# Throwaway scripts written to poke at the database or an endpoint during
+# verification. They are never part of the codebase and must never be committed.
+*.tmp
+*.tmp.*
+*.temp
+probe.*
+scratch.*
+debug.*
+
 # Misc
 *.pid
 *.seed

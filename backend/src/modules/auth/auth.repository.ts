@@ -98,6 +98,22 @@ export class UserRepository {
             .where(isNull(users.deletedAt));
     }
 
+    /**
+     * Enable or disable an account (admin capability; guarded by RBAC).
+     * Returns the updated row, or `undefined` if no live user has that id — so
+     * the service can tell "not found" apart from a successful change without a
+     * second round-trip. We never hard-delete users; this is the reversible
+     * alternative, and `deleted_at` stays untouched.
+     */
+    async setActive(userId: string, isActive: boolean): Promise<UserRecord | undefined> {
+        const [row] = await this.db
+            .update(users)
+            .set({ isActive, updatedAt: new Date() })
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+            .returning();
+        return row;
+    }
+
     /** Stamp the last successful login time. */
     async updateLastLoginAt(userId: string, when: Date = new Date()): Promise<void> {
         await this.db

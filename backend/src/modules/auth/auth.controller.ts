@@ -12,6 +12,8 @@ import type {
     RefreshInput,
     ForgotPasswordInput,
     ResetPasswordInput,
+    AdminCreateUserInput,
+    UserIdParam,
 } from "./auth.validators";
 import type { RequestContext } from "./auth.types";
 
@@ -94,6 +96,29 @@ export const listUsers: RequestHandler = async (_req, res) => {
     const users = await authService.listUsers();
     res.status(200).json({ success: true, data: { users } });
 };
+
+export const createUser: RequestHandler = async (req, res) => {
+    const input = req.valid.body as AdminCreateUserInput;
+    const user = await authService.createUser(input);
+    res.status(201).json({ success: true, data: { user } });
+};
+
+/**
+ * Enable/disable an account. Both handlers are the same call with the flag
+ * flipped; the actor's id comes from the verified token, never the body, so the
+ * self-deactivation guard in the service cannot be spoofed.
+ */
+function setActive(isActive: boolean): RequestHandler {
+    return async (req, res) => {
+        if (!req.user) throw new UnauthorizedError("Not authenticated");
+        const { id } = req.valid.params as UserIdParam;
+        const user = await authService.setUserActive(req.user.id, id, isActive);
+        res.status(200).json({ success: true, data: { user } });
+    };
+}
+
+export const activateUser = setActive(true);
+export const deactivateUser = setActive(false);
 
 export const getCurrentUser: RequestHandler = async (req, res) => {
     if (!req.user) throw new UnauthorizedError("Not authenticated");
