@@ -72,6 +72,15 @@ const smtpPortRaw = nullable("SMTP_PORT");
 const smtpPort = smtpPortRaw === null ? null : toInt("SMTP_PORT", smtpPortRaw);
 const smtpSecureRaw = nullable("SMTP_SECURE");
 
+/**
+ * Credentials of the bootstrap ADMIN account created by `npm run db:seed`.
+ * These defaults exist so a fresh clone can seed and log in without extra setup;
+ * they are public knowledge and MUST be overridden in any real deployment.
+ */
+const DEFAULT_SEED_ADMIN_EMAIL = "tonymony5678@gmail.com";
+const DEFAULT_SEED_ADMIN_PASSWORD = "admin@123";
+const seedAdminPassword = optional("SEED_ADMIN_PASSWORD", DEFAULT_SEED_ADMIN_PASSWORD);
+
 export const config = {
     env: nodeEnv,
     isProduction: nodeEnv === "production",
@@ -127,6 +136,20 @@ export const config = {
              */
             ttlDays: toInt("REFRESH_TOKEN_TTL_DAYS", optional("REFRESH_TOKEN_TTL_DAYS", "7")),
         },
+    },
+
+    /**
+     * Bootstrap data for `npm run db:seed`. Read ONLY by the seed script — the
+     * running server never touches these, and the admin has no special-case code
+     * path: it is an ordinary user row that happens to hold the ADMIN role.
+     */
+    seed: {
+        /** Lowercased to match how the auth validators normalize a login email. */
+        adminEmail: optional("SEED_ADMIN_EMAIL", DEFAULT_SEED_ADMIN_EMAIL).trim().toLowerCase(),
+        /** Hashed with Argon2id like every other password before it is stored. */
+        adminPassword: seedAdminPassword,
+        /** True when SEED_ADMIN_PASSWORD was left at its published default. */
+        adminPasswordIsDefault: seedAdminPassword === DEFAULT_SEED_ADMIN_PASSWORD,
     },
 
     /**

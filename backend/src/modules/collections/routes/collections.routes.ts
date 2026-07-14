@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { validateUuidParam } from "../middleware/params.middleware";
+import { authenticate } from "../../auth/auth.middleware";
 import {
     createActivity,
     updateActivity,
@@ -14,6 +15,8 @@ import {
 } from "../controllers/collections.controller";
 
 const collectionsRouter = Router();
+
+collectionsRouter.use(authenticate);
 
 collectionsRouter.post("/", createActivity);
 

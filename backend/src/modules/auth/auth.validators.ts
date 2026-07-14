@@ -59,6 +59,28 @@ export const registerSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 /**
+ * ADMIN CREATE USER — POST /users, behind the "user:create" permission.
+ *
+ * Deliberately the SAME shape as registration: an admin provisioning an account
+ * supplies exactly what a self-registering user would, and nothing more. There
+ * is no `role` field, and Zod strips unknown keys, so a caller who posts
+ * `{"role":"ADMIN"}` gets it silently discarded rather than honoured. Role
+ * assignment is not a client-controlled input anywhere in this API.
+ */
+export const adminCreateUserSchema = registerSchema;
+export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
+
+/**
+ * A `:id` path parameter that must be a UUID. Guards the activate/deactivate
+ * routes so a malformed id fails as a clean 422 at the edge instead of blowing
+ * up Postgres with an invalid-uuid cast error deep in the repository.
+ */
+export const userIdParamSchema = z.object({
+    id: z.uuid("A valid user id is required"),
+});
+export type UserIdParam = z.infer<typeof userIdParamSchema>;
+
+/**
  * LOGIN — email + a non-empty password.
  * We do NOT enforce password complexity on login: the rules may have changed
  * since the account was created, and rejecting here would just leak policy.

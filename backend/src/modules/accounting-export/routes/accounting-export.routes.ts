@@ -3,6 +3,7 @@ import { Router } from "express";
 import { exportEntries, listEntries } from "../controllers/accounting-export.controller.js";
 import { errorHandlerMiddleware } from "../middleware/error-handler.middleware.js";
 import { requestLoggerMiddleware } from "../middleware/request-logger.middleware.js";
+import { authenticate } from "../../auth/auth.middleware";
 
 /* ============================================================
    ACCOUNTING EXPORT ROUTES
@@ -17,6 +18,7 @@ import { requestLoggerMiddleware } from "../middleware/request-logger.middleware
 export const accountingExportRouter = Router();
 
 accountingExportRouter.use(requestLoggerMiddleware);
+accountingExportRouter.use(authenticate);
 
 accountingExportRouter.get("/export/:category", exportEntries);
 accountingExportRouter.get("/:category", listEntries);

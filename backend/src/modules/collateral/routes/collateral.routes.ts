@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { validateUuidParam } from "../middleware/params.middleware";
+import { authenticate } from "../../auth/auth.middleware";
 import {
     createCollateral,
     updateCollateral,
@@ -12,6 +13,8 @@ import {
 } from "../controllers/collateral.controller";
 
 const collateralRouter = Router();
+
+collateralRouter.use(authenticate);
 
 collateralRouter.post("/", createCollateral);
 

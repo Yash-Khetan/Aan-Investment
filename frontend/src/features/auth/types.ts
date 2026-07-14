@@ -4,6 +4,7 @@ export interface PublicUser {
   lastName: string | null;
   email: string;
   roles: string[];
+  isActive: boolean;
 }
 
 export interface LoginInput {

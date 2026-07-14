@@ -131,7 +131,9 @@ npm run db:seed        # seed system roles, permissions and grants (required)
 npm run dev            # start with hot reload
 ```
 
-`db:seed` is **not optional**: it creates the `EMPLOYEE` role and the permission catalogue. `POST /auth/register` resolves the default role by name, so registration fails against an unseeded database. The seed is idempotent — running it twice changes nothing.
+`db:seed` is **not optional**: it creates the `EMPLOYEE` and `ADMIN` roles, the permission catalogue, the role→permission grants, and the single bootstrap admin account. `POST /auth/register` resolves the default role by name, so registration fails against an unseeded database. The seed is idempotent — running it twice changes nothing, and it never resets an existing admin's password.
+
+The seeded admin defaults to **`tonymony5678@gmail.com` / `admin@123`**. Those defaults are published here, which makes them **public knowledge** — set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in `.env` before seeding anything that is not a throwaway local database. The seed warns on every run that uses the default password, and **refuses to run at all** when `NODE_ENV=production`.
 
 The server starts on **http://localhost:3000**. A liveness probe is available at `GET /health`.
 
@@ -152,6 +154,8 @@ Every variable is read in `src/config/env.ts` and nowhere else — no module rea
 | `JWT_ACCESS_TTL`           | No       | Access-token lifetime (default`15m`).                                  |
 | `REFRESH_TOKEN_TTL_DAYS`   | No       | Refresh-token validity in days (default`7`).                           |
 | `APP_PASSWORD_RESET_URL`   | No       | Base URL of the reset page; the emailed link appends `?token=…`.        |
+| `SEED_ADMIN_EMAIL`         | No       | Email of the seeded admin (default`tonymony5678@gmail.com`). Seed-only. |
+| `SEED_ADMIN_PASSWORD`      | No       | Password of the seeded admin (default`admin@123` — **public**). Seed-only. |
 | `CORS_ORIGINS`             | Prod     | Comma-separated allowed origins. Required in production.                 |
 | `LOG_LEVEL`                | No       | Pino log level (`debug` \| `info` \| `warn` \| `error`).         |
 | `SMTP_HOST`                | No\*     | SMTP server host.                                                        |
@@ -175,16 +179,19 @@ Every variable is read in `src/config/env.ts` and nowhere else — no module rea
 
 All auth routes are mounted under `/auth`; the current-user route under `/users`.
 
-| Method | Endpoint                  | Auth           | Description                                                          |
-| ------ | ------------------------- | -------------- | -------------------------------------------------------------------- |
-| POST   | `/auth/register`        | Public         | Create an account with the default `EMPLOYEE` role. Issues no tokens. |
-| POST   | `/auth/login`           | Public         | Authenticate with credentials; issues access token + refresh cookie. |
-| POST   | `/auth/refresh`         | Refresh cookie | Rotate the session and issue a new access token.                     |
-| POST   | `/auth/logout`          | Public         | Invalidate the current session (idempotent).                         |
-| POST   | `/auth/forgot-password` | Public         | Request a password-reset token for an email.                         |
-| POST   | `/auth/reset-password`  | Reset token    | Set a new password using a valid reset token.                        |
-| GET    | `/users/me`             | Access token   | Return the authenticated user's profile.                             |
-| GET    | `/users`                | `user:read`  | List all users. RBAC-protected.                                      |
+| Method | Endpoint                     | Auth               | Description                                                          |
+| ------ | ---------------------------- | ------------------ | -------------------------------------------------------------------- |
+| POST   | `/auth/register`           | Public             | Create an account with the default `EMPLOYEE` role. Issues no tokens. |
+| POST   | `/auth/login`              | Public             | Authenticate with credentials; issues access token + refresh cookie. |
+| POST   | `/auth/refresh`            | Refresh cookie     | Rotate the session and issue a new access token.                     |
+| POST   | `/auth/logout`             | Public             | Invalidate the current session (idempotent).                         |
+| POST   | `/auth/forgot-password`    | Public             | Request a password-reset token for an email.                         |
+| POST   | `/auth/reset-password`     | Reset token        | Set a new password using a valid reset token.                        |
+| GET    | `/users/me`                | Access token       | Return the authenticated user's profile.                             |
+| GET    | `/users`                   | `user:read`      | List all users. **Admin only.**                                      |
+| POST   | `/users`                   | `user:create`    | Provision an account for a colleague. **Admin only.**                |
+| PATCH  | `/users/:id/activate`      | `user:activate`  | Re-enable a disabled account. **Admin only.**                        |
+| PATCH  | `/users/:id/deactivate`    | `user:deactivate`| Disable an account and revoke its sessions. **Admin only.**          |
 
 Every response shares one envelope. Success: `{ "success": true, "data": { … } }`. Failure: `{ "success": false, "error": { "message": "…", "requestId": "…" } }`, with an extra `details` array on validation errors. All failures funnel through a single global error handler.
 
@@ -235,6 +242,31 @@ Requires `Authorization: Bearer <access-token>`. Returns the profile behind the 
 
 ---
 
+## User Management (admin only)
+
+Four routes, each gated by a distinct permission that only `ADMIN` holds. An authenticated `EMPLOYEE` reaching any of them gets **403**, not 401 — they are authenticated, just not permitted.
+
+### `GET /users`
+
+Lists every non-deleted user with their roles and `isActive` flag. Requires `user:read`.
+
+### `POST /users`
+
+Body `{ firstName, lastName, email, password }` — the **same** shape and the same validation as registration. Requires `user:create`. Returns **201** with the sanitized user.
+
+The admin does not choose a role: there is no `role` field, so this endpoint cannot mint a second admin. The account is created with `EMPLOYEE`, hashed with the same Argon2id parameters, in the same single transaction that writes the user row and its role grant together. Duplicate email → **409**.
+
+### `PATCH /users/:id/activate` · `PATCH /users/:id/deactivate`
+
+Enable or disable an account. Require `user:activate` / `user:deactivate` respectively. A malformed `:id` fails as **422** at the route edge before it can reach Postgres. Unknown id → **404**.
+
+Deactivation is this system's answer to deletion — reversible, and it destroys no history. Two consequences are worth knowing:
+
+* **Sessions are revoked immediately.** Disabling an account deletes every `user_sessions` row for it, so it cannot silently keep renewing itself. Its already-issued access token still works until it expires (≤15 min) — access tokens are stateless by design — but `POST /auth/refresh` re-checks `isActive`, so the door shuts on its own and cannot be propped open. `POST /auth/login` returns 403 for a disabled account.
+* **An admin may not deactivate themselves** → **400**. With a single admin account that would be an unrecoverable lockout: nobody would be left holding `user:activate` to undo it. The actor's id comes from the verified token, never the request body, so the guard cannot be spoofed.
+
+---
+
 ## Token Model & Refresh Flow
 
 * **Access tokens** are short-lived JWTs (HS256, default 15 minutes) carrying `{ sub, roles }` and sent in the `Authorization: Bearer <token>` header. They are stateless — verified by signature alone, with no database hit on the hot path.
@@ -259,15 +291,28 @@ Passwords are hashed with **Argon2id** (memory-hard: 19 MiB, 2 passes), whose PH
 
 Authentication answers *who are you*; authorization answers *what may you do*. They are separate layers and never duplicate each other's work.
 
-Permissions resolve through four tables: `user_roles → roles (active only) → role_permissions → permissions`. The LMS is internal to Aan Finance & Investment, so the seed defines a single business role:
+Permissions resolve through four tables: `user_roles → roles (active only) → role_permissions → permissions`. The LMS is internal to Aan Finance & Investment, so the seed defines two roles:
 
-| Role       | Permissions                                                                        |
-| ---------- | ---------------------------------------------------------------------------------- |
-| `EMPLOYEE` | `user:read`, `user:write`, `loan:read`, `loan:create` — the default for new accounts |
+| Role       | Permissions                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `EMPLOYEE` | `loan:read`, `loan:create` — the default for every new account                                                          |
+| `ADMIN`    | everything `EMPLOYEE` has, plus `user:read`, `user:create`, `user:update`, `user:activate`, `user:deactivate`           |
 
-`EMPLOYEE` holds the entire permission catalogue. Further roles (`ADMIN`, `AUDITOR`, `CREDIT_MANAGER`, `COLLECTION_OFFICER`) can be introduced by adding rows to `SYSTEM_ROLES` and `ROLE_PERMISSIONS` in `backend/src/db/seed/index.ts` — the authorization layer needs no change.
+`ADMIN` **inherits every employee capability** — its grant list is literally `[...EMPLOYEE_PERMISSIONS, ...ADMIN_PERMISSIONS]` — so an admin can do anything an employee can, and additionally manage users. The reverse is not true: an employee hitting a user-management route gets a 403.
 
-An earlier design shipped `MANAGER` and `VIEWER` roles. The seed now retires them: any user still holding one is migrated to `EMPLOYEE` before the role rows are deleted, so nobody loses access. Because `user_roles.role_id` has no `ON DELETE CASCADE`, the memberships must be removed before the role itself — `retireLegacyRoles()` does this in order. On a database that never had them, the step is a no-op.
+There is deliberately **no `user:delete`**. Accounts are deactivated, never destroyed, so history and audit trails survive.
+
+Exactly **one** admin account exists, created by the seed (see [Setup](#local-setup)). It is an *ordinary user row* that happens to hold the `ADMIN` role — there is no `if (email === "admin@…")` anywhere in the codebase, and login, refresh, sessions and password hashing treat it exactly like anyone else. Nothing in `auth.routes.ts` names a role either: routes ask for *permissions*, and the seed decides who holds them. Adding a second privileged role later needs no code change outside the seed.
+
+Registration cannot escalate privilege. Neither `POST /auth/register` nor `POST /users` accepts a `role` field, and Zod strips unknown keys — so a caller who posts `{"role":"ADMIN"}` has it silently discarded. A role can only be granted by the seed or by direct database access.
+
+Further roles (`AUDITOR`, `CREDIT_MANAGER`, `COLLECTION_OFFICER`) are added by extending `SYSTEM_ROLES` and `ROLE_PERMISSIONS` in `backend/src/db/seed/index.ts` — the authorization layer needs no change.
+
+#### The seed both grants and revokes
+
+`syncRolePermissions()` makes each managed role's grants match `ROLE_PERMISSIONS` **exactly**: it inserts what is listed and *deletes what is not*. This matters, because `EMPLOYEE` previously held the whole catalogue, `user:read` included — every employee could list every user. Inserting new grants would never have undone that; only deleting the stale rows does. Roles the seed does not manage are left untouched.
+
+Two retirements run for the same reason. `MANAGER` and `VIEWER` roles from an earlier design are dropped, with any remaining holder migrated to `EMPLOYEE` first so nobody loses access (`user_roles.role_id` has no `ON DELETE CASCADE`, so memberships must go before the role). And the coarse `user:write` permission is deleted, superseded by the finer `user:create` / `user:update` / `user:activate` / `user:deactivate`; `role_permissions.permission_id` cascades, so no role is left holding a key to a door that no longer exists. On a database that never had them, both steps are no-ops.
 
 Guards compose on a route, `authenticate` always first:
 
@@ -331,6 +376,7 @@ docker run -p 3000:3000 --env-file .env aan-backend
 * Application bootstrap, configuration, logging, and graceful shutdown — implemented.
 * Database layer, schema, and migrations — implemented.
 * Full authentication module (register, login, refresh, logout, forgot/reset password, RBAC, session management) — implemented.
+* Admin role + admin-only user management (list, create, activate, deactivate) — implemented.
 * Notifications module (email, SMS, WhatsApp) with persistence — implemented.
 * Borrower and Loan master modules (CRUD, validation, nested promoters/guarantors) — implemented.
 * Interest engine, repayment engine, collateral, collections, documents, reports, accounting export, dashboard — implemented; see the module list under `backend/src/modules/`.

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { uploadSingleFile } from "../middleware/upload.middleware";
+import { authenticate } from "../../auth/auth.middleware";
 import {
     uploadDocument,
     downloadDocument,
@@ -9,6 +10,8 @@ import {
 } from "../controllers/document.controller";
 
 const documentRouter = Router();
+
+documentRouter.use(authenticate);
 
 documentRouter.post("/upload", uploadSingleFile, uploadDocument);
 documentRouter.get("/entity/:entityType/:entityId", listDocuments);
