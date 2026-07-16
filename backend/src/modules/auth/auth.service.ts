@@ -9,7 +9,6 @@ import {
 import { db as defaultDb } from "../../db";
 import {
     passwordUtil,
-    signAccessToken,
     generateRefreshToken,
     hashRefreshToken,
 } from "./auth.utils";
@@ -45,6 +44,7 @@ import type {
     PublicUser,
     RegisteredUser,
     LoginResult,
+    AuthenticatedUser,
 } from "./auth.types";
 
 /** Map a raw DB user row + roles to the safe client projection. */
@@ -196,10 +196,9 @@ export class AuthService {
      * Deactivation is our stand-in for deletion: it is reversible and it destroys
      * no history. Two consequences worth knowing:
      *
-     *  - Disabling REVOKES every refresh session immediately, so the account
-     *    cannot silently keep renewing itself. Its already-issued access token
-     *    still works until it expires (≤15m) — access tokens are stateless by
-     *    design, and refresh() re-checks `isActive`, so the door shuts on its own.
+     *  - Disabling REVOKES every session immediately (deletes the rows), so the
+     *    account is locked out at once: authentication validates each request
+     *    against the session table, and there are no longer any rows to match.
      *  - An admin may not deactivate THEMSELVES. With a single admin account that
      *    would be an unrecoverable lockout: no one left holding "user:activate".
      *
@@ -240,60 +239,50 @@ export class AuthService {
         if (!user.isActive) throw new ForbiddenError("Account is disabled");
 
         const roles = await this.roles.findRoleNamesForUser(user.id);
-        const accessToken = signAccessToken({ sub: user.id, roles });
-        const refresh = generateRefreshToken();
+        const session = generateRefreshToken();
 
         await this.sessions.create({
             userId: user.id,
-            tokenHash: refresh.tokenHash,
-            expiresAt: refresh.expiresAt,
+            tokenHash: session.tokenHash,
+            expiresAt: session.expiresAt,
             ipAddress: ctx.ipAddress,
             userAgent: ctx.userAgent,
         });
         await this.users.updateLastLoginAt(user.id);
 
-        return { user: toPublicUser(user, roles), accessToken, refreshToken: refresh.token };
+        return { user: toPublicUser(user, roles), token: session.token };
     }
 
     /**
-     * refresh — exchange a valid refresh token for a NEW token pair (rotation).
-     * The presented token is invalidated and replaced, so a stolen-and-reused
-     * old token cannot yield fresh access.
-     * Errors: 401 (unknown/expired token, or user gone/disabled).
+     * authenticateByToken — resolve the caller's identity from the opaque session
+     * token they presented (as a Bearer credential). This is the gate every
+     * protected request passes through, so it re-validates against live data on
+     * each call: a session that is unknown, expired, or whose owner has been
+     * deleted/deactivated is rejected (and any stale row is cleaned up).
+     *
+     * Roles are read fresh from the database (not baked into the token), so a
+     * role change takes effect on the very next request.
+     * Errors: 401 (unknown/expired session, or user gone/disabled).
      */
-    async refresh(rawRefreshToken: string, ctx: RequestContext): Promise<LoginResult> {
-        const tokenHash = hashRefreshToken(rawRefreshToken);
+    async authenticateByToken(rawToken: string): Promise<AuthenticatedUser> {
+        const tokenHash = hashRefreshToken(rawToken);
         const session = await this.sessions.findByTokenHash(tokenHash);
-        if (!session) throw new UnauthorizedError("Invalid refresh token");
+        if (!session) throw new UnauthorizedError("Invalid or expired session");
 
         // Expired → clean it up and reject.
         if (session.expiresAt.getTime() <= Date.now()) {
             await this.sessions.deleteByTokenHash(tokenHash);
-            throw new UnauthorizedError("Refresh token expired");
+            throw new UnauthorizedError("Session expired");
         }
 
         const user = await this.users.findById(session.userId);
         if (!user || !user.isActive) {
             await this.sessions.deleteByTokenHash(tokenHash);
-            throw new UnauthorizedError("Invalid refresh token");
+            throw new UnauthorizedError("Invalid or expired session");
         }
 
-        // Rotate: delete the presented token, issue a brand-new one.
-        await this.sessions.deleteByTokenHash(tokenHash);
-
         const roles = await this.roles.findRoleNamesForUser(user.id);
-        const accessToken = signAccessToken({ sub: user.id, roles });
-        const refresh = generateRefreshToken();
-
-        await this.sessions.create({
-            userId: user.id,
-            tokenHash: refresh.tokenHash,
-            expiresAt: refresh.expiresAt,
-            ipAddress: ctx.ipAddress,
-            userAgent: ctx.userAgent,
-        });
-
-        return { user: toPublicUser(user, roles), accessToken, refreshToken: refresh.token };
+        return { id: user.id, roles };
     }
 
     /**
@@ -407,8 +396,8 @@ export class AuthService {
 
     /**
      * getCurrentUser — load the sanitized profile behind an authenticated id.
-     * Powers GET /users/me; the id comes from the verified access token.
-     * Errors: 404 (user not found / soft-deleted since the token was issued).
+     * Powers GET /users/me; the id comes from the verified session.
+     * Errors: 404 (user not found / soft-deleted since the session was issued).
      */
     async getCurrentUser(userId: string): Promise<PublicUser> {
         const user = await this.users.findById(userId);

@@ -1,19 +1,9 @@
 import argon2 from "argon2";
-import jwt, { type SignOptions } from "jsonwebtoken";
-import type { CookieOptions, Request, Response } from "express";
+import type { Request } from "express";
 import { config } from "../../config";
 import { randomToken, sha256Hex } from "../../common/crypto";
-import { UnauthorizedError } from "../../common/errors";
-import {
-    ARGON2_OPTIONS,
-    REFRESH_TOKEN_BYTES,
-    REFRESH_COOKIE_NAME,
-} from "./auth.constants";
-import type {
-    AccessTokenPayload,
-    DecodedAccessToken,
-    GeneratedRefreshToken,
-} from "./auth.types";
+import { ARGON2_OPTIONS, REFRESH_TOKEN_BYTES } from "./auth.constants";
+import type { GeneratedRefreshToken } from "./auth.types";
 
 /* ------------------------------------------------------------------ *
  * Passwords (Argon2id)
@@ -44,45 +34,20 @@ export const passwordUtil = {
 };
 
 /* ------------------------------------------------------------------ *
- * Tokens (JWT access + opaque refresh)
+ * Session tokens (opaque, server-side)
+ *
+ * The token issued at login IS the credential — clients present it as a Bearer
+ * token on every request. It is an OPAQUE random string (not a JWT): we store
+ * only its SHA-256 hash in userSessions.refreshToken and validate each request
+ * against that row, so authentication is fully revocable server-side.
  * ------------------------------------------------------------------ */
 
-const { secret, ttl } = config.auth.accessToken;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Sign a short-lived ACCESS TOKEN (JWT). Embeds { sub, roles } + an expiry.
- * Stateless: verified later by signature alone, no DB hit.
- */
-export function signAccessToken(payload: AccessTokenPayload): string {
-    // jsonwebtoken types `expiresIn` as a branded string union; our config value
-    // is a plain string, so cast through unknown.
-    const options: SignOptions = {
-        expiresIn: ttl as unknown as SignOptions["expiresIn"],
-    };
-    return jwt.sign(payload, secret, options);
-}
-
-/**
- * Verify an ACCESS TOKEN. Returns the decoded claims on success, or throws an
- * UnauthorizedError (401) on a bad/expired/tampered token.
- */
-export function verifyAccessToken(token: string): DecodedAccessToken {
-    try {
-        const decoded = jwt.verify(token, secret);
-        if (typeof decoded === "string") {
-            throw new Error("Unexpected string JWT payload");
-        }
-        return decoded as DecodedAccessToken;
-    } catch {
-        throw new UnauthorizedError("Invalid or expired access token");
-    }
-}
-
-/**
- * Generate a REFRESH TOKEN. Refresh tokens are OPAQUE random strings, not JWTs.
- * Returns the raw token (goes to the client cookie), its SHA-256 hash (what we
- * persist in userSessions.refreshToken), and the absolute expiry.
+ * Generate a SESSION TOKEN. Returns the raw token (returned to the client at
+ * login), its SHA-256 hash (persisted in userSessions.refreshToken), and the
+ * absolute expiry.
  */
 export function generateRefreshToken(): GeneratedRefreshToken {
     const token = randomToken(REFRESH_TOKEN_BYTES);
@@ -93,49 +58,18 @@ export function generateRefreshToken(): GeneratedRefreshToken {
     };
 }
 
-/** Hash a raw refresh token for DB lookup (hash the incoming cookie, match by hash). */
+/** Hash a raw session token for DB lookup (hash the presented token, match by hash). */
 export function hashRefreshToken(token: string): string {
     return sha256Hex(token);
 }
 
-/* ------------------------------------------------------------------ *
- * Refresh-token cookie
- *
- * Only the refresh token is a cookie; the access token rides in the response
- * body / Authorization header.
- *  - httpOnly: not readable by JS → mitigates XSS token theft.
- *  - secure:   HTTPS only. TRUE in prod; FALSE in dev for http://localhost.
- *  - sameSite: "lax" in dev (same-site localhost); "none" in prod so a
- *              cross-origin SPA can send it (spec requires pairing with secure).
- *  - path:     "/auth" → the browser only sends it to /auth/* (refresh, logout).
- *  - maxAge:   matches the refresh TTL so cookie and DB session expire together.
- * ------------------------------------------------------------------ */
-
-const COOKIE_PATH = "/auth";
-
-function cookieOptions(): CookieOptions {
-    return {
-        httpOnly: true,
-        secure: config.isProduction,
-        sameSite: config.isProduction ? "none" : "lax",
-        path: COOKIE_PATH,
-    };
-}
-
-/** Set the refresh cookie after login/refresh. */
-export function setRefreshCookie(res: Response, rawToken: string): void {
-    res.cookie(REFRESH_COOKIE_NAME, rawToken, {
-        ...cookieOptions(),
-        maxAge: config.auth.refreshToken.ttlDays * DAY_MS,
-    });
-}
-
-/** Clear the refresh cookie on logout. Options must match those used to set it. */
-export function clearRefreshCookie(res: Response): void {
-    res.clearCookie(REFRESH_COOKIE_NAME, cookieOptions());
-}
-
-/** Read the raw refresh token from the incoming cookie (if present). */
-export function readRefreshCookie(req: Request): string | undefined {
-    return req.cookies?.[REFRESH_COOKIE_NAME];
+/**
+ * Read the raw session token from a `Bearer <token>` Authorization header.
+ * Returns undefined when the header is absent, malformed, or carries no token.
+ */
+export function readBearerToken(req: Request): string | undefined {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith("Bearer ")) return undefined;
+    const token = header.slice("Bearer ".length).trim();
+    return token || undefined;
 }

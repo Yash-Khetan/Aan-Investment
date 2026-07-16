@@ -91,16 +91,6 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-/**
- * REFRESH — the refresh token normally arrives in an httpOnly cookie, so the
- * body is optional (a `refreshToken` field is accepted as a fallback for
- * non-browser clients). The controller will prefer the cookie.
- */
-export const refreshSchema = z.object({
-    refreshToken: z.string().min(1).optional(),
-});
-export type RefreshInput = z.infer<typeof refreshSchema>;
-
 /** FORGOT PASSWORD — just a well-formed email; response is always generic. */
 export const forgotPasswordSchema = z.object({ email });
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

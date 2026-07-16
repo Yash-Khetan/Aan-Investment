@@ -1,15 +1,10 @@
 import type { Request, RequestHandler } from "express";
 import { authService } from "./auth.service";
-import {
-    setRefreshCookie,
-    clearRefreshCookie,
-    readRefreshCookie,
-} from "./auth.utils";
+import { readBearerToken } from "./auth.utils";
 import { UnauthorizedError } from "../../common/errors";
 import type {
     RegisterInput,
     LoginInput,
-    RefreshInput,
     ForgotPasswordInput,
     ResetPasswordInput,
     AdminCreateUserInput,
@@ -18,9 +13,9 @@ import type {
 import type { RequestContext } from "./auth.types";
 
 /**
- * Auth controllers — thin HTTP adapters. Each: read validated input / cookie /
- * req.user, call ONE AuthService method, set/clear cookie, send JSON. No logic,
- * no SQL, no JWT, no hashing. Async throws are auto-forwarded to the global
+ * Auth controllers — thin HTTP adapters. Each: read validated input /
+ * Authorization header / req.user, call ONE AuthService method, send JSON. No
+ * logic, no SQL, no hashing. Async throws are auto-forwarded to the global
  * error handler by Express 5.
  */
 
@@ -40,31 +35,18 @@ export const register: RequestHandler = async (req, res) => {
 export const login: RequestHandler = async (req, res) => {
     const input = req.valid.body as LoginInput;
     const result = await authService.login(input, requestContext(req));
-    setRefreshCookie(res, result.refreshToken); // refresh → httpOnly cookie
+    // The session token IS the credential: the client stores it and sends it as
+    // `Authorization: Bearer <token>` on every subsequent request. It is
+    // long-lived (REFRESH_TOKEN_TTL_DAYS), so there is no mid-session expiry.
     res.status(200).json({
         success: true,
-        data: { user: result.user, accessToken: result.accessToken }, // access → body
-    });
-};
-
-export const refresh: RequestHandler = async (req, res) => {
-    // Prefer the httpOnly cookie; fall back to a body token for non-browser clients.
-    const token =
-        readRefreshCookie(req) ?? (req.valid.body as RefreshInput).refreshToken;
-    if (!token) throw new UnauthorizedError("Refresh token missing");
-
-    const result = await authService.refresh(token, requestContext(req));
-    setRefreshCookie(res, result.refreshToken); // rotated token → new cookie
-    res.status(200).json({
-        success: true,
-        data: { user: result.user, accessToken: result.accessToken },
+        data: { user: result.user, token: result.token },
     });
 };
 
 export const logout: RequestHandler = async (req, res) => {
-    const token = readRefreshCookie(req);
+    const token = readBearerToken(req);
     if (token) await authService.logout(token); // delete DB session (idempotent)
-    clearRefreshCookie(res); // remove the cookie
     res.status(200).json({ success: true, data: { message: "Logged out" } });
 };
 

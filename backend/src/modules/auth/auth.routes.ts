@@ -5,7 +5,6 @@ import { authorize } from "./authorize.middleware";
 import {
     registerSchema,
     loginSchema,
-    refreshSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
     adminCreateUserSchema,
@@ -17,11 +16,10 @@ import * as controller from "./auth.controller";
  * authRouter — mounted at /auth.
  *  POST /register         validate(registerSchema)       → names + email + strong
  *                         password. Creates the account only; issues NO tokens.
- *  POST /login            validate(loginSchema)          → reject bad shape (422)
- *  POST /refresh          validate(refreshSchema)        → optional body token;
- *                         authenticated by the refresh COOKIE, not a JWT
- *  POST /logout           (none)                         → uses the cookie; safe
- *                         to call unauthenticated, idempotent
+ *  POST /login            validate(loginSchema)          → reject bad shape (422);
+ *                         returns the opaque session token in the body
+ *  POST /logout           (none)                         → reads the Bearer token;
+ *                         safe to call unauthenticated, idempotent
  *  POST /forgot-password  validate(forgotPasswordSchema) → valid email shape
  *  POST /reset-password   validate(resetPasswordSchema)  → token + strong password
  */
@@ -29,7 +27,6 @@ export const authRouter = Router();
 
 authRouter.post("/register", validate({ body: registerSchema }), controller.register);
 authRouter.post("/login", validate({ body: loginSchema }), controller.login);
-authRouter.post("/refresh", validate({ body: refreshSchema }), controller.refresh);
 authRouter.post("/logout", controller.logout);
 authRouter.post(
     "/forgot-password",
@@ -47,7 +44,7 @@ authRouter.post(
  *
  * `/me` is the only route here open to every authenticated user. The rest are
  * user MANAGEMENT, and the seed grants their permissions to ADMIN alone — so an
- * EMPLOYEE's access token gets a 403 from `authorize`, not a 401. Nothing in
+ * authenticated EMPLOYEE gets a 403 from `authorize`, not a 401. Nothing in
  * this file names a role: the guards ask for permissions, and the seed decides
  * who holds them. Adding a second privileged role later needs no change here.
  *

@@ -170,8 +170,8 @@ export class RoleRepository {
     }
 
     /**
-     * Return the ACTIVE role names assigned to a user. Called on login/refresh
-     * to embed roles in the access token — the seam RBAC depends on.
+     * Return the ACTIVE role names assigned to a user. Read fresh on each
+     * authenticated request to populate req.user.roles — the seam RBAC depends on.
      */
     async findRoleNamesForUser(userId: string): Promise<string[]> {
         const rows = await this.db
