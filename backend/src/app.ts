@@ -1,6 +1,5 @@
 import express, { type Application } from "express";
 import helmet from "helmet";
-import cookieParser from "cookie-parser";
 import { config } from "./config";
 import { corsMiddleware } from "./middleware/cors";
 import { requestLogger } from "./middleware/requestLogger";
@@ -50,10 +49,6 @@ export function createApp(): Application {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // (5) Cookie parser — populates req.cookies (the refresh endpoint reads the
-    // httpOnly refresh cookie). Must run before the routes that use it.
-    app.use(cookieParser());
-
     // Liveness probe. Cheap, dependency-free — used by load balancers / Docker.
     app.get("/health", (_req, res) => {
         res.json({
@@ -64,7 +59,7 @@ export function createApp(): Application {
     });
 
     // Feature routes.
-    app.use("/auth", authRouter); //  /auth/login, /logout, /refresh, /forgot-password, /reset-password
+    app.use("/auth", authRouter); //  /auth/register, /login, /logout, /forgot-password, /reset-password
     app.use("/users", userRouter); //  /users/me (protected)
 
     // TEMPORARY: renders the page the forgot-password email links to, until a

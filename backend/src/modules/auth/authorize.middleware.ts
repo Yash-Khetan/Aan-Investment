@@ -14,7 +14,7 @@ import { UnauthorizedError, ForbiddenError } from "../../common/errors";
  *     `authorizeAny`.
  *   - Resolves the user's effective permissions from the database on each call
  *     (user_roles → role_permissions → permissions), so a revoked role/permission
- *     takes effect immediately without waiting for the access token to expire.
+ *     takes effect immediately on the user's next request.
  *
  * Responses:
  *   - 401 (UnauthorizedError) — no authenticated user on the request. In normal

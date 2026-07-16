@@ -41,15 +41,14 @@ It **does not** include customer-facing portals, mobile applications, or digital
 
 ### Authentication & Security
 
-* JWT access tokens (short-lived)
-* Opaque refresh tokens with server-side sessions
+* Opaque session tokens (server-side sessions, no JWT)
+* Bearer-token authentication, validated against the database on every request
 * Role-Based Access Control (RBAC)
 * Argon2 password hashing
 * Helmet security headers
 * CORS allow-listing
 * Rate limiting (`express-rate-limit`)
 * Zod request validation
-* HTTP-only refresh cookies
 
 ### Tooling & Infrastructure
 
@@ -150,9 +149,7 @@ Every variable is read in `src/config/env.ts` and nowhere else — no module rea
 | `NODE_ENV`                 | No       | `development` \| `production` \| `test` (default `development`). |
 | `PORT`                     | No       | HTTP port (default`3000`).                                             |
 | `DATABASE_URL`             | Yes      | Full PostgreSQL connection string (Supabase transaction pooler).         |
-| `JWT_ACCESS_SECRET`        | Yes      | HMAC secret signing access tokens. Boot fails if under 32 chars.        |
-| `JWT_ACCESS_TTL`           | No       | Access-token lifetime (default`15m`).                                  |
-| `REFRESH_TOKEN_TTL_DAYS`   | No       | Refresh-token validity in days (default`7`).                           |
+| `REFRESH_TOKEN_TTL_DAYS`   | No       | Session-token validity in days (default`7`).                           |
 | `APP_PASSWORD_RESET_URL`   | No       | Base URL of the reset page; the emailed link appends `?token=…`.        |
 | `SEED_ADMIN_EMAIL`         | No       | Email of the seeded admin (default`tonymony5678@gmail.com`). Seed-only. |
 | `SEED_ADMIN_PASSWORD`      | No       | Password of the seeded admin (default`admin@123` — **public**). Seed-only. |
@@ -171,7 +168,7 @@ Every variable is read in `src/config/env.ts` and nowhere else — no module rea
 
 \* Optional at boot so a deployment that never sends notifications still starts. The notifications module raises `ProviderConfigError` at **send time** if the channel it needs is unconfigured. Without SMTP configured, `POST /auth/forgot-password` still returns 200 — the email delivery failure is logged, never surfaced to the caller.
 
-**There is deliberately no `JWT_REFRESH_SECRET`.** Refresh tokens are opaque random strings stored server-side, not JWTs, so there is nothing to sign.
+**There is deliberately no signing secret.** Session tokens are opaque random strings stored server-side, not JWTs, so there is nothing to sign — a token is validated by matching its SHA-256 hash against `user_sessions`.
 
 ---
 
@@ -181,13 +178,12 @@ All auth routes are mounted under `/auth`; the current-user route under `/users`
 
 | Method | Endpoint                     | Auth               | Description                                                          |
 | ------ | ---------------------------- | ------------------ | -------------------------------------------------------------------- |
-| POST   | `/auth/register`           | Public             | Create an account with the default `EMPLOYEE` role. Issues no tokens. |
-| POST   | `/auth/login`              | Public             | Authenticate with credentials; issues access token + refresh cookie. |
-| POST   | `/auth/refresh`            | Refresh cookie     | Rotate the session and issue a new access token.                     |
-| POST   | `/auth/logout`             | Public             | Invalidate the current session (idempotent).                         |
+| POST   | `/auth/register`           | Public             | Create an account with the default `EMPLOYEE` role. Issues no token.  |
+| POST   | `/auth/login`              | Public             | Authenticate with credentials; issues the session token in the body. |
+| POST   | `/auth/logout`             | Bearer token       | Invalidate the current session (idempotent).                         |
 | POST   | `/auth/forgot-password`    | Public             | Request a password-reset token for an email.                         |
 | POST   | `/auth/reset-password`     | Reset token        | Set a new password using a valid reset token.                        |
-| GET    | `/users/me`                | Access token       | Return the authenticated user's profile.                             |
+| GET    | `/users/me`                | Bearer token       | Return the authenticated user's profile.                             |
 | GET    | `/users`                   | `user:read`      | List all users. **Admin only.**                                      |
 | POST   | `/users`                   | `user:create`    | Provision an account for a colleague. **Admin only.**                |
 | PATCH  | `/users/:id/activate`      | `user:activate`  | Re-enable a disabled account. **Admin only.**                        |
@@ -214,19 +210,19 @@ Body `{ firstName, lastName, email, password }`. Names are trimmed, the email is
 { "success": true, "data": { "id": "…", "email": "…", "roles": ["EMPLOYEE"] } }
 ```
 
-Returns **201 Created**. Registration deliberately does **not** log the user in — no access token, no refresh cookie, no session. The client calls `POST /auth/login` afterwards. The user row and its default-role grant are written in a **single transaction**, so an account can never exist without a role. The unique index on `users.email` is the authority on duplicates: a lost race between two concurrent registrations surfaces as the same 409, not a 500.
+Returns **201 Created**. Registration deliberately does **not** log the user in — no token, no session. The client calls `POST /auth/login` afterwards. The user row and its default-role grant are written in a **single transaction**, so an account can never exist without a role. The unique index on `users.email` is the authority on duplicates: a lost race between two concurrent registrations surfaces as the same 409, not a 500.
 
 ### `POST /auth/login`
 
-Body `{ email, password }`. Returns **200** with the sanitized user and an access token in the body; the refresh token is set as an HTTP-only cookie. Unknown email and wrong password return the **same** 401 message, so accounts cannot be enumerated. A disabled account returns 403, but only after the password verifies.
+Body `{ email, password }`. Returns **200** with the sanitized user and the session token in the body (`data.token`). The client stores this token and sends it as `Authorization: Bearer <token>` on every subsequent request; it IS the credential. Unknown email and wrong password return the **same** 401 message, so accounts cannot be enumerated. A disabled account returns 403, but only after the password verifies.
 
-### `POST /auth/refresh`
-
-Reads the refresh token from the HTTP-only cookie (a body token is accepted as a fallback for non-browser clients). **Rotates** the session: the presented token is deleted and a brand-new token pair is issued, so a stolen-and-replayed token cannot yield fresh access. Expired or unknown tokens return 401.
+```json
+{ "success": true, "data": { "user": { … }, "token": "…" } }
+```
 
 ### `POST /auth/logout`
 
-Deletes the server-side session and clears the cookie. Idempotent and safe to call unauthenticated — an unknown token is a no-op that still reports success.
+Reads the session token from the `Authorization: Bearer` header and deletes the matching server-side session. Idempotent and safe to call without a valid token — an unknown or missing token is a no-op that still reports success.
 
 ### `POST /auth/forgot-password`
 
@@ -238,7 +234,7 @@ Body `{ token, newPassword }`. Validates the token's existence, expiry and singl
 
 ### `GET /users/me`
 
-Requires `Authorization: Bearer <access-token>`. Returns the profile behind the verified token's `sub` claim. The header must contain the raw token with no quotes and no repeated `Bearer` prefix.
+Requires `Authorization: Bearer <session-token>`. Returns the profile behind the session the token resolves to. The header must contain the raw token with no quotes and no repeated `Bearer` prefix.
 
 ---
 
@@ -262,26 +258,26 @@ Enable or disable an account. Require `user:activate` / `user:deactivate` respec
 
 Deactivation is this system's answer to deletion — reversible, and it destroys no history. Two consequences are worth knowing:
 
-* **Sessions are revoked immediately.** Disabling an account deletes every `user_sessions` row for it, so it cannot silently keep renewing itself. Its already-issued access token still works until it expires (≤15 min) — access tokens are stateless by design — but `POST /auth/refresh` re-checks `isActive`, so the door shuts on its own and cannot be propped open. `POST /auth/login` returns 403 for a disabled account.
-* **An admin may not deactivate themselves** → **400**. With a single admin account that would be an unrecoverable lockout: nobody would be left holding `user:activate` to undo it. The actor's id comes from the verified token, never the request body, so the guard cannot be spoofed.
+* **Sessions are revoked immediately.** Disabling an account deletes every `user_sessions` row for it. Because every request is validated against that table, the account is locked out at once — there are no rows left to match, so the very next request gets a 401. `POST /auth/login` returns 403 for a disabled account.
+* **An admin may not deactivate themselves** → **400**. With a single admin account that would be an unrecoverable lockout: nobody would be left holding `user:activate` to undo it. The actor's id comes from the authenticated session, never the request body, so the guard cannot be spoofed.
 
 ---
 
-## Token Model & Refresh Flow
+## Session-Token Model
 
-* **Access tokens** are short-lived JWTs (HS256, default 15 minutes) carrying `{ sub, roles }` and sent in the `Authorization: Bearer <token>` header. They are stateless — verified by signature alone, with no database hit on the hot path.
-* **Refresh tokens** are opaque 384-bit random strings, *not* JWTs. Only their SHA-256 hash is stored in `user_sessions`; the raw value exists solely in the client's cookie. One row per device/login.
-* The refresh cookie is `httpOnly` (invisible to JavaScript, mitigating XSS token theft), `secure` in production, and scoped to `path=/auth` so the browser only sends it to the refresh and logout endpoints.
+Authentication is session-based: there is a single token, and it is the credential.
+
+* **Session tokens** are opaque 384-bit random strings, *not* JWTs. Login returns the raw token in the response body; the client stores it and sends it as `Authorization: Bearer <token>` on every request. Only the token's SHA-256 hash is stored in `user_sessions` — the raw value is never persisted, logged, or returned again. One row per device/login.
+* **Every request is validated against the database.** `authenticate` hashes the presented token, looks up the session row, checks it has not expired, confirms the owner still exists and is active, and loads the owner's roles fresh. There is no stateless fast path — which is precisely what makes a session instantly revocable.
+* **Default lifetime is 7 days** (`REFRESH_TOKEN_TTL_DAYS`), fixed at login. There is no per-request rotation and no sliding renewal: an active user re-authenticates once the window elapses.
 
 ```
-login    → access token (body, 15m)  +  refresh cookie (7d, httpOnly)
-   ↓ access token expires
-refresh  → old session row deleted, new token pair issued   ← rotation
-   ↓
-logout   → session row deleted, cookie cleared
+login    → session token (body, 7d)     ← client stores it, sends as Bearer
+   ↓  every request: Bearer <token> → hash → match user_sessions → check expiry + isActive → load roles
+logout   → session row deleted           ← Bearer token identifies the row
 ```
 
-Because refresh tokens are stored server-side, a session can be revoked instantly. Resetting a password deletes every session row for that user.
+Because tokens are stored server-side, a session can be revoked instantly: deactivating an account or resetting a password deletes every session row for that user, and the next request with an orphaned token gets a 401.
 
 Passwords are hashed with **Argon2id** (memory-hard: 19 MiB, 2 passes), whose PHC-string output embeds the algorithm, parameters and salt — so no separate salt column exists. Reset tokens are single-use and time-bound.
 
@@ -320,9 +316,9 @@ Guards compose on a route, `authenticate` always first:
 userRouter.get("/", authenticate, authorize("user:read"), controller.listUsers);
 ```
 
-`authorize(...perms)` requires **all** listed permissions; `authorizeAny(...perms)` requires **at least one**. Both reuse `req.user` from `authenticate` rather than re-parsing the token, and both resolve effective permissions from the database on each call — so revoking a role takes effect immediately instead of waiting for the access token to expire. Missing authentication yields 401; authenticated-but-unpermitted yields 403.
+`authorize(...perms)` requires **all** listed permissions; `authorizeAny(...perms)` requires **at least one**. Both reuse `req.user` from `authenticate` rather than re-validating the token, and both resolve effective permissions from the database on each call — so revoking a role takes effect on the user's next request. Missing authentication yields 401; authenticated-but-unpermitted yields 403.
 
-Role *names* are embedded in the access token for cheap display, but permission checks never trust them — they always hit the database.
+Role *names* are loaded onto `req.user` for cheap display, but permission checks never trust them — they always hit the database.
 
 ---
 

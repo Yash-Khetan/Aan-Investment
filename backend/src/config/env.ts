@@ -122,15 +122,14 @@ export const config = {
     },
 
     auth: {
-        accessToken: {
-            /** HMAC secret that signs access-token JWTs. REQUIRED. */
-            secret: required("JWT_ACCESS_SECRET"),
-            /** Access-token lifetime, as a jsonwebtoken duration (e.g. "15m"). */
-            ttl: optional("JWT_ACCESS_TTL", "15m"),
-        },
+        /**
+         * Authentication is session-based: the opaque token issued at login IS the
+         * credential clients present (as a Bearer token) on every request. There is
+         * no separate short-lived access-token JWT — hence no signing secret here.
+         */
         refreshToken: {
             /**
-             * Refresh tokens are OPAQUE random strings (not JWTs), so there is no
+             * Session tokens are OPAQUE random strings (not JWTs), so there is no
              * signing secret — only a validity window (in days) used to compute
              * the userSessions.expiresAt timestamp.
              */
@@ -214,12 +213,6 @@ if (config.isProduction && config.cors.origins.length === 0) {
     );
 }
 
-// Fail-fast: a weak JWT secret undermines every access token. Require length.
-if (config.auth.accessToken.secret.length < 32) {
-    throw new Error(
-        "JWT_ACCESS_SECRET must be at least 32 characters (use a long random value).",
-    );
-}
 if (config.auth.refreshToken.ttlDays <= 0) {
     throw new Error("REFRESH_TOKEN_TTL_DAYS must be a positive integer.");
 }

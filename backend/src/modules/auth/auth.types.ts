@@ -5,31 +5,15 @@
  * them, controllers/middleware consume them.
  */
 
-/** Claims embedded inside an access-token JWT. */
-export interface AccessTokenPayload {
-    /** Subject — the user's id. */
-    sub: string;
-    /** Role names, embedded so RBAC needs no DB lookup on the hot path. */
-    roles: string[];
-}
-
-/** A verified access token = our claims plus standard JWT timestamps. */
-export interface DecodedAccessToken extends AccessTokenPayload {
-    /** Issued-at (epoch seconds). */
-    iat: number;
-    /** Expiry (epoch seconds). */
-    exp: number;
-}
-
 /** Identity the authenticate middleware attaches to req.user. */
 export interface AuthenticatedUser {
     id: string;
     roles: string[];
 }
 
-/** A freshly generated opaque refresh token and the data we persist for it. */
+/** A freshly generated opaque session token and the data we persist for it. */
 export interface GeneratedRefreshToken {
-    /** Raw token — sent to the client (cookie). NEVER stored. */
+    /** Raw token — returned to the client at login (Bearer credential). NEVER stored. */
     token: string;
     /** SHA-256 hex — stored in userSessions.refreshToken. */
     tokenHash: string;
@@ -67,9 +51,8 @@ export interface RegisteredUser {
     roles: string[];
 }
 
-/** Result of login/refresh: sanitized user + tokens (raw refresh for the cookie). */
+/** Result of login: sanitized user + the raw opaque session token (Bearer credential). */
 export interface LoginResult {
     user: PublicUser;
-    accessToken: string;
-    refreshToken: string;
+    token: string;
 }
