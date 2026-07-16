@@ -37,12 +37,23 @@ export const RESET_TOKEN_TTL_MINUTES = 30;
 export const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
 
 /**
- * Role granted to every self-registered account. Resolved to an id at runtime
- * through the role repository (never hardcoded), and seeded by db/seed.
- * EMPLOYEE is the only business role today: the LMS is internal, so every
- * registered user is a member of staff with full operational access.
+ * Role granted to every account this API creates — whether the user registered
+ * themselves or an admin created them. Resolved to an id at runtime through the
+ * role repository (never hardcoded), and seeded by db/seed.
+ *
+ * There is deliberately no way to ask for a different role over HTTP: neither
+ * the register nor the admin-create payload carries a `role` field, so a role
+ * can only ever be granted by the seed or by direct database access. That is
+ * what closes the privilege-escalation door.
  */
 export const DEFAULT_ROLE_NAME = "EMPLOYEE";
 
 /** 409 message for a registration against an email that already exists. */
 export const EMAIL_ALREADY_EXISTS_MESSAGE = "Email already exists";
+
+/**
+ * 400 message when an admin tries to deactivate themselves. There is exactly one
+ * admin account, so letting it disable itself would lock the organisation out of
+ * every user-management endpoint with no way back in through the API.
+ */
+export const CANNOT_DEACTIVATE_SELF_MESSAGE = "You cannot deactivate your own account";

@@ -50,6 +50,11 @@ export interface PublicUser {
     lastName: string | null;
     email: string;
     roles: string[];
+    /**
+     * Whether the account may log in. Surfaced so the admin user list shows who
+     * is currently disabled — otherwise activate/deactivate would be blind.
+     */
+    isActive: boolean;
 }
 
 /**

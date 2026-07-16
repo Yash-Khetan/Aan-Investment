@@ -2,12 +2,15 @@ import { Router } from "express";
 
 import { validateQuery } from "../middleware/validate-request.middleware";
 import { reportsErrorHandler } from "../middleware/error-handler.middleware";
+import { authenticate } from "../../auth/auth.middleware";
 import { reportFiltersSchema, exportQuerySchema } from "../validators/report-filters.validator";
 
 import * as reportsController from "../controllers/reports.controller";
 import * as exportController from "../controllers/export.controller";
 
 export const reportsRouter = Router();
+
+reportsRouter.use(authenticate);
 
 /* ============================================================
    JSON REPORT ENDPOINTS

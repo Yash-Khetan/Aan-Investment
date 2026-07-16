@@ -1,16 +1,19 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
-import { createInterestConfig } from "../api";
+import { createInterestConfig, getLoanInterestRate } from "../api";
 import { INTEREST_BASIS_OPTIONS, INTEREST_RULE_TYPES } from "../types";
 import type { InterestBasis, InterestRuleType } from "../types";
 
 export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [annualRate, setAnnualRate] = useState("");
+  const { data: annualRate, isLoading: isLoadingRate } = useQuery({
+    queryKey: ["loan-interest-rate", loanId],
+    queryFn: () => getLoanInterestRate(loanId),
+  });
   const [interestBasis, setInterestBasis] = useState<InterestBasis>("ACTUAL_365");
   const [ruleType, setRuleType] = useState<InterestRuleType>("NORMAL");
   const [effectiveFrom, setEffectiveFrom] = useState("");
@@ -27,9 +30,10 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (annualRate === undefined) return;
     mutation.mutate({
       loanId,
-      annualRate: Number(annualRate),
+      annualRate,
       interestBasis,
       ruleType,
       effectiveFrom,
@@ -47,9 +51,9 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
             type="number"
             step="0.01"
             min="0"
-            value={annualRate}
-            onChange={(e) => setAnnualRate(e.target.value)}
-            required
+            value={isLoadingRate ? "Loading..." : (annualRate ?? "")}
+            disabled
+            readOnly
           />
           <SelectField
             label="Interest Basis"
@@ -102,7 +106,7 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
         )}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending || isLoadingRate || annualRate === undefined}>
             {mutation.isPending ? "Saving..." : "Save Interest Config"}
           </Button>
           <Button type="button" variant="ghost" onClick={onDone}>

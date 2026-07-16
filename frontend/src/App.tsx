@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute } from "./components/AdminRoute";
 import { LandingPage } from "./features/landing/LandingPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { SignupPage } from "./features/auth/SignupPage";
@@ -22,6 +23,8 @@ import { InterestEnginePage } from "./features/interest/InterestEnginePage";
 import { RepaymentEnginePage } from "./features/repayment/RepaymentEnginePage";
 import { PaymentsPage } from "./features/payments/PaymentsPage";
 import { AccountingLedgerPage } from "./features/accounting-entries/AccountingLedgerPage";
+import { UsersPage } from "./features/admin/UsersPage";
+import { CreateUserPage } from "./features/admin/CreateUserPage";
 
 export default function App() {
   return (
@@ -49,6 +52,10 @@ export default function App() {
           <Route path="/collateral" element={<CollateralPage />} />
           <Route path="/collections" element={<CollectionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/users/new" element={<CreateUserPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

@@ -10,9 +10,7 @@ import {
 
 export const loanStatusEnum = pgEnum("loan_status", [
     "PENDING",
-    "ACTIVE",
     "OVERDUE",
-    "NPA",
     "CLOSED",
     "WRITTEN_OFF",
 ]);

@@ -31,12 +31,14 @@ import {
     INVALID_CREDENTIALS_MESSAGE,
     DEFAULT_ROLE_NAME,
     EMAIL_ALREADY_EXISTS_MESSAGE,
+    CANNOT_DEACTIVATE_SELF_MESSAGE,
 } from "./auth.constants";
 import type {
     RegisterInput,
     LoginInput,
     ForgotPasswordInput,
     ResetPasswordInput,
+    AdminCreateUserInput,
 } from "./auth.validators";
 import type {
     RequestContext,
@@ -53,6 +55,9 @@ function toPublicUser(user: UserRecord, roles: string[]): PublicUser {
         lastName: user.lastName,
         email: user.email,
         roles,
+        // The column is nullable (it predates a NOT NULL default), and a NULL
+        // there has always meant "not disabled". Normalize once, here.
+        isActive: user.isActive ?? true,
     };
 }
 
@@ -84,6 +89,35 @@ export class AuthService {
      * Errors: 409 (email already registered).
      */
     async register(input: RegisterInput): Promise<RegisteredUser> {
+        const { user, roleName } = await this.createWithDefaultRole(input);
+        return { id: user.id, email: user.email, roles: [roleName] };
+    }
+
+    /**
+     * createUser — an ADMIN provisions an account for a colleague. Backs
+     * POST /users (requires the "user:create" permission).
+     *
+     * Identical to registration in every way that matters — same validation, same
+     * Argon2 hashing, same atomic user+role write, and the same DEFAULT_ROLE_NAME.
+     * The admin does NOT choose a role: the payload has no `role` field, so this
+     * endpoint cannot mint another admin. Promoting someone stays a deliberate
+     * database operation, which is exactly the point.
+     *
+     * Errors: 409 (email already registered).
+     */
+    async createUser(input: AdminCreateUserInput): Promise<PublicUser> {
+        const { user, roleName } = await this.createWithDefaultRole(input);
+        return toPublicUser(user, [roleName]);
+    }
+
+    /**
+     * The shared account-creation path behind register() and createUser().
+     * Atomic: the user row and its role grant commit together, so a failure can
+     * never leave a permission-less orphan account behind.
+     */
+    private async createWithDefaultRole(
+        input: RegisterInput | AdminCreateUserInput,
+    ): Promise<{ user: UserRecord; roleName: string }> {
         // Fast path: answer the common duplicate case without paying for a hash.
         // Not authoritative on its own — the unique index below closes the race.
         const existing = await this.users.findByEmail(input.email);
@@ -115,7 +149,7 @@ export class AuthService {
             // Best-effort: a delivery failure must never fail registration itself.
             await this.sendWelcomeEmail(user);
 
-            return { id: user.id, email: user.email, roles: [role.name] };
+            return { user, roleName:role.name };
         } catch (error) {
             // Two requests for the same email raced past the pre-check, or the
             // email belongs to a soft-deleted account. Either way: 409, not 500.
@@ -153,6 +187,42 @@ export class AuthService {
         } catch (error) {
             logger.error("Failed to send welcome email", { err: error, userId: user.id });
         }
+    }
+
+    /**
+     * setUserActive — an ADMIN enables or disables an account. Backs
+     * PATCH /users/:id/activate and /deactivate ("user:activate" / "user:deactivate").
+     *
+     * Deactivation is our stand-in for deletion: it is reversible and it destroys
+     * no history. Two consequences worth knowing:
+     *
+     *  - Disabling REVOKES every refresh session immediately, so the account
+     *    cannot silently keep renewing itself. Its already-issued access token
+     *    still works until it expires (≤15m) — access tokens are stateless by
+     *    design, and refresh() re-checks `isActive`, so the door shuts on its own.
+     *  - An admin may not deactivate THEMSELVES. With a single admin account that
+     *    would be an unrecoverable lockout: no one left holding "user:activate".
+     *
+     * Errors: 400 (self-deactivation); 404 (no such user).
+     */
+    async setUserActive(
+        actorUserId: string,
+        targetUserId: string,
+        isActive: boolean,
+    ): Promise<PublicUser> {
+        if (!isActive && actorUserId === targetUserId) {
+            throw new BadRequestError(CANNOT_DEACTIVATE_SELF_MESSAGE);
+        }
+
+        const user = await this.users.setActive(targetUserId, isActive);
+        if (!user) throw new NotFoundError("User not found");
+
+        if (!isActive) {
+            await this.sessions.deleteAllForUser(user.id);
+        }
+
+        const roles = await this.roles.findRoleNamesForUser(user.id);
+        return toPublicUser(user, roles);
     }
 
     /**

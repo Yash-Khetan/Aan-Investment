@@ -5,20 +5,23 @@ const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/borrowers", label: "Borrowers" },
   { to: "/loans", label: "Loans" },
+  { to: "/collateral", label: "Collateral" },
+  { to: "/documents", label: "Documents" },
   { to: "/interest", label: "Interest Engine" },
   { to: "/repayment", label: "Repayment Engine" },
   { to: "/payments", label: "Payments" },
   { to: "/reports", label: "Reports" },
   { to: "/accounting", label: "Accounting Export" },
   { to: "/accounting-entries", label: "Accounting Ledger" },
-  { to: "/collateral", label: "Collateral" },
   { to: "/collections", label: "Collections" },
-  { to: "/documents", label: "Documents" },
 ];
+
+const ADMIN_NAV_ITEM = { to: "/admin/users", label: "Admin" };
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const navItems = user?.roles.includes("ADMIN") ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   async function handleLogout() {
     await logout();
@@ -33,7 +36,7 @@ export function Layout() {
           <div className="text-lg font-semibold text-slate-900">LMS</div>
         </Link>
         <nav className="flex flex-col gap-0.5 px-3">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

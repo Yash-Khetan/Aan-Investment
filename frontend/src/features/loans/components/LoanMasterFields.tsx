@@ -68,13 +68,14 @@ export function LoanMasterFields({
               </option>
             ))}
           </SelectField>
-          <SelectField label="Status" value={form.status} onChange={(e) => onChange({ status: e.target.value })}>
+          {/* <SelectField label="Status" value={form.status} onChange={(e) => onChange({ status: e.target.value })}>
             {LOAN_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.replace(/_/g, " ")}
               </option>
             ))}
-          </SelectField>
+          </SelectField> */}
+          {/* intentionally removed since the default loan status has to active and the user should not be able to create it in the first place  */}
         </div>
       </Card>
 

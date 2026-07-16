@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { borrowers, loans } from "../db/schema/index.js";
+import { authenticate } from "../modules/auth/auth.middleware";
 
 /**
  * Minimal, read-only lookup endpoints for the frontend. None of the six
@@ -16,6 +17,8 @@ import { borrowers, loans } from "../db/schema/index.js";
  * trivial SELECT queries, not a domain with business logic of its own.
  */
 export const lookupRouter = Router();
+
+lookupRouter.use(authenticate);
 
 lookupRouter.get("/loans", async (_req, res, next) => {
     try {
