@@ -22,6 +22,13 @@
       "when": 1783665942642,
       "tag": "0002_perpetual_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783949749338,
+      "tag": "0003_certain_northstar",
+      "breakpoints": true
     }
   ]
 }
