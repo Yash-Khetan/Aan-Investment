@@ -21,6 +21,11 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+/** Exposed for callers (e.g. multipart uploads) that can't route through apiRequest's fetch call directly. */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 export interface FieldError {
   field: string;
   message: string;
@@ -80,7 +85,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
 /** Downloads a file response (CSV/XLSX export endpoints) and triggers a browser save. */
 export async function downloadFile(path: string, fallbackFilename: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${path}`);
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  });
 
   if (!res.ok) {
     const { message } = await parseErrorBody(res);

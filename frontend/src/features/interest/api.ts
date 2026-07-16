@@ -28,6 +28,12 @@ export async function getInterestConfig(loanId: string): Promise<InterestConfig>
   return res.data;
 }
 
+/** Reads the loan's sanctioned interest rate, so the interest-config form doesn't ask the user to retype it. */
+export async function getLoanInterestRate(loanId: string): Promise<number> {
+  const res = await apiRequest<Envelope<{ interestRate: string }>>(`/api/v1/loans/${loanId}`);
+  return Number(res.data.interestRate);
+}
+
 export async function calculateInterest(
   loanId: string,
   input: CalculateInterestInput,

@@ -1,4 +1,4 @@
-import { apiRequest, downloadFile, API_BASE_URL, ApiError } from "../../lib/api";
+import { apiRequest, downloadFile, getAccessToken, API_BASE_URL, ApiError } from "../../lib/api";
 import type { DocumentMetadata } from "./types";
 
 export function listDocuments(entityType: string, entityId: string): Promise<DocumentMetadata[]> {
@@ -21,8 +21,11 @@ export async function uploadDocument(input: {
   if (input.remarks) formData.append("remarks", input.remarks);
   formData.append("file", input.file);
 
+  const accessToken = getAccessToken();
   const res = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
+    credentials: "include",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     body: formData,
   });
 
