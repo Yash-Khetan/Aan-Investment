@@ -7,7 +7,6 @@ const NAV_ITEMS = [
   { to: "/loans", label: "Loans" },
   { to: "/collateral", label: "Collateral" },
   { to: "/documents", label: "Documents" },
-  { to: "/interest", label: "Interest Engine" },
   { to: "/repayment", label: "Repayment Engine" },
   { to: "/payments", label: "Payments" },
   { to: "/reports", label: "Reports" },

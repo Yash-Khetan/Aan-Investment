@@ -5,17 +5,54 @@ import { PageHeader } from "../../components/Layout";
 import { Button } from "../../components/ui/Button";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
+import { InterestSetup } from "../interest/InterestSetup";
 import { createLoan } from "./api";
 import { EMPTY_LOAN_FORM, formStateToCreateInput } from "./types";
-import type { LoanFormState } from "./types";
+import type { Loan, LoanFormState } from "./types";
+
+/**
+ * Two-step loan creation. Interest setup needs a persisted loanId (every
+ * interest-engine call keys off it), so the loan master is saved first and the
+ * interest engine opens against the new loan — no separate sidebar tab.
+ */
+const STEPS = ["Loan Details", "Interest Setup"] as const;
+
+function StepIndicator({ current }: { current: number }) {
+  return (
+    <div className="mb-6 flex items-center gap-3">
+      {STEPS.map((label, i) => (
+        <div key={label} className="flex items-center gap-3">
+          {i > 0 && <div className="h-px w-10 bg-slate-300" />}
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                i === current
+                  ? "bg-slate-900 text-white"
+                  : i < current
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-200 text-slate-500"
+              }`}
+            >
+              {i < current ? "✓" : i + 1}
+            </span>
+            <span className={`text-sm font-medium ${i === current ? "text-slate-900" : "text-slate-500"}`}>
+              {label}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function CreateLoanPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<LoanFormState>(EMPTY_LOAN_FORM);
+  const [createdLoan, setCreatedLoan] = useState<Loan | null>(null);
 
   const mutation = useMutation({
     mutationFn: createLoan,
-    onSuccess: () => navigate("/loans"),
+    onSuccess: (loan) => setCreatedLoan(loan),
   });
 
   function patch(p: Partial<LoanFormState>) {
@@ -29,22 +66,45 @@ export function CreateLoanPage() {
 
   return (
     <div>
-      <PageHeader title="New Loan" description="Loan master — sanction terms, tenure, and key dates." />
+      <PageHeader
+        title="New Loan"
+        description={
+          createdLoan
+            ? `Loan ${createdLoan.loanAccountNumber} created — configure how its interest is calculated.`
+            : "Loan master — sanction terms, tenure, and key dates."
+        }
+      />
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <LoanMasterFields form={form} onChange={patch} />
+      <StepIndicator current={createdLoan ? 1 : 0} />
 
-        {mutation.isError && <FormErrors error={mutation.error} />}
+      {!createdLoan && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <LoanMasterFields form={form} onChange={patch} />
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Create Loan"}
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate("/loans")}>
-            Cancel
-          </Button>
+          {mutation.isError && <FormErrors error={mutation.error} />}
+
+          <div className="flex gap-2">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving..." : "Create Loan & Set Up Interest"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => navigate("/loans")}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {createdLoan && (
+        <div className="flex flex-col gap-6">
+          <InterestSetup loanId={createdLoan.id} />
+
+          <div className="flex gap-2">
+            <Button type="button" onClick={() => navigate("/loans")}>
+              Done
+            </Button>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   );
 }
