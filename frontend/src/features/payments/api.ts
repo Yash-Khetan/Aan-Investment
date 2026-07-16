@@ -1,5 +1,5 @@
 import { apiRequest } from "../../lib/api";
-import type { Payment, RecordPaymentInput, RecordPaymentResult } from "./types";
+import type { PaymentWithAllocations, RecordPaymentInput, RecordPaymentResult } from "./types";
 
 interface Envelope<T> {
   success: true;
@@ -14,7 +14,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   return res.data;
 }
 
-export async function getPaymentHistory(loanId: string): Promise<Payment[]> {
-  const res = await apiRequest<Envelope<Payment[]>>(`/payments/${loanId}`);
+export async function getPaymentHistory(loanId: string): Promise<PaymentWithAllocations[]> {
+  const res = await apiRequest<Envelope<PaymentWithAllocations[]>>(`/payments/${loanId}`);
   return res.data;
 }

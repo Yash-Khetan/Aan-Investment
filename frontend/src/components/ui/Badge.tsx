@@ -21,12 +21,12 @@ const PALETTE: Record<string, string> = {
   INACTIVE: "bg-slate-100 text-slate-700",
 };
 
-export function Badge({ status }: { status: string | null | undefined }) {
+export function Badge({ status, label }: { status: string | null | undefined; label?: string }) {
   if (!status) return <span className="text-slate-400">—</span>;
   const classes = PALETTE[status] ?? "bg-slate-100 text-slate-700";
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}>
-      {status.replace(/_/g, " ")}
+      {label ?? status.replace(/_/g, " ")}
     </span>
   );
 }

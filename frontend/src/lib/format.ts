@@ -1,11 +1,12 @@
-export function formatCurrency(value: number | string | null | undefined): string {
+export function formatCurrency(value: number | string | null | undefined, decimals = 0): string {
   if (value === null || value === undefined || value === "") return "—";
   const num = typeof value === "string" ? Number.parseFloat(value) : value;
   if (Number.isNaN(num)) return "—";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(num);
 }
 

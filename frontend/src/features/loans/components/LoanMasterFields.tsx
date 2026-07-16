@@ -1,7 +1,7 @@
 import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
-import { LOAN_STATUSES, LOAN_TYPES, REPAYMENT_TYPES, SECURITY_TYPES } from "../types";
+import { LOAN_TYPES, REPAYMENT_TYPES, SECURITY_TYPES } from "../types";
 import type { LoanFormState } from "../types";
 
 function SectionTitle({ children }: { children: string }) {

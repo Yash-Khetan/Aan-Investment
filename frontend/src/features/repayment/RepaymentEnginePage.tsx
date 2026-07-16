@@ -10,21 +10,49 @@ import { formatCurrency, formatDate } from "../../lib/format";
 import { ApiError } from "../../lib/api";
 import { LoanSelect } from "../lookup/LoanSelect";
 import { getSchedule } from "./api";
+import { INSTALLMENT_STATUS_LABELS, getDaysLate, getDaysOverdue, isInstallmentOverdue } from "./types";
 import type { Installment } from "./types";
 import { GenerateScheduleForm } from "./components/GenerateScheduleForm";
 
 const COLUMNS: Column<Installment>[] = [
   { key: "installmentNumber", header: "#", render: (r) => r.installmentNumber },
   { key: "dueDate", header: "Due Date", render: (r) => formatDate(r.dueDate) },
-  { key: "principalAmount", header: "Principal", render: (r) => formatCurrency(r.principalAmount) },
-  { key: "interestAmount", header: "Interest", render: (r) => formatCurrency(r.interestAmount) },
+  { key: "principalAmount", header: "Principal", render: (r) => formatCurrency(r.principalAmount, 2) },
+  { key: "interestAmount", header: "Interest", render: (r) => formatCurrency(r.interestAmount, 2) },
   {
     key: "totalAmount",
     header: "Total",
-    render: (r) => <span className="font-medium">{formatCurrency(r.totalAmount)}</span>,
+    render: (r) => <span className="font-medium">{formatCurrency(r.totalAmount, 2)}</span>,
   },
-  { key: "paidTotal", header: "Paid", render: (r) => formatCurrency(r.paidTotal) },
-  { key: "status", header: "Status", render: (r) => <Badge status={r.status} /> },
+  { key: "paidTotal", header: "Paid", render: (r) => formatCurrency(r.paidTotal, 2) },
+  { key: "penaltyPaid", header: "Penalty", render: (r) => formatCurrency(r.penaltyPaid, 2) },
+  {
+    key: "status",
+    header: "Status",
+    // Always the installment's real status — never overwritten with a synthetic "Overdue" value,
+    // so you can always tell PARTIAL (some money in) apart from PENDING (none in). Lateness is
+    // shown separately in the Days Overdue column instead of being folded in here.
+    render: (r) => <Badge status={r.status} label={INSTALLMENT_STATUS_LABELS[r.status]} />,
+  },
+  {
+    key: "daysOverdue",
+    header: "Days Overdue",
+    render: (r) => {
+      // Still unpaid/short and past due — urgent, needs collection action.
+      if (isInstallmentOverdue(r)) {
+        return <span className="font-medium text-orange-700">{getDaysOverdue(r.dueDate)}</span>;
+      }
+      // Already fully settled, but the payment came in after the due date — informational only,
+      // shown in a muted tone since there's nothing outstanding to chase anymore.
+      if (r.status === "SUCCESS" && r.paidDate) {
+        const daysLate = getDaysLate(r.dueDate, r.paidDate);
+        if (daysLate > 0) {
+          return <span className="text-slate-500">Paid {daysLate}d late</span>;
+        }
+      }
+      return <span className="text-slate-400">—</span>;
+    },
+  },
   { key: "paidDate", header: "Paid Date", render: (r) => formatDate(r.paidDate) },
 ];
 
@@ -86,6 +114,15 @@ export function RepaymentEnginePage() {
               <div>
                 <div className="text-xs font-medium text-slate-500">Installments</div>
                 <div className="mt-1 text-sm text-slate-900">{data.installments.length}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Outstanding Balance</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {formatCurrency(
+                    data.installments.reduce((sum, i) => sum + (Number(i.totalAmount) - Number(i.paidTotal)), 0),
+                    2,
+                  )}
+                </div>
               </div>
               {data.schedule.remarks && (
                 <div className="col-span-2">
