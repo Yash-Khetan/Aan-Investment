@@ -42,15 +42,23 @@ export const emiStrategy: RepaymentStrategy = {
         principalAmount = outstandingPrincipal;
       }
 
-      const totalAmount = principalAmount + interestAmount;
       outstandingPrincipal -= principalAmount;
+
+      // Round principal/interest first, then derive totalAmount from those rounded values —
+      // never from the unrounded intermediates. Rounding principal and interest independently
+      // from a totalAmount computed before that rounding can leave totalAmount a paisa off from
+      // principalAmount + interestAmount, which then permanently blocks an installment from ever
+      // reaching SUCCESS status even when it's fully paid (paidTotal is built from the same two
+      // rounded fields, so it can never catch up to a totalAmount that was rounded independently).
+      const roundedPrincipal = round2(principalAmount);
+      const roundedInterest = round2(interestAmount);
 
       installments.push({
         installmentNumber: i,
         dueDate: addMonths(disbursementDate, moratoriumMonths + i),
-        principalAmount: round2(principalAmount),
-        interestAmount: round2(interestAmount),
-        totalAmount: round2(totalAmount),
+        principalAmount: roundedPrincipal,
+        interestAmount: roundedInterest,
+        totalAmount: round2(roundedPrincipal + roundedInterest),
       });
     }
 

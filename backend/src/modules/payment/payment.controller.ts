@@ -16,6 +16,7 @@ export const createPayment: RequestHandler = async (req, res, next) => {
       outstandingPenalty: number;
       outstandingInterest: number;
       outstandingPrincipal: number;
+      autoApplyOverflow?: boolean;
     };
 
     const result = await recordPayment(body);

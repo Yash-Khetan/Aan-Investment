@@ -17,6 +17,7 @@ export const recordPaymentSchema = z.object({
   outstandingPenalty: z.coerce.number().nonnegative().default(0),
   outstandingInterest: z.coerce.number().nonnegative().default(0),
   outstandingPrincipal: z.coerce.number().nonnegative(),
+  autoApplyOverflow: z.boolean().optional().default(false),
 });
 
 export const loanIdParamSchema = z.object({

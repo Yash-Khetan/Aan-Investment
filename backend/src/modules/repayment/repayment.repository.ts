@@ -1,5 +1,5 @@
-import { eq, and, desc } from "drizzle-orm";
-import { db, repaymentSchedules, installments } from "../../db";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { db, repaymentSchedules, installments, paymentAllocations } from "../../db";
 import { GeneratedInstallment } from "./repayment.types";
 
 /**
@@ -21,9 +21,25 @@ export async function getCurrentSchedule(loanId: string) {
  */
 export async function getInstallmentsForSchedule(scheduleId: string) {
   return db
-    .select()
+    .select({
+      id: installments.id,
+      scheduleId: installments.scheduleId,
+      installmentNumber: installments.installmentNumber,
+      dueDate: installments.dueDate,
+      principalAmount: installments.principalAmount,
+      interestAmount: installments.interestAmount,
+      totalAmount: installments.totalAmount,
+      paidPrincipal: installments.paidPrincipal,
+      paidInterest: installments.paidInterest,
+      paidTotal: installments.paidTotal,
+      status: installments.status,
+      paidDate: installments.paidDate,
+      penaltyPaid: sql<string>`coalesce(sum(${paymentAllocations.penalInterestApplied}), 0)`,
+    })
     .from(installments)
+    .leftJoin(paymentAllocations, eq(paymentAllocations.installmentId, installments.id))
     .where(eq(installments.scheduleId, scheduleId))
+    .groupBy(installments.id)
     .orderBy(installments.installmentNumber);
 }
 
