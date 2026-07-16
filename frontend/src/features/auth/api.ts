@@ -30,15 +30,6 @@ export async function login(input: LoginInput): Promise<AuthResult> {
   return res.data;
 }
 
-/** Silent session restore: exchanges the httpOnly refresh cookie for a fresh access token. */
-export async function refresh(): Promise<AuthResult> {
-  const res = await apiRequest<Envelope<AuthResult>>("/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-  return res.data;
-}
-
 export async function logout(): Promise<void> {
   await apiRequest<Envelope<{ message: string }>>("/auth/logout", { method: "POST" });
 }

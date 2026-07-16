@@ -12,9 +12,10 @@ export interface LoginInput {
   password: string;
 }
 
+/** Result of login: sanitized user + the raw opaque session token (Bearer credential). */
 export interface AuthResult {
   user: PublicUser;
-  accessToken: string;
+  token: string;
 }
 
 export interface RegisterInput {

@@ -11,7 +11,7 @@ export const SECURITY_TYPES = [
 
 export const REPAYMENT_TYPES = ["EMI", "BULLET", "INTEREST_ONLY", "STRUCTURED", "CUSTOM"] as const;
 
-export const LOAN_STATUSES = ["PENDING", "ACTIVE", "OVERDUE", "NPA", "CLOSED", "WRITTEN_OFF"] as const;
+export const LOAN_STATUSES = ["PENDING", "OVERDUE", "CLOSED", "WRITTEN_OFF"] as const;
 
 export interface Loan {
   id: string;

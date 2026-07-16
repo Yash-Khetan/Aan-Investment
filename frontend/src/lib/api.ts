@@ -11,9 +11,9 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /**
- * In-memory access token, set by AuthContext after login/refresh. Kept out of
- * localStorage so an XSS payload can't read it directly; lost on hard reload,
- * which is why AuthContext silently calls /auth/refresh on mount.
+ * In-memory copy of the opaque session token, set by AuthContext after login
+ * or session restore. AuthContext also persists it to localStorage so the
+ * session survives reloads (there is no refresh endpoint to trade a cookie in).
  */
 let accessToken: string | null = null;
 
