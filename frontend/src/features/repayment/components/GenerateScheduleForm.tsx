@@ -47,6 +47,7 @@ export function GenerateScheduleForm({ loanId, onDone }: { loanId: string; onDon
           <TextField
             label="Principal (INR)"
             type="number"
+            step="0.01"
             min="0"
             value={principal}
             onChange={(e) => setPrincipal(e.target.value)}

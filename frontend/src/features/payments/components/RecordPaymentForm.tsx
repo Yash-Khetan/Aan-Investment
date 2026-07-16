@@ -79,6 +79,7 @@ export function RecordPaymentForm({
           <TextField
             label="Amount (INR)"
             type="number"
+            step="0.01"
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -126,6 +127,7 @@ export function RecordPaymentForm({
           <TextField
             label="Outstanding Principal"
             type="number"
+            step="0.01"
             min="0"
             value={outstandingPrincipal}
             onChange={(e) => setOutstandingPrincipal(e.target.value)}
@@ -134,6 +136,7 @@ export function RecordPaymentForm({
           <TextField
             label="Outstanding Interest"
             type="number"
+            step="0.01"
             min="0"
             value={outstandingInterest}
             onChange={(e) => setOutstandingInterest(e.target.value)}
@@ -141,6 +144,7 @@ export function RecordPaymentForm({
           <TextField
             label="Outstanding Penalty"
             type="number"
+            step="0.01"
             min="0"
             value={outstandingPenalty}
             onChange={(e) => setOutstandingPenalty(e.target.value)}

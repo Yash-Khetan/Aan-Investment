@@ -60,6 +60,7 @@ export function CalculateInterestPanel({
           <TextField
             label="Outstanding Principal"
             type="number"
+            step="0.01"
             min="0"
             value={outstandingPrincipal}
             onChange={(e) => setOutstandingPrincipal(e.target.value)}
@@ -68,6 +69,7 @@ export function CalculateInterestPanel({
           <TextField
             label="Overdue Installment Amount"
             type="number"
+            step="0.01"
             min="0"
             value={overdueInstallmentAmount}
             onChange={(e) => setOverdueInstallmentAmount(e.target.value)}

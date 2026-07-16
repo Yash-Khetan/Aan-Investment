@@ -90,6 +90,7 @@ export function PenalRulesPanel({ loanId }: { loanId: string }) {
               <TextField
                 label="Penal Amount (INR)"
                 type="number"
+                step="0.01"
                 min="0"
                 value={penalAmount}
                 onChange={(e) => setPenalAmount(e.target.value)}
