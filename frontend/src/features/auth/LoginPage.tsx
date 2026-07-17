@@ -73,12 +73,12 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
+        {/* <p className="mt-6 text-center text-xs text-slate-500">
           Don&apos;t have an account?{" "}
           <Link to="/signup" className="font-medium text-slate-900 hover:underline">
             Sign up
           </Link>
-        </p>
+        </p> */}
       </div>
     </div>
   );

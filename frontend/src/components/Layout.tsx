@@ -9,10 +9,10 @@ const NAV_ITEMS = [
   { to: "/documents", label: "Documents" },
   { to: "/repayment", label: "Repayment Engine" },
   { to: "/payments", label: "Payments" },
+  { to: "/collections", label: "Collections" },
   { to: "/reports", label: "Reports" },
   { to: "/accounting", label: "Accounting Export" },
   { to: "/accounting-entries", label: "Accounting Ledger" },
-  { to: "/collections", label: "Collections" },
 ];
 
 const ADMIN_NAV_ITEM = { to: "/admin/users", label: "Admin" };

@@ -14,7 +14,7 @@ import {
 } from "./auth.utils";
 import { randomToken, sha256Hex } from "../../common/crypto";
 import { escapeHtml } from "../../common/html";
-import { notificationService } from "../notifications";
+import { notificationService, renderEmailLayout, emailButton } from "../notifications";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
 import {
@@ -106,7 +106,9 @@ export class AuthService {
      * Errors: 409 (email already registered).
      */
     async createUser(input: AdminCreateUserInput): Promise<PublicUser> {
-        const { user, roleName } = await this.createWithDefaultRole(input);
+        const { user, roleName } = await this.createWithDefaultRole(input, {
+            invitedByAdmin: true,
+        });
         return toPublicUser(user, [roleName]);
     }
 
@@ -117,6 +119,7 @@ export class AuthService {
      */
     private async createWithDefaultRole(
         input: RegisterInput | AdminCreateUserInput,
+        options: { invitedByAdmin?: boolean } = {},
     ): Promise<{ user: UserRecord; roleName: string }> {
         // Fast path: answer the common duplicate case without paying for a hash.
         // Not authoritative on its own — the unique index below closes the race.
@@ -147,7 +150,11 @@ export class AuthService {
             });
 
             // Best-effort: a delivery failure must never fail registration itself.
-            await this.sendWelcomeEmail(user);
+            if (options.invitedByAdmin) {
+                await this.sendAdminInviteEmail(user);
+            } else {
+                await this.sendWelcomeEmail(user);
+            }
 
             return { user, roleName:role.name };
         } catch (error) {
@@ -173,10 +180,14 @@ export class AuthService {
                         `Hi ${user.firstName},\n\n` +
                         `Your account has been created. You can sign in any time to get started.\n\n` +
                         `Welcome aboard!`,
-                    html:
-                        `<p>Hi ${safeName},</p>` +
-                        `<p>Your account has been created. You can sign in any time to get started.</p>` +
-                        `<p>Welcome aboard!</p>`,
+                    html: renderEmailLayout({
+                        previewText: "Your Aan Investment account is ready.",
+                        bodyHtml:
+                            `<h2 style="margin:0 0 16px;font-size:18px;color:#1a3c6e;">Welcome aboard, ${safeName}!</h2>` +
+                            `<p style="margin:0 0 12px;">Your account has been created successfully. ` +
+                            `You can sign in any time to get started.</p>` +
+                            `<p style="margin:0;">We're glad to have you with us.</p>`,
+                    }),
                 },
                 {
                     userId: user.id,
@@ -186,6 +197,64 @@ export class AuthService {
             );
         } catch (error) {
             logger.error("Failed to send welcome email", { err: error, userId: user.id });
+        }
+    }
+
+    /**
+     * Invite email for accounts an ADMIN provisioned. Unlike the self-service
+     * welcome email, this one tells the user an administrator set their initial
+     * password and points them at the forgot-password page so they can replace
+     * it with one of their own. The temporary password itself is NEVER emailed —
+     * the admin shares it out of band.
+     */
+    private async sendAdminInviteEmail(user: UserRecord): Promise<void> {
+        const safeName = escapeHtml(user.firstName);
+        // Reuse the reset URL's origin so no new env var is needed; the
+        // forgot-password page lives on the same frontend.
+        const forgotPasswordUrl = new URL(
+            "/forgot-password",
+            config.app.passwordResetUrl,
+        ).toString();
+
+        try {
+            await notificationService.sendEmail(
+                {
+                    to: user.email,
+                    subject: "Your Aan Investment LMS account is ready",
+                    text:
+                        `Hi ${user.firstName},\n\n` +
+                        `An administrator has created an account for you on Aan Investment LMS. ` +
+                        `You can sign in with your email address and the temporary password they shared with you.\n\n` +
+                        `For your security, we recommend setting a password of your own right away. ` +
+                        `Visit the link below, enter your email, and follow the reset link we send you:\n\n` +
+                        `${forgotPasswordUrl}\n\n` +
+                        `If you weren't expecting this account, please contact your administrator.`,
+                    html: renderEmailLayout({
+                        previewText: "An administrator has created your account — set your own password.",
+                        bodyHtml:
+                            `<h2 style="margin:0 0 16px;font-size:18px;color:#1a3c6e;">Your account is ready</h2>` +
+                            `<p style="margin:0 0 12px;">Hi ${safeName},</p>` +
+                            `<p style="margin:0 0 12px;">An administrator has created an account for you on ` +
+                            `<strong>Aan Investment LMS</strong>. You can sign in with your email address and ` +
+                            `the temporary password they shared with you.</p>` +
+                            `<p style="margin:0 0 12px;">For your security, we recommend setting a password of ` +
+                            `your own right away. Click the button below, enter your email, and follow the ` +
+                            `reset link we send you.</p>` +
+                            emailButton(forgotPasswordUrl, "Set your own password") +
+                            `<p style="margin:0;color:#6b7280;font-size:13px;">If you weren't expecting this ` +
+                            `account, please contact your administrator.</p>`,
+                    }),
+                },
+                {
+                    userId: user.id,
+                    title: "Your account is ready",
+                    message:
+                        "An administrator created your account. Set your own password from the forgot-password page.",
+                    link: forgotPasswordUrl,
+                },
+            );
+        } catch (error) {
+            logger.error("Failed to send admin-invite email", { err: error, userId: user.id });
         }
     }
 
@@ -341,12 +410,21 @@ export class AuthService {
                         `This link expires in ${ttlMinutes} minutes.\n\n` +
                         `${resetLink}\n\n` +
                         `If you didn't request this, you can safely ignore this email.`,
-                    html:
-                        `<p>Hi ${safeName},</p>` +
-                        `<p>We received a request to reset your password. Use the link below to choose a new one. ` +
-                        `This link expires in ${ttlMinutes} minutes.</p>` +
-                        `<p><a href="${resetLink}">Reset your password</a></p>` +
-                        `<p>If you didn't request this, you can safely ignore this email.</p>`,
+                    html: renderEmailLayout({
+                        previewText: `Your password reset link expires in ${ttlMinutes} minutes.`,
+                        bodyHtml:
+                            `<h2 style="margin:0 0 16px;font-size:18px;color:#1a3c6e;">Password reset request</h2>` +
+                            `<p style="margin:0 0 12px;">Hi ${safeName},</p>` +
+                            `<p style="margin:0 0 12px;">We received a request to reset your password. ` +
+                            `Click the button below to choose a new one. ` +
+                            `This link expires in <strong>${ttlMinutes} minutes</strong>.</p>` +
+                            emailButton(resetLink, "Reset your password") +
+                            `<p style="margin:0 0 12px;">If the button doesn't work, copy and paste this link into your browser:</p>` +
+                            `<p style="margin:0 0 16px;word-break:break-all;font-size:13px;">` +
+                            `<a href="${resetLink}" style="color:#2563eb;">${resetLink}</a></p>` +
+                            `<p style="margin:0;color:#6b7280;font-size:13px;">If you didn't request this, ` +
+                            `you can safely ignore this email &mdash; your password will remain unchanged.</p>`,
+                    }),
                 },
                 // `message` and `link` are what get PERSISTED. Both are deliberately
                 // tokenless: the single-use raw token lives only in the email body

@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { loans } from "../../db/schema";
+import type { loans, loanTranches } from "../../db/schema";
 import type {
     createLoanSchema,
     updateLoanSchema,
@@ -12,6 +12,9 @@ export type Loan = typeof loans.$inferSelect;
 
 /** Shape accepted by Drizzle's insert. */
 export type NewLoan = typeof loans.$inferInsert;
+
+/** Shape accepted by Drizzle's insert for a disbursement tranche. */
+export type NewLoanTranche = typeof loanTranches.$inferInsert;
 
 /** Validated (coerced) API inputs. */
 export type CreateLoanInput = z.infer<typeof createLoanSchema>;
