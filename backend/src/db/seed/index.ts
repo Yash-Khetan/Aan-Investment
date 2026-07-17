@@ -101,7 +101,7 @@ const RETIRED_ROLES = ["MANAGER", "VIEWER"];
  * covering every user mutation; it is superseded by the finer `user:create`,
  * `user:update`, `user:activate` and `user:deactivate`.
  */
-const RETIRED_PERMISSIONS = ["user:write"];
+const RETIRED_PERMISSIONS = ["user:write", "user:delete"];
 
 /** The bootstrap administrator. Credentials come from config (SEED_ADMIN_*). */
 const ADMIN_USER = {

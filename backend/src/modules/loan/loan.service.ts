@@ -11,6 +11,7 @@ import {
     type PaginatedResult,
 } from "../../common/http/pagination";
 import type { PaginationMeta } from "../../common/http/apiResponse";
+import { db } from "../../db/index";
 import * as loanRepository from "./loan.repository";
 import { assertLoanInvariants } from "./loan.validators";
 import type {
@@ -20,6 +21,9 @@ import type {
     NewLoan,
     UpdateLoanInput,
 } from "./loan.types";
+
+/** Today's date as YYYY-MM-DD, matching the `date` columns' string format. */
+const today = (): string => new Date().toISOString().slice(0, 10);
 
 /**
  * Loan business layer. Owns all rules and orchestration; delegates every DB
@@ -111,6 +115,26 @@ export const createLoan = async (
     if (input.relationshipManagerId !== undefined)
         values.relationshipManagerId = input.relationshipManagerId;
     if (input.createdBy !== undefined) values.createdBy = input.createdBy;
+
+    // A loan created with an initial disbursed amount gets tranche #1 recorded
+    // in the same transaction, so accounting-export's disbursement report (and
+    // any other reader of loan_tranches) sees it immediately and consistently.
+    if (input.disbursedAmount !== undefined && input.disbursedAmount > 0) {
+        return db.transaction(async (tx) => {
+            const loan = await loanRepository.create(values, tx);
+            await loanRepository.createTranche(
+                {
+                    loanId: loan.id,
+                    trancheNumber: 1,
+                    amount: toMoney(input.disbursedAmount)!,
+                    disbursementDate: input.firstDisbursementDate ?? today(),
+                    remarks: "Initial disbursement",
+                },
+                tx,
+            );
+            return loan;
+        });
+    }
 
     return loanRepository.create(values);
 };
@@ -229,6 +253,37 @@ export const updateLoan = async (
     if (input.status !== undefined) patch.status = input.status;
     if ("relationshipManagerId" in input)
         patch.relationshipManagerId = input.relationshipManagerId ?? null;
+
+    // An increase in disbursedAmount is a new tranche being drawn down; record
+    // it atomically with the loan update. A decrease (correction) or an
+    // unchanged amount records no tranche — see accounting-export's decision
+    // not to model negative disbursements.
+    const previousDisbursed = num(existing.disbursedAmount) ?? 0;
+    const disbursementIncrease =
+        input.disbursedAmount !== undefined
+            ? input.disbursedAmount - previousDisbursed
+            : 0;
+
+    if (disbursementIncrease > 0) {
+        return db.transaction(async (tx) => {
+            const updated = await loanRepository.update(id, patch, tx);
+            if (!updated) throw new NotFoundError(`Loan '${id}' not found`);
+
+            const trancheNumber = (await loanRepository.countTranches(id, tx)) + 1;
+            await loanRepository.createTranche(
+                {
+                    loanId: id,
+                    trancheNumber,
+                    amount: toMoney(disbursementIncrease)!,
+                    disbursementDate: today(),
+                    remarks: `Additional disbursement (tranche ${trancheNumber})`,
+                },
+                tx,
+            );
+
+            return updated;
+        });
+    }
 
     const updated = await loanRepository.update(id, patch);
     if (!updated) throw new NotFoundError(`Loan '${id}' not found`);

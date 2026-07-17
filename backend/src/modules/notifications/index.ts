@@ -6,6 +6,9 @@
 
 export { notificationService } from "./services/notification.service";
 
+export { renderEmailLayout, emailButton } from "./templates/email-layout";
+export type { EmailLayoutOptions } from "./templates/email-layout";
+
 export type {
     NotificationChannel,
     NotificationRecordMeta,
