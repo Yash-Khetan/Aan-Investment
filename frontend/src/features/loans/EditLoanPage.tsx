@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
+import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
 import { getLoan, updateLoan } from "./api";
 import { EMPTY_LOAN_FORM, loanToFormState, formStateToUpdateInput } from "./types";
 import type { LoanFormState } from "./types";
@@ -71,6 +72,12 @@ export function EditLoanPage() {
             </Button>
           </div>
         </form>
+      )}
+
+      {data && loaded && (
+        <div className="mt-6">
+          <GuarantorsSection loanId={data.id} />
+        </div>
       )}
     </div>
   );

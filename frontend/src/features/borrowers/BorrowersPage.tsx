@@ -58,7 +58,7 @@ export function BorrowersPage() {
 
   return (
     <div>
-      <PageHeader title="Borrowers" description="Borrower master data — promoters, guarantors, and internal ratings." />
+      <PageHeader title="Borrowers" description="Borrower master data — promoters and internal ratings." />
 
       <div className="mb-6 flex items-end justify-between gap-3">
         <div className="w-80">

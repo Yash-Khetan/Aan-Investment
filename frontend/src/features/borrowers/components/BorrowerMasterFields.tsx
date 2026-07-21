@@ -11,7 +11,7 @@ function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
 }
 
-/** Borrower master-data fields shared by the create and edit pages. Promoters/guarantors are handled separately (create only — the backend has no update endpoint for them yet). */
+/** Borrower master-data fields shared by the create and edit pages. Promoters are handled separately (create only — the backend has no update endpoint for them yet). Guarantors now belong to loans, not borrowers. */
 export function BorrowerMasterFields({
   form,
   onChange,

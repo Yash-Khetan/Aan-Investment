@@ -61,21 +61,14 @@ export function EditBorrowerPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <BorrowerMasterFields form={form} onChange={patch} showStatus />
 
-          {(data.promoters.length > 0 || data.guarantors.length > 0) && (
+          {data.promoters.length > 0 && (
             <Card className="p-4">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Promoters &amp; Guarantors
-              </h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Promoters</h2>
               <p className="mb-3 text-xs text-slate-400">Read-only here — editing these isn't supported yet.</p>
               <div className="flex flex-col gap-1.5 text-sm text-slate-700">
                 {data.promoters.map((p) => (
                   <div key={p.id}>
                     <span className="text-slate-400">Promoter —</span> {p.name} {p.designation ? `(${p.designation})` : ""}
-                  </div>
-                ))}
-                {data.guarantors.map((g) => (
-                  <div key={g.id}>
-                    <span className="text-slate-400">Guarantor —</span> {g.name} ({g.guaranteeType})
                   </div>
                 ))}
               </div>

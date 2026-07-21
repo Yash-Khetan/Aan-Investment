@@ -36,6 +36,13 @@
       "when": 1784123307005,
       "tag": "0004_material_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784723307005,
+      "tag": "0005_guarantor_loan_relationship",
+      "breakpoints": true
     }
   ]
 }

@@ -28,20 +28,6 @@ export interface Promoter {
   shareholdingPercent?: number;
 }
 
-export interface Guarantor {
-  id?: string;
-  name: string;
-  guaranteeType: string;
-  pan?: string;
-  phone?: string;
-  email?: string;
-  addressLine1?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  netWorth?: number;
-}
-
 export interface Borrower {
   id: string;
   borrowerCode: string;
@@ -71,7 +57,6 @@ export interface Borrower {
 
 export interface BorrowerDetail extends Borrower {
   promoters: Promoter[];
-  guarantors: Guarantor[];
 }
 
 export interface CreateBorrowerInput {
@@ -96,7 +81,6 @@ export interface CreateBorrowerInput {
   ratingRemarks?: string;
   notes?: string;
   promoters?: Promoter[];
-  guarantors?: Guarantor[];
 }
 
 /** Master-field update payload. Every field is sent; nullable ones clear on empty string. */
@@ -199,11 +183,7 @@ export function borrowerToFormState(b: Borrower): BorrowerFormState {
   };
 }
 
-export function formStateToCreateInput(
-  f: BorrowerFormState,
-  promoters: Promoter[],
-  guarantors: Guarantor[],
-): CreateBorrowerInput {
+export function formStateToCreateInput(f: BorrowerFormState, promoters: Promoter[]): CreateBorrowerInput {
   return {
     borrowerCode: f.borrowerCode,
     name: f.name,
@@ -226,7 +206,6 @@ export function formStateToCreateInput(
     ratingRemarks: f.ratingRemarks || undefined,
     notes: f.notes || undefined,
     promoters: promoters.filter((p) => p.name.trim() !== "").length > 0 ? promoters.filter((p) => p.name.trim() !== "") : undefined,
-    guarantors: guarantors.filter((g) => g.name.trim() !== "").length > 0 ? guarantors.filter((g) => g.name.trim() !== "") : undefined,
   };
 }
 

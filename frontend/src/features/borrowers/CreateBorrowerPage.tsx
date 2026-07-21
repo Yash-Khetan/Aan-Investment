@@ -9,10 +9,9 @@ import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
 import { createBorrower } from "./api";
 import { EMPTY_BORROWER_FORM, formStateToCreateInput } from "./types";
-import type { BorrowerFormState, Guarantor, Promoter } from "./types";
+import type { BorrowerFormState, Promoter } from "./types";
 
 const emptyPromoter: Promoter = { name: "", designation: "", pan: "", phone: "", email: "" };
-const emptyGuarantor: Guarantor = { name: "", guaranteeType: "", pan: "", phone: "", email: "" };
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
@@ -23,7 +22,6 @@ export function CreateBorrowerPage() {
 
   const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
-  const [guarantors, setGuarantors] = useState<Guarantor[]>([]);
 
   const mutation = useMutation({
     mutationFn: createBorrower,
@@ -38,13 +36,9 @@ export function CreateBorrowerPage() {
     setPromoters((rows) => rows.map((r, i) => (i === index ? { ...r, ...patchVal } : r)));
   }
 
-  function updateGuarantor(index: number, patchVal: Partial<Guarantor>) {
-    setGuarantors((rows) => rows.map((r, i) => (i === index ? { ...r, ...patchVal } : r)));
-  }
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    mutation.mutate(formStateToCreateInput(form, promoters, guarantors));
+    mutation.mutate(formStateToCreateInput(form, promoters));
   }
 
   return (
@@ -96,57 +90,6 @@ export function CreateBorrowerPage() {
                 />
                 <div className="flex items-end">
                   <Button type="button" variant="ghost" onClick={() => setPromoters((rows) => rows.filter((_, idx) => idx !== i))}>
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <SectionTitle>Guarantors</SectionTitle>
-            <Button type="button" variant="secondary" onClick={() => setGuarantors((rows) => [...rows, { ...emptyGuarantor }])}>
-              + Add Guarantor
-            </Button>
-          </div>
-          {guarantors.length === 0 && <p className="text-sm text-slate-400">No guarantors added.</p>}
-          <div className="flex flex-col gap-3">
-            {guarantors.map((g, i) => (
-              <div key={i} className="grid grid-cols-2 gap-3 rounded-md border border-slate-100 p-3 lg:grid-cols-4">
-                <TextField label="Name" value={g.name} onChange={(e) => updateGuarantor(i, { name: e.target.value })} required />
-                <TextField
-                  label="Guarantee Type"
-                  value={g.guaranteeType}
-                  onChange={(e) => updateGuarantor(i, { guaranteeType: e.target.value })}
-                  placeholder="PERSONAL / CORPORATE"
-                  required
-                />
-                <TextField label="PAN" value={g.pan ?? ""} onChange={(e) => updateGuarantor(i, { pan: e.target.value.toUpperCase() })} />
-                <TextField
-                  label="Phone"
-                  type="tel"
-                  value={g.phone ?? ""}
-                  onChange={(e) => updateGuarantor(i, { phone: e.target.value })}
-                  pattern={PHONE_PATTERN}
-                  title={PHONE_TITLE}
-                />
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={g.email ?? ""}
-                  onChange={(e) => updateGuarantor(i, { email: e.target.value })}
-                />
-                <TextField
-                  label="Net Worth (INR)"
-                  type="number"
-                  min="0"
-                  value={g.netWorth ?? ""}
-                  onChange={(e) => updateGuarantor(i, { netWorth: e.target.value ? Number(e.target.value) : undefined })}
-                />
-                <div className="flex items-end">
-                  <Button type="button" variant="ghost" onClick={() => setGuarantors((rows) => rows.filter((_, idx) => idx !== i))}>
                     Remove
                   </Button>
                 </div>

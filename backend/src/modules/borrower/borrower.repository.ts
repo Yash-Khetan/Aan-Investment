@@ -15,7 +15,6 @@ import {
 import { db } from "../../db/index";
 import {
     borrowers,
-    guarantors,
     promoters,
     users,
 } from "../../db/schema";
@@ -25,7 +24,6 @@ import type {
     BorrowerWithManager,
     ListBorrowersQuery,
     NewBorrower,
-    NewGuarantor,
     NewPromoter,
 } from "./borrower.types";
 
@@ -48,7 +46,6 @@ export const create = async (
     data: NewBorrower,
     children: {
         promoters: Omit<NewPromoter, "borrowerId">[];
-        guarantors: Omit<NewGuarantor, "borrowerId">[];
     },
 ): Promise<BorrowerDetail> => {
     const id = await db.transaction(async (tx) => {
@@ -62,11 +59,6 @@ export const create = async (
             await tx
                 .insert(promoters)
                 .values(children.promoters.map((p) => ({ ...p, borrowerId })));
-        }
-        if (children.guarantors.length > 0) {
-            await tx
-                .insert(guarantors)
-                .values(children.guarantors.map((g) => ({ ...g, borrowerId })));
         }
         return borrowerId;
     });
@@ -88,15 +80,14 @@ export const findById = async (
 
     if (!row) return undefined;
 
-    const [promoterRows, guarantorRows] = await Promise.all([
-        db.select().from(promoters).where(eq(promoters.borrowerId, id)),
-        db.select().from(guarantors).where(eq(guarantors.borrowerId, id)),
-    ]);
+    const promoterRows = await db
+        .select()
+        .from(promoters)
+        .where(eq(promoters.borrowerId, id));
 
     return {
         ...(row as BorrowerWithManager),
         promoters: promoterRows,
-        guarantors: guarantorRows,
     };
 };
 
