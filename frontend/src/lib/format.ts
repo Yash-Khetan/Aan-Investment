@@ -23,3 +23,11 @@ export function formatNumber(value: number | string | null | undefined): string 
   if (Number.isNaN(num)) return "—";
   return new Intl.NumberFormat("en-IN").format(num);
 }
+
+/** Formats a decimal rate (e.g. 0.145 -> "14.50%"). Input is a fraction, not a whole percentage. */
+export function formatPercent(value: number | string | null | undefined, decimals = 2): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const num = typeof value === "string" ? Number.parseFloat(value) : value;
+  if (Number.isNaN(num)) return "—";
+  return `${(num * 100).toFixed(decimals)}%`;
+}

@@ -36,6 +36,21 @@ export interface Loan {
   status: string | null;
   relationshipManagerId: string | null;
   createdAt: string | null;
+  /** Sum of (expected - paid) across unpaid installments past due, on the current repayment schedule. */
+  amountOverdue: number;
+  /** Days since the oldest unpaid overdue installment's due date; 0 when nothing is overdue. */
+  dpd: number;
+  /** RBI-style NBFC delinquency bucket derived from dpd: STD, SMA-0, SMA-1, SMA-2, or NPA. */
+  classification: string;
+  /** Earliest due date among unpaid installments (overdue or upcoming); null if none. */
+  nextDueDate: string | null;
+  /**
+   * Annualized IRR from this loan's realized cash flows (disbursements out, actual
+   * payments in) plus its current outstanding principal as a final notional inflow.
+   * Only present on the single-loan detail response, not the list. Null when there
+   * isn't enough cash-flow data yet to solve a rate.
+   */
+  irr?: number | null;
 }
 
 export interface CreateLoanInput {

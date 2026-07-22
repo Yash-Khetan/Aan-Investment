@@ -8,6 +8,7 @@ import { TextField } from "../../components/ui/Field";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
 import { createBorrower } from "./api";
+import { uploadDocument } from "../documents/api";
 import { EMPTY_BORROWER_FORM, formStateToCreateInput } from "./types";
 import type { BorrowerFormState, Promoter } from "./types";
 
@@ -22,9 +23,24 @@ export function CreateBorrowerPage() {
 
   const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
+  const [panFile, setPanFile] = useState<File | null>(null);
+  const [gstFile, setGstFile] = useState<File | null>(null);
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
 
   const mutation = useMutation({
-    mutationFn: createBorrower,
+    mutationFn: async (input: ReturnType<typeof formStateToCreateInput>) => {
+      const borrower = await createBorrower(input);
+      if (panFile) {
+        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "PAN_CARD", name: "PAN", file: panFile });
+      }
+      if (gstFile) {
+        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "GSTIN_CERTIFICATE", name: "GSTIN", file: gstFile });
+      }
+      if (aadhaarFile) {
+        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "AADHAAR", name: "Aadhaar", file: aadhaarFile });
+      }
+      return borrower;
+    },
     onSuccess: (borrower) => navigate(`/borrowers`, { state: { createdId: borrower.id } }),
   });
 
@@ -46,7 +62,16 @@ export function CreateBorrowerPage() {
       <PageHeader title="New Borrower" description="Borrower master — identity, address, and internal details." />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <BorrowerMasterFields form={form} onChange={patch} />
+        <BorrowerMasterFields
+          form={form}
+          onChange={patch}
+          panFile={panFile}
+          onPanFileChange={setPanFile}
+          gstFile={gstFile}
+          onGstFileChange={setGstFile}
+          aadhaarFile={aadhaarFile}
+          onAadhaarFileChange={setAadhaarFile}
+        />
 
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">

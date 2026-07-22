@@ -43,6 +43,13 @@
       "when": 1784723307005,
       "tag": "0005_guarantor_loan_relationship",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784809707005,
+      "tag": "0006_add_aadhaar_and_kyc_document_types",
+      "breakpoints": true
     }
   ]
 }

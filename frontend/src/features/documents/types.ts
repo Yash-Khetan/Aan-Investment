@@ -13,6 +13,9 @@ export const DOCUMENT_TYPES = [
   "VALUATION_REPORT",
   "INSURANCE",
   "KYC",
+  "PAN_CARD",
+  "GSTIN_CERTIFICATE",
+  "AADHAAR",
   "FINANCIAL_STATEMENT",
   "OTHER",
 ] as const;

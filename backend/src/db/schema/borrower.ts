@@ -89,6 +89,10 @@ export const borrowers = pgTable("borrowers", {
         length: 25,
     }),
 
+    aadhaar: varchar("aadhaar", {
+        length: 12,
+    }),
+
     /* ── Business Details ── */
 
     dateOfIncorporation: date("date_of_incorporation"),

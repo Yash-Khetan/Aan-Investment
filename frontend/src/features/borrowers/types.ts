@@ -45,6 +45,7 @@ export interface Borrower {
   pan: string | null;
   gst: string | null;
   cin: string | null;
+  aadhaar: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   internalRating: string | null;
@@ -75,6 +76,7 @@ export interface CreateBorrowerInput {
   pan?: string;
   gst?: string;
   cin?: string;
+  aadhaar?: string;
   dateOfIncorporation?: string;
   natureOfBusiness?: string;
   internalRating?: string;
@@ -100,6 +102,7 @@ export interface UpdateBorrowerInput {
   pan: string | null;
   gst: string | null;
   cin: string | null;
+  aadhaar: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   internalRating: string | null;
@@ -125,6 +128,7 @@ export interface BorrowerFormState {
   pan: string;
   gst: string;
   cin: string;
+  aadhaar: string;
   dateOfIncorporation: string;
   natureOfBusiness: string;
   internalRating: string;
@@ -149,6 +153,7 @@ export const EMPTY_BORROWER_FORM: BorrowerFormState = {
   pan: "",
   gst: "",
   cin: "",
+  aadhaar: "",
   dateOfIncorporation: "",
   natureOfBusiness: "",
   internalRating: "",
@@ -174,6 +179,7 @@ export function borrowerToFormState(b: Borrower): BorrowerFormState {
     pan: b.pan ?? "",
     gst: b.gst ?? "",
     cin: b.cin ?? "",
+    aadhaar: b.aadhaar ?? "",
     dateOfIncorporation: b.dateOfIncorporation ?? "",
     natureOfBusiness: b.natureOfBusiness ?? "",
     internalRating: b.internalRating ?? "",
@@ -200,6 +206,7 @@ export function formStateToCreateInput(f: BorrowerFormState, promoters: Promoter
     pan: f.pan || undefined,
     gst: f.gst || undefined,
     cin: f.cin || undefined,
+    aadhaar: f.aadhaar || undefined,
     dateOfIncorporation: f.dateOfIncorporation || undefined,
     natureOfBusiness: f.natureOfBusiness || undefined,
     internalRating: f.internalRating || undefined,
@@ -226,6 +233,7 @@ export function formStateToUpdateInput(f: BorrowerFormState): UpdateBorrowerInpu
     pan: f.pan || null,
     gst: f.gst || null,
     cin: f.cin || null,
+    aadhaar: f.aadhaar || null,
     dateOfIncorporation: f.dateOfIncorporation || null,
     natureOfBusiness: f.natureOfBusiness || null,
     internalRating: f.internalRating || null,

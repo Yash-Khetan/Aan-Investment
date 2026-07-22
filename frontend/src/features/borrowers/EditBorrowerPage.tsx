@@ -8,6 +8,9 @@ import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields } from "./components/BorrowerMasterFields";
 import { getBorrower, updateBorrower } from "./api";
+import { listDocuments } from "../documents/api";
+import { UploadDocumentForm } from "../documents/components/UploadDocumentForm";
+import { DocumentCard } from "../documents/components/DocumentCard";
 import { EMPTY_BORROWER_FORM, borrowerToFormState, formStateToUpdateInput } from "./types";
 import type { BorrowerFormState } from "./types";
 
@@ -18,10 +21,17 @@ export function EditBorrowerPage() {
 
   const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
   const [loaded, setLoaded] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["borrower", id],
     queryFn: () => getBorrower(id!),
+    enabled: !!id,
+  });
+
+  const { data: documents } = useQuery({
+    queryKey: ["documents", "BORROWER", id],
+    queryFn: () => listDocuments("BORROWER", id!),
     enabled: !!id,
   });
 
@@ -59,7 +69,7 @@ export function EditBorrowerPage() {
 
       {data && loaded && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <BorrowerMasterFields form={form} onChange={patch} showStatus />
+          <BorrowerMasterFields form={form} onChange={patch} showStatus borrowerId={id} documents={documents} />
 
           {data.promoters.length > 0 && (
             <Card className="p-4">
@@ -86,6 +96,28 @@ export function EditBorrowerPage() {
             </Button>
           </div>
         </form>
+      )}
+
+      {id && (
+        <Card className="mt-6 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Documents</h2>
+            <Button type="button" variant="secondary" onClick={() => setShowUploadForm((s) => !s)}>
+              {showUploadForm ? "Cancel" : "+ Upload"}
+            </Button>
+          </div>
+
+          {showUploadForm && (
+            <UploadDocumentForm entityType="BORROWER" entityId={id} onDone={() => setShowUploadForm(false)} />
+          )}
+
+          {documents && documents.length === 0 && <p className="text-sm text-slate-400">No documents uploaded yet.</p>}
+          <div className="flex flex-col gap-3">
+            {documents?.map((doc) => (
+              <DocumentCard key={doc.id} doc={doc} entityType="BORROWER" entityId={id} />
+            ))}
+          </div>
+        </Card>
       )}
     </div>
   );

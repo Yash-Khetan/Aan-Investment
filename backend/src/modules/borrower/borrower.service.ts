@@ -99,6 +99,7 @@ export const createBorrower = async (
     if (input.pan !== undefined) values.pan = input.pan;
     if (input.gst !== undefined) values.gst = input.gst;
     if (input.cin !== undefined) values.cin = input.cin;
+    if (input.aadhaar !== undefined) values.aadhaar = input.aadhaar;
     if (input.dateOfIncorporation !== undefined)
         values.dateOfIncorporation = input.dateOfIncorporation;
     if (input.natureOfBusiness !== undefined)
@@ -170,6 +171,7 @@ export const updateBorrower = async (
     if ("pan" in input) patch.pan = input.pan ?? null;
     if ("gst" in input) patch.gst = input.gst ?? null;
     if ("cin" in input) patch.cin = input.cin ?? null;
+    if ("aadhaar" in input) patch.aadhaar = input.aadhaar ?? null;
     if ("dateOfIncorporation" in input)
         patch.dateOfIncorporation = input.dateOfIncorporation ?? null;
     if ("natureOfBusiness" in input)

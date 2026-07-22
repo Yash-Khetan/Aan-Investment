@@ -14,10 +14,13 @@ import type { PaginationMeta } from "../../common/http/apiResponse";
 import { db } from "../../db/index";
 import * as loanRepository from "./loan.repository";
 import { assertLoanInvariants } from "./loan.validators";
+import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
+import { getLoanIrrs } from "./loan.irr";
 import type {
     CreateLoanInput,
     ListLoansQuery,
     LoanWithBorrower,
+    LoanWithMetrics,
     NewLoan,
     UpdateLoanInput,
 } from "./loan.types";
@@ -139,19 +142,43 @@ export const createLoan = async (
     return loanRepository.create(values);
 };
 
-export const getLoanById = async (id: string): Promise<LoanWithBorrower> => {
+/**
+ * Attach derived overdue/DPD/classification/next-due-date fields to each
+ * loan, and overwrite `outstandingPrincipal` with the computed value (see
+ * `loan.metrics.ts` — the stored column isn't kept in sync with payments).
+ */
+const enrichWithMetrics = async (
+    loans: LoanWithBorrower[],
+): Promise<LoanWithMetrics[]> => {
+    const loanIds = loans.map((l) => l.id);
+    const [metrics, outstanding] = await Promise.all([
+        getOverdueMetrics(loanIds),
+        getOutstandingPrincipal(loanIds),
+    ]);
+    return loans.map((loan) => ({
+        ...loan,
+        ...(metrics.get(loan.id) ?? EMPTY_METRICS),
+        outstandingPrincipal: (outstanding.get(loan.id) ?? 0).toFixed(2),
+    }));
+};
+
+export const getLoanById = async (
+    id: string,
+): Promise<LoanWithMetrics & { irr: number | null }> => {
     const loan = await loanRepository.findById(id);
     if (!loan) throw new NotFoundError(`Loan '${id}' not found`);
-    return loan;
+    const [enriched] = await enrichWithMetrics([loan]);
+    const irrs = await getLoanIrrs([id]);
+    return { ...enriched!, irr: irrs.get(id) ?? null };
 };
 
 export const listLoans = async (
     query: ListLoansQuery,
-): Promise<{ data: LoanWithBorrower[]; meta: PaginationMeta }> => {
+): Promise<{ data: LoanWithMetrics[]; meta: PaginationMeta }> => {
     const { rows, total }: PaginatedResult<LoanWithBorrower> =
         await loanRepository.findAll(query);
     return {
-        data: rows,
+        data: await enrichWithMetrics(rows),
         meta: buildPaginationMeta(query.page, query.limit, total),
     };
 };

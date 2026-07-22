@@ -94,6 +94,7 @@ export const createBorrowerSchema = z
         pan: pan.optional(),
         gst: gst.optional(),
         cin: cin.optional(),
+        aadhaar: aadhaar.optional(),
 
         /* Business */
         dateOfIncorporation: z
@@ -135,6 +136,7 @@ export const updateBorrowerSchema = z
         pan: pan.nullable(),
         gst: gst.nullable(),
         cin: cin.nullable(),
+        aadhaar: aadhaar.nullable(),
         dateOfIncorporation: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")

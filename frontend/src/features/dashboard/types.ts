@@ -33,7 +33,14 @@ export interface CollectionsSummary {
   };
 }
 
+export interface PortfolioReturns {
+  /** Fraction (e.g. 0.145 = 14.5%), not a whole percentage. Null when there isn't enough cash-flow data to solve a rate. */
+  overallIrr: number | null;
+  overallMirr: number | null;
+}
+
 export interface DashboardSummary {
   portfolio: PortfolioSummary;
   collections: CollectionsSummary;
+  returns: PortfolioReturns;
 }
