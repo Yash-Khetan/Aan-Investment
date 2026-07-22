@@ -15,7 +15,6 @@ import type {
     CreateBorrowerInput,
     ListBorrowersQuery,
     NewBorrower,
-    NewGuarantor,
     NewPromoter,
     UpdateBorrowerInput,
 } from "./borrower.types";
@@ -73,25 +72,6 @@ const mapPromoters = (
         return row;
     });
 
-const mapGuarantors = (
-    input: CreateBorrowerInput["guarantors"],
-): Omit<NewGuarantor, "borrowerId">[] =>
-    (input ?? []).map((g) => {
-        const row: Omit<NewGuarantor, "borrowerId"> = {
-            name: g.name,
-            guaranteeType: g.guaranteeType,
-        };
-        if (g.pan !== undefined) row.pan = g.pan;
-        if (g.phone !== undefined) row.phone = g.phone;
-        if (g.email !== undefined) row.email = g.email;
-        if (g.addressLine1 !== undefined) row.addressLine1 = g.addressLine1;
-        if (g.city !== undefined) row.city = g.city;
-        if (g.state !== undefined) row.state = g.state;
-        if (g.pincode !== undefined) row.pincode = g.pincode;
-        if (g.netWorth !== undefined) row.netWorth = num(g.netWorth);
-        return row;
-    });
-
 export const createBorrower = async (
     input: CreateBorrowerInput,
 ): Promise<BorrowerDetail> => {
@@ -119,6 +99,7 @@ export const createBorrower = async (
     if (input.pan !== undefined) values.pan = input.pan;
     if (input.gst !== undefined) values.gst = input.gst;
     if (input.cin !== undefined) values.cin = input.cin;
+    if (input.aadhaar !== undefined) values.aadhaar = input.aadhaar;
     if (input.dateOfIncorporation !== undefined)
         values.dateOfIncorporation = input.dateOfIncorporation;
     if (input.natureOfBusiness !== undefined)
@@ -134,7 +115,6 @@ export const createBorrower = async (
 
     return borrowerRepository.create(values, {
         promoters: mapPromoters(input.promoters),
-        guarantors: mapGuarantors(input.guarantors),
     });
 };
 
@@ -191,6 +171,7 @@ export const updateBorrower = async (
     if ("pan" in input) patch.pan = input.pan ?? null;
     if ("gst" in input) patch.gst = input.gst ?? null;
     if ("cin" in input) patch.cin = input.cin ?? null;
+    if ("aadhaar" in input) patch.aadhaar = input.aadhaar ?? null;
     if ("dateOfIncorporation" in input)
         patch.dateOfIncorporation = input.dateOfIncorporation ?? null;
     if ("natureOfBusiness" in input)

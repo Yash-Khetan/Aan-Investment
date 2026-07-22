@@ -75,6 +75,9 @@ punchlist/
 # Drizzle
 drizzle/meta/
 
+# Tesseract.js language data — downloaded to CWD on first OCR call, not source.
+*.traineddata
+
 # Supabase
 .supabase/
 

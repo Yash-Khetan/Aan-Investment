@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { borrowerRoutes } from "../modules/borrower";
 import { loanRoutes } from "../modules/loan";
+import { guarantorRoutes } from "../modules/guarantor";
 
 /**
  * API v1 router. Each business module mounts its own sub-router here.
@@ -13,6 +14,9 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.use("/borrowers", borrowerRoutes);
+// Guarantors are managed only through the loan they belong to — mounted
+// before the general "/loans" router so its nested path is matched first.
+apiRouter.use("/loans/:loanId/guarantors", guarantorRoutes);
 apiRouter.use("/loans", loanRoutes);
 
 export default apiRouter;

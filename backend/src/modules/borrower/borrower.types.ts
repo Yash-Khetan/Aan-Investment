@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { borrowers, promoters, guarantors } from "../../db/schema";
+import type { borrowers, promoters } from "../../db/schema";
 import type {
     createBorrowerSchema,
     updateBorrowerSchema,
@@ -10,12 +10,10 @@ import type {
 /** Rows as stored/returned by the database. */
 export type Borrower = typeof borrowers.$inferSelect;
 export type Promoter = typeof promoters.$inferSelect;
-export type Guarantor = typeof guarantors.$inferSelect;
 
 /** Shapes accepted by Drizzle inserts. */
 export type NewBorrower = typeof borrowers.$inferInsert;
 export type NewPromoter = typeof promoters.$inferInsert;
-export type NewGuarantor = typeof guarantors.$inferInsert;
 
 /** Validated (coerced) API inputs. */
 export type CreateBorrowerInput = z.infer<typeof createBorrowerSchema>;
@@ -30,5 +28,4 @@ export type BorrowerWithManager = Borrower & {
 /** Full borrower detail including its child entities. */
 export type BorrowerDetail = BorrowerWithManager & {
     promoters: Promoter[];
-    guarantors: Guarantor[];
 };

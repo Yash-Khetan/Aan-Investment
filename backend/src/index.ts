@@ -19,6 +19,7 @@ import { accountingExportRouter } from "./modules/accounting-export";
 import { collateralRouter } from "./modules/collateral";
 import { collectionsRouter } from "./modules/collections";
 import { documentRouter } from "./modules/document-vault";
+import { ocrRouter } from "./modules/ocr/ocr.routes";
 import { reportsRouter } from "./modules/reports";
 import dashboardRouter from "./modules/dashboard/routes/dashboard.routes.js";
 import { lookupRouter } from "./routes/lookup.routes.js";
@@ -99,6 +100,7 @@ function createApp(): Application {
     app.use("/accounting-entries", accountingRouter); //  POST /disbursement, POST /write-off, GET /:loanId
 
     app.use("/documents", documentRouter);
+    app.use("/ocr", ocrRouter); //  POST /extract
     app.use("/collateral", collateralRouter);
     app.use("/collections", collectionsRouter);
     app.use("/reports", reportsRouter);

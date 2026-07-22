@@ -8,7 +8,7 @@ import { HorizontalBarChart, type BarDatum } from "../../components/charts/Horiz
 import { Meter } from "../../components/charts/Meter";
 import { StatusLegend } from "../../components/charts/StatusLegend";
 import { LOAN_STATUS_ROLE, COLLECTION_STATUS_ROLE } from "../../components/charts/palette";
-import { formatCurrency, formatNumber } from "../../lib/format";
+import { formatCurrency, formatNumber, formatPercent } from "../../lib/format";
 import { getDashboardSummary } from "./api";
 
 const AT_RISK_STATUSES = new Set(["OVERDUE", "NPA", "WRITTEN_OFF"]);
@@ -74,6 +74,8 @@ export function DashboardPage() {
               <StatCard label="Total Sanctioned" value={formatCurrency(data.portfolio.totals.totalSanctioned)} />
               <StatCard label="Total Disbursed" value={formatCurrency(data.portfolio.totals.totalDisbursed)} />
               <StatCard label="Outstanding" value={formatCurrency(data.portfolio.totals.totalOutstanding)} />
+              <StatCard label="Overall IRR" value={formatPercent(data.returns.overallIrr)} />
+              <StatCard label="Overall MIRR" value={formatPercent(data.returns.overallMirr)} />
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">

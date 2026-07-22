@@ -28,20 +28,6 @@ export interface Promoter {
   shareholdingPercent?: number;
 }
 
-export interface Guarantor {
-  id?: string;
-  name: string;
-  guaranteeType: string;
-  pan?: string;
-  phone?: string;
-  email?: string;
-  addressLine1?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  netWorth?: number;
-}
-
 export interface Borrower {
   id: string;
   borrowerCode: string;
@@ -59,6 +45,7 @@ export interface Borrower {
   pan: string | null;
   gst: string | null;
   cin: string | null;
+  aadhaar: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   internalRating: string | null;
@@ -71,7 +58,6 @@ export interface Borrower {
 
 export interface BorrowerDetail extends Borrower {
   promoters: Promoter[];
-  guarantors: Guarantor[];
 }
 
 export interface CreateBorrowerInput {
@@ -90,13 +76,13 @@ export interface CreateBorrowerInput {
   pan?: string;
   gst?: string;
   cin?: string;
+  aadhaar?: string;
   dateOfIncorporation?: string;
   natureOfBusiness?: string;
   internalRating?: string;
   ratingRemarks?: string;
   notes?: string;
   promoters?: Promoter[];
-  guarantors?: Guarantor[];
 }
 
 /** Master-field update payload. Every field is sent; nullable ones clear on empty string. */
@@ -116,6 +102,7 @@ export interface UpdateBorrowerInput {
   pan: string | null;
   gst: string | null;
   cin: string | null;
+  aadhaar: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   internalRating: string | null;
@@ -141,6 +128,7 @@ export interface BorrowerFormState {
   pan: string;
   gst: string;
   cin: string;
+  aadhaar: string;
   dateOfIncorporation: string;
   natureOfBusiness: string;
   internalRating: string;
@@ -165,6 +153,7 @@ export const EMPTY_BORROWER_FORM: BorrowerFormState = {
   pan: "",
   gst: "",
   cin: "",
+  aadhaar: "",
   dateOfIncorporation: "",
   natureOfBusiness: "",
   internalRating: "",
@@ -190,6 +179,7 @@ export function borrowerToFormState(b: Borrower): BorrowerFormState {
     pan: b.pan ?? "",
     gst: b.gst ?? "",
     cin: b.cin ?? "",
+    aadhaar: b.aadhaar ?? "",
     dateOfIncorporation: b.dateOfIncorporation ?? "",
     natureOfBusiness: b.natureOfBusiness ?? "",
     internalRating: b.internalRating ?? "",
@@ -199,11 +189,7 @@ export function borrowerToFormState(b: Borrower): BorrowerFormState {
   };
 }
 
-export function formStateToCreateInput(
-  f: BorrowerFormState,
-  promoters: Promoter[],
-  guarantors: Guarantor[],
-): CreateBorrowerInput {
+export function formStateToCreateInput(f: BorrowerFormState, promoters: Promoter[]): CreateBorrowerInput {
   return {
     borrowerCode: f.borrowerCode,
     name: f.name,
@@ -220,13 +206,13 @@ export function formStateToCreateInput(
     pan: f.pan || undefined,
     gst: f.gst || undefined,
     cin: f.cin || undefined,
+    aadhaar: f.aadhaar || undefined,
     dateOfIncorporation: f.dateOfIncorporation || undefined,
     natureOfBusiness: f.natureOfBusiness || undefined,
     internalRating: f.internalRating || undefined,
     ratingRemarks: f.ratingRemarks || undefined,
     notes: f.notes || undefined,
     promoters: promoters.filter((p) => p.name.trim() !== "").length > 0 ? promoters.filter((p) => p.name.trim() !== "") : undefined,
-    guarantors: guarantors.filter((g) => g.name.trim() !== "").length > 0 ? guarantors.filter((g) => g.name.trim() !== "") : undefined,
   };
 }
 
@@ -247,6 +233,7 @@ export function formStateToUpdateInput(f: BorrowerFormState): UpdateBorrowerInpu
     pan: f.pan || null,
     gst: f.gst || null,
     cin: f.cin || null,
+    aadhaar: f.aadhaar || null,
     dateOfIncorporation: f.dateOfIncorporation || null,
     natureOfBusiness: f.natureOfBusiness || null,
     internalRating: f.internalRating || null,

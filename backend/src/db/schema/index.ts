@@ -2,6 +2,7 @@ export * from "./shared";
 export * from "./auth";
 export * from "./borrower";
 export * from "./loan";
+export * from "./guarantor";
 export * from "./interest";
 export * from "./repayment";
 export * from "./payment";
