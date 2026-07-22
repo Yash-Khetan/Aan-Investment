@@ -23,7 +23,7 @@ export function LoanMasterFields({
     <>
       <Card className="p-4">
         <SectionTitle>Basic Details</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Loan Account Number"
             value={form.loanAccountNumber}
@@ -81,7 +81,7 @@ export function LoanMasterFields({
 
       <Card className="p-4">
         <SectionTitle>Amounts &amp; Interest</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Sanctioned Amount (INR)"
             type="number"
@@ -138,7 +138,7 @@ export function LoanMasterFields({
 
       <Card className="p-4">
         <SectionTitle>Key Dates</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField label="Sanction Date" type="date" value={form.sanctionDate} onChange={(e) => onChange({ sanctionDate: e.target.value })} />
           <TextField
             label="First Disbursement Date"

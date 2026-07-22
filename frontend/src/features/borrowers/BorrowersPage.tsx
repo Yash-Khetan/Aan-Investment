@@ -71,8 +71,8 @@ export function BorrowersPage() {
     <div>
       <PageHeader title="Borrowers" description="Borrower master data — promoters and internal ratings." />
 
-      <div className="mb-6 flex items-end justify-between gap-3">
-        <div className="w-80">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:w-80">
           <TextField label="Search" placeholder="Name, code, PAN, GST…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Link to="/borrowers/new">

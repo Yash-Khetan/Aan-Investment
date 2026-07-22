@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-8 py-6">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Aan Finance &amp; Investment Pvt. Ltd.</div>
           <div className="text-lg font-semibold text-slate-900">Aan Investment LMS</div>
@@ -25,7 +25,7 @@ export function LandingPage() {
         </Link> */}
       </header>
 
-      <main className="mx-auto max-w-6xl px-8">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <section className="flex flex-col items-start gap-6 py-20">
           {/* <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
             Internal platform · Hyderabad, Telangana

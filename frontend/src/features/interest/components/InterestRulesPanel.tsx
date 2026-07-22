@@ -66,7 +66,7 @@ export function InterestRulesPanel({ interestConfigId }: { interestConfigId: str
 
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <TextField
               label="From Month"
               type="number"

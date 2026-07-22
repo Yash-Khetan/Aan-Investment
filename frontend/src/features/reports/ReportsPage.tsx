@@ -60,7 +60,7 @@ export function ReportsPage() {
       <PageHeader title="Reports" description="Read-only MIS reports. View as JSON, or export to CSV / Excel." />
 
       <Card className="mb-6 p-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           <SelectField
             label="Report"
             value={report}

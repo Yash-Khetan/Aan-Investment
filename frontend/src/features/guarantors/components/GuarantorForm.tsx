@@ -94,7 +94,7 @@ export function GuarantorForm({
   return (
     <Card className="p-4">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TextField label="Name" value={form.name} onChange={(e) => patch({ name: e.target.value })} required />
           <TextField
             label="Guarantee Type"

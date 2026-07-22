@@ -85,7 +85,7 @@ export function IdentityDocumentField({
             <span className="shrink-0 text-emerald-600">✓</span>
             <span className="truncate text-slate-700">{uploadedFileName}</span>
           </span>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap gap-2">
             {borrowerId && existingDoc && (
               <button
                 type="button"

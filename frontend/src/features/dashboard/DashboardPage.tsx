@@ -69,7 +69,7 @@ export function DashboardPage() {
         <div className="flex flex-col gap-8">
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Portfolio</h2>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard label="Total Loans" value={formatNumber(data.portfolio.totals.totalLoans)} />
               <StatCard label="Total Sanctioned" value={formatCurrency(data.portfolio.totals.totalSanctioned)} />
               <StatCard label="Total Disbursed" value={formatCurrency(data.portfolio.totals.totalDisbursed)} />
@@ -108,7 +108,7 @@ export function DashboardPage() {
 
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Collections</h2>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard label="Open Cases" value={formatNumber(data.collections.openCases)} />
               <StatCard label="Total Overdue" value={formatCurrency(data.collections.totalOverdueAmount)} />
               <StatCard label="Upcoming Follow-ups" value={formatNumber(data.collections.upcomingFollowUps)} />

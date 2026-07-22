@@ -85,8 +85,8 @@ export function LoansPage() {
     <div>
       <PageHeader title="Loans" description="Loan master data — sanction, disbursement, and lifecycle status." />
 
-      <div className="mb-6 flex items-end justify-between gap-3">
-        <div className="w-80">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:w-80">
           <TextField
             label="Search"
             placeholder="Loan account number…"

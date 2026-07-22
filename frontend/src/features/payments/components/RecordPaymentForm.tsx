@@ -150,7 +150,7 @@ export function RecordPaymentForm({
   return (
     <Card className="mb-6 p-4">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Payment Reference Number"
             value={paymentRefNumber}
@@ -204,7 +204,7 @@ export function RecordPaymentForm({
           </SelectField>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Outstanding Principal"
             type="number"
@@ -289,7 +289,7 @@ export function RecordPaymentForm({
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Payment Recorded — Waterfall Allocation
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="text-xs font-medium text-slate-500">Penalty Applied</div>
               <div className="mt-1 text-sm text-slate-900">

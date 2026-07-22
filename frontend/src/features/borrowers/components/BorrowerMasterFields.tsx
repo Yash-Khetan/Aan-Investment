@@ -57,7 +57,7 @@ export function BorrowerMasterFields({
     <>
       <Card className="p-4">
         <SectionTitle>Basic Details</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Borrower Code"
             value={form.borrowerCode}
@@ -146,7 +146,7 @@ export function BorrowerMasterFields({
 
       <Card className="p-4">
         <SectionTitle>Contact</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField label="Email" type="email" value={form.email} onChange={(e) => onChange({ email: e.target.value })} />
           <TextField
             label="Phone"
@@ -169,7 +169,7 @@ export function BorrowerMasterFields({
 
       <Card className="p-4">
         <SectionTitle>Registered Address</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField label="Address Line 1" value={form.addressLine1} onChange={(e) => onChange({ addressLine1: e.target.value })} />
           <TextField label="Address Line 2" value={form.addressLine2} onChange={(e) => onChange({ addressLine2: e.target.value })} />
           <TextField label="City" value={form.city} onChange={(e) => onChange({ city: e.target.value })} />
@@ -180,7 +180,7 @@ export function BorrowerMasterFields({
 
       <Card className="p-4">
         <SectionTitle>Internal</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField label="Internal Rating" value={form.internalRating} onChange={(e) => onChange({ internalRating: e.target.value })} />
           <TextAreaField
             label="Rating Remarks"

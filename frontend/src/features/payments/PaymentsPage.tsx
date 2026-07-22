@@ -114,14 +114,14 @@ export function PaymentsPage() {
         description="Record a repayment against a loan — applied automatically via its appropriation waterfall (penalty → interest → principal)."
       />
 
-      <div className="mb-6 w-96">
+      <div className="mb-6 w-full sm:w-96">
         <LoanSelect value={loanId} onChange={setLoanId} />
       </div>
 
       {!loanId && <EmptyState message="Select a loan to record a payment." />}
 
       {loanId && data && (
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Outstanding Balance" value={formatCurrency(outstandingBalance, 2)} />
           <StatCard label="Installments Remaining" value={String(outstandingInstallments.length)} />
         </div>

@@ -55,7 +55,7 @@ export function DetailSection({ title, children }: { title: string; children: Re
   return (
     <div className="mb-6">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
     </div>
   );
 }

@@ -24,8 +24,8 @@ export function CollectionsPage() {
     <div>
       <PageHeader title="Collections" description="Recovery activity trail, follow-ups, and Promises to Pay." />
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="w-96">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-96">
           <LoanSelect value={loanId} onChange={setLoanId} />
         </div>
         {loanId && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "+ Log Activity"}</Button>}

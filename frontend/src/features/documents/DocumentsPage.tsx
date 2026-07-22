@@ -31,8 +31,8 @@ export function DocumentsPage() {
     <div>
       <PageHeader title="Documents" description="Upload, list, download, and delete files against a loan or borrower." />
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="w-48">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="w-full sm:w-48">
           <SelectField label="Entity Type" value={entityType} onChange={(e) => handleEntityTypeChange(e.target.value as EntityType)}>
             {ENTITY_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -41,7 +41,7 @@ export function DocumentsPage() {
             ))}
           </SelectField>
         </div>
-        <div className="w-96">
+        <div className="w-full sm:w-96">
           {entityType === "LOAN" ? (
             <LoanSelect label="Loan" value={entityId} onChange={setEntityId} />
           ) : (

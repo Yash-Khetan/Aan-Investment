@@ -59,7 +59,7 @@ export function GuarantorRow({ guarantor, loanId }: { guarantor: Guarantor; loan
           </div>
         </div>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => setEditing(true)}>
             Edit
           </Button>

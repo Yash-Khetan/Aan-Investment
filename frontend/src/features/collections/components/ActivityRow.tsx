@@ -39,7 +39,7 @@ export function ActivityRow({ activity, loanId }: { activity: CollectionActivity
         </div>
 
         {hasOpenPromise && (
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => closeMutation.mutate(true)} disabled={closeMutation.isPending}>
               Mark Kept
             </Button>

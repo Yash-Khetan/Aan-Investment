@@ -83,7 +83,7 @@ export function CreateBorrowerPage() {
           {promoters.length === 0 && <p className="text-sm text-slate-400">No promoters added.</p>}
           <div className="flex flex-col gap-3">
             {promoters.map((p, i) => (
-              <div key={i} className="grid grid-cols-2 gap-3 rounded-md border border-slate-100 p-3 lg:grid-cols-4">
+              <div key={i} className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-4">
                 <TextField label="Name" value={p.name} onChange={(e) => updatePromoter(i, { name: e.target.value })} required />
                 <TextField
                   label="Designation"
