@@ -65,6 +65,8 @@ const ADMIN_PERMISSIONS = [
     "user:update",
     "user:activate",
     "user:deactivate",
+    "loan:update",
+    "borrower:update",
 ];
 
 /** The canonical permission catalogue (RBAC). Keys are "resource:action". */
@@ -76,6 +78,8 @@ const PERMISSIONS: { name: string; description: string }[] = [
     { name: "user:deactivate", description: "Disable a user account." },
     { name: "loan:read", description: "View loans." },
     { name: "loan:create", description: "Create loans." },
+    { name: "loan:update", description: "Edit a loan after creation." },
+    { name: "borrower:update", description: "Edit a borrower after creation." },
 ];
 
 /**

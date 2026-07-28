@@ -42,7 +42,7 @@ export function CalculateInterestPanel({
     <Card className="p-4">
       <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Calculate Interest</div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TextField
             label="As Of Date"
             type="date"
@@ -105,7 +105,7 @@ export function CalculateInterestPanel({
       </form>
 
       {mutation.data && (
-        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="text-xs font-medium text-slate-500">Base Interest</div>
             <div className="mt-1 text-sm font-medium text-slate-900">{formatCurrency(mutation.data.baseInterest)}</div>

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../common/http/asyncHandler";
 import { validate } from "../../common/middleware/validate";
 import { authenticate } from "../auth/auth.middleware";
+import { authorize } from "../auth/authorize.middleware";
 import * as borrowerController from "./borrower.controller";
 import {
     borrowerIdParamSchema,
@@ -37,6 +38,7 @@ router.get(
 router.put(
     "/:id",
     authenticate,
+    authorize("borrower:update"),
     validate({ params: borrowerIdParamSchema, body: updateBorrowerSchema }),
     asyncHandler(borrowerController.updateBorrower),
 );

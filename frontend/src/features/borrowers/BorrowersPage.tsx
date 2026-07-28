@@ -7,13 +7,19 @@ import { Badge } from "../../components/ui/Badge";
 import { Table, type Column } from "../../components/ui/Table";
 import { TextField } from "../../components/ui/Field";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
+import { SlideOver } from "../../components/ui/SlideOver";
 import { formatDate } from "../../lib/format";
+import { useAuth } from "../auth/AuthContext";
 import { deleteBorrower, listBorrowers } from "./api";
+import { BorrowerDetailView } from "./components/BorrowerDetailView";
 import type { Borrower } from "./types";
 
 export function BorrowersPage() {
   const [search, setSearch] = useState("");
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.roles.includes("ADMIN") ?? false;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["borrowers", search],
@@ -44,9 +50,14 @@ export function BorrowersPage() {
       header: "",
       render: (b) => (
         <div className="flex justify-end gap-2">
-          <Link to={`/borrowers/${b.id}/edit`}>
-            <Button variant="secondary">Edit</Button>
-          </Link>
+          <Button variant="secondary" onClick={() => setViewingId(b.id)}>
+            View
+          </Button>
+          {isAdmin && (
+            <Link to={`/borrowers/${b.id}/edit`}>
+              <Button variant="secondary">Edit</Button>
+            </Link>
+          )}
           <Button variant="danger" onClick={() => handleDelete(b)} disabled={deleteMutation.isPending}>
             Delete
           </Button>
@@ -58,10 +69,10 @@ export function BorrowersPage() {
 
   return (
     <div>
-      <PageHeader title="Borrowers" description="Borrower master data — promoters, guarantors, and internal ratings." />
+      <PageHeader title="Borrowers" description="Borrower master data — promoters and internal ratings." />
 
-      <div className="mb-6 flex items-end justify-between gap-3">
-        <div className="w-80">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:w-80">
           <TextField label="Search" placeholder="Name, code, PAN, GST…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Link to="/borrowers/new">
@@ -81,6 +92,10 @@ export function BorrowersPage() {
       {data && data.data.length === 0 && <EmptyState message="No borrowers yet — create the first one." />}
 
       {data && data.data.length > 0 && <Table columns={columns} rows={data.data} rowKey={(b) => b.id} />}
+
+      <SlideOver open={!!viewingId} title="Borrower Details" onClose={() => setViewingId(null)}>
+        {viewingId && <BorrowerDetailView borrowerId={viewingId} />}
+      </SlideOver>
     </div>
   );
 }

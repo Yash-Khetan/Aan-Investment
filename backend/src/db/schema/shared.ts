@@ -143,6 +143,9 @@ export const documentTypeEnum = pgEnum("document_type", [
     "VALUATION_REPORT",
     "INSURANCE",
     "KYC",
+    "PAN_CARD",
+    "GSTIN_CERTIFICATE",
+    "AADHAAR",
     "FINANCIAL_STATEMENT",
     "OTHER",
 ]);

@@ -6,16 +6,18 @@ import { Button } from "../../components/ui/Button";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
 import { InterestSetup } from "../interest/InterestSetup";
+import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
 import { createLoan } from "./api";
 import { EMPTY_LOAN_FORM, formStateToCreateInput } from "./types";
 import type { Loan, LoanFormState } from "./types";
 
 /**
- * Two-step loan creation. Interest setup needs a persisted loanId (every
- * interest-engine call keys off it), so the loan master is saved first and the
- * interest engine opens against the new loan — no separate sidebar tab.
+ * Two-step loan creation. Interest setup and guarantors both need a persisted
+ * loanId (interest-engine calls and guarantor records key off it), so the loan
+ * master is saved first and both open against the new loan — no separate
+ * sidebar tabs.
  */
-const STEPS = ["Loan Details", "Interest Setup"] as const;
+const STEPS = ["Loan Details", "Interest Setup & Guarantors"] as const;
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -70,7 +72,7 @@ export function CreateLoanPage() {
         title="New Loan"
         description={
           createdLoan
-            ? `Loan ${createdLoan.loanAccountNumber} created — configure how its interest is calculated.`
+            ? `Loan ${createdLoan.loanAccountNumber} created — set up interest and add any guarantors.`
             : "Loan master — sanction terms, tenure, and key dates."
         }
       />
@@ -97,6 +99,8 @@ export function CreateLoanPage() {
       {createdLoan && (
         <div className="flex flex-col gap-6">
           <InterestSetup loanId={createdLoan.id} />
+
+          <GuarantorsSection loanId={createdLoan.id} />
 
           <div className="flex gap-2">
             <Button type="button" onClick={() => navigate("/loans")}>

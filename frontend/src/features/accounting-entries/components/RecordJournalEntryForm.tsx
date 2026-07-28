@@ -40,7 +40,7 @@ export function RecordJournalEntryForm({
     <Card className="mb-4 p-4">
       <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Amount (INR)"
             type="number"

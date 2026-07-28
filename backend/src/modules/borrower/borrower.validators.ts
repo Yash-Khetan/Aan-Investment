@@ -46,13 +46,8 @@ const shareholdingPercent = z.coerce
     .min(0, "must be zero or positive")
     .max(100, "must not exceed 100");
 
-const netWorth = z.coerce
-    .number()
-    .finite("must be a finite number")
-    .nonnegative("must be zero or positive");
-
 /* ------------------------------------------------------------------ */
-/* Child entities (reuse existing promoters / guarantors tables)      */
+/* Child entities (reuse existing promoters table)                    */
 /* ------------------------------------------------------------------ */
 
 export const promoterSchema = z
@@ -69,21 +64,6 @@ export const promoterSchema = z
         state: z.string().trim().max(100).optional(),
         pincode: pincode.optional(),
         shareholdingPercent: shareholdingPercent.optional(),
-    })
-    .strict();
-
-export const guarantorSchema = z
-    .object({
-        name: z.string().trim().min(1, "is required").max(255),
-        guaranteeType: z.string().trim().min(1, "is required").max(50),
-        pan: pan.optional(),
-        phone: mobile.optional(),
-        email: email.optional(),
-        addressLine1: z.string().trim().optional(),
-        city: z.string().trim().max(100).optional(),
-        state: z.string().trim().max(100).optional(),
-        pincode: pincode.optional(),
-        netWorth: netWorth.optional(),
     })
     .strict();
 
@@ -114,6 +94,7 @@ export const createBorrowerSchema = z
         pan: pan.optional(),
         gst: gst.optional(),
         cin: cin.optional(),
+        aadhaar: aadhaar.optional(),
 
         /* Business */
         dateOfIncorporation: z
@@ -131,7 +112,6 @@ export const createBorrowerSchema = z
 
         /* Child entities (optional; inserted transactionally) */
         promoters: z.array(promoterSchema).optional(),
-        guarantors: z.array(guarantorSchema).optional(),
     })
     .strict();
 
@@ -156,6 +136,7 @@ export const updateBorrowerSchema = z
         pan: pan.nullable(),
         gst: gst.nullable(),
         cin: cin.nullable(),
+        aadhaar: aadhaar.nullable(),
         dateOfIncorporation: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")

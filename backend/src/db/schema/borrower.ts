@@ -89,6 +89,10 @@ export const borrowers = pgTable("borrowers", {
         length: 25,
     }),
 
+    aadhaar: varchar("aadhaar", {
+        length: 12,
+    }),
+
     /* ── Business Details ── */
 
     dateOfIncorporation: date("date_of_incorporation"),
@@ -198,67 +202,6 @@ export const promoters = pgTable("promoters", {
 }, (table) => ({
 
     promoterBorrowerIdx: index("promoter_borrower_idx")
-        .on(table.borrowerId),
-
-}));
-
-/* ============================================================
-   GUARANTORS
-============================================================ */
-
-export const guarantors = pgTable("guarantors", {
-
-    id: uuid("id")
-        .defaultRandom()
-        .primaryKey(),
-
-    borrowerId: uuid("borrower_id")
-        .references(() => borrowers.id, {
-            onDelete: "cascade",
-        })
-        .notNull(),
-
-    name: varchar("name", {
-        length: 255,
-    }).notNull(),
-
-    guaranteeType: varchar("guarantee_type", {
-        length: 50,
-    }).notNull(),
-
-    pan: varchar("pan", {
-        length: 10,
-    }),
-
-    phone: varchar("phone", {
-        length: 20,
-    }),
-
-    email: varchar("email", {
-        length: 255,
-    }),
-
-    addressLine1: text("address_line_1"),
-
-    city: varchar("city", {
-        length: 100,
-    }),
-
-    state: varchar("state", {
-        length: 100,
-    }),
-
-    pincode: varchar("pincode", {
-        length: 10,
-    }),
-
-    netWorth: money("net_worth"),
-
-    ...timestamps,
-
-}, (table) => ({
-
-    guarantorBorrowerIdx: index("guarantor_borrower_idx")
         .on(table.borrowerId),
 
 }));

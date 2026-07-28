@@ -41,7 +41,7 @@ export function DocumentCard({
         </div>
         {doc.remarks && <div className="mt-1 text-xs text-slate-400">{doc.remarks}</div>}
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => downloadDocument(doc.id, doc.fileName ?? doc.name)}>
           Download
         </Button>

@@ -61,7 +61,7 @@ export function AccountingPage() {
       />
 
       <Card className="mb-6 p-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SelectField label="Category" value={category} onChange={(e) => setCategory(e.target.value as AccountingCategory)}>
             {ACCOUNTING_CATEGORIES.map((c) => (
               <option key={c} value={c}>

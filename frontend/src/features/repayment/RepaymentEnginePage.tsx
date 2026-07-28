@@ -76,8 +76,8 @@ export function RepaymentEnginePage() {
         description="Generate and review the repayment schedule for a loan — EMI, bullet, interest-only or structured."
       />
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="w-96">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-96">
           <LoanSelect
             value={loanId}
             onChange={(id) => {
@@ -106,7 +106,7 @@ export function RepaymentEnginePage() {
       {loanId && data && (
         <>
           <Card className="mb-4 p-4">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs font-medium text-slate-500">Version</div>
                 <div className="mt-1 text-sm text-slate-900">{data.schedule.version}</div>

@@ -69,7 +69,7 @@ export function InterestSetup({ loanId }: { loanId: string }) {
           )}
 
           <Card className="mb-6 p-4">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs font-medium text-slate-500">Annual Rate</div>
                 <div className="mt-1 text-sm text-slate-900">{Number(data.annualRate)}%</div>

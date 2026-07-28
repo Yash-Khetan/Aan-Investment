@@ -45,7 +45,7 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
   return (
     <Card className="mb-6 p-4">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Annual Rate (%)"
             type="number"

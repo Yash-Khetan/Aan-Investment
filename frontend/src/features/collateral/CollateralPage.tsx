@@ -22,8 +22,8 @@ export function CollateralPage() {
     <div>
       <PageHeader title="Collateral" description="Security pledged against a loan — valuations, LTV, and insurance." />
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="w-96">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-96">
           <LoanSelect value={loanId} onChange={setLoanId} />
         </div>
         {loanId && (

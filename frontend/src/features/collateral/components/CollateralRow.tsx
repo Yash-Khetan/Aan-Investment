@@ -80,7 +80,7 @@ export function CollateralRow({ collateral, loanId }: { collateral: CollateralRe
           {ltv && <div className="mt-2 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600">Recalculated LTV: {ltv}</div>}
         </div>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={handleLtv}>
             Recalc LTV
           </Button>
@@ -113,7 +113,7 @@ export function CollateralRow({ collateral, loanId }: { collateral: CollateralRe
 
       {mode === "insurance" && (
         <form
-          className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 lg:grid-cols-4"
+          className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4"
           onSubmit={(e) => {
             e.preventDefault();
             insuranceMutation.mutate();

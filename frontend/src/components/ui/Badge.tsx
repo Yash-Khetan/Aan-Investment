@@ -5,6 +5,11 @@ const PALETTE: Record<string, string> = {
   OVERDUE: "bg-orange-100 text-orange-800",
   NPA: "bg-red-100 text-red-800",
   CLOSED: "bg-slate-100 text-slate-700",
+  // loan classification (STD/SMA/NPA)
+  STD: "bg-emerald-100 text-emerald-800",
+  "SMA-0": "bg-amber-100 text-amber-800",
+  "SMA-1": "bg-amber-100 text-amber-800",
+  "SMA-2": "bg-amber-100 text-amber-800",
   WRITTEN_OFF: "bg-red-200 text-red-900",
   // payment / installment status
   SUCCESS: "bg-emerald-100 text-emerald-800",

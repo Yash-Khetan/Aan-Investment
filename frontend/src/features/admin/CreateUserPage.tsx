@@ -35,7 +35,7 @@ export function CreateUserPage() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <Card className="p-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField label="First name" value={form.firstName} onChange={(e) => patch({ firstName: e.target.value })} required />
             <TextField label="Last name" value={form.lastName} onChange={(e) => patch({ lastName: e.target.value })} required />
             <TextField label="Email" type="email" value={form.email} onChange={(e) => patch({ email: e.target.value })} required />

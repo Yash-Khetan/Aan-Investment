@@ -56,8 +56,8 @@ export function AccountingLedgerPage() {
         description="Journal entries for disbursement, interest accrual/receipt, principal receipt, penal interest and write-off (SRS §18)."
       />
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="w-96">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="w-full sm:w-96">
           <LoanSelect
             value={loanId}
             onChange={(id) => {
