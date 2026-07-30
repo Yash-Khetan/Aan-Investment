@@ -47,6 +47,11 @@ export const loans = pgTable("loans", {
     securityType: securityTypeEnum("security_type")
         .default("NONE"),
 
+    /** Free-text label when securityType is OTHERS; unused otherwise. */
+    otherSecurityType: varchar("other_security_type", {
+        length: 255,
+    }),
+
     repaymentType: repaymentTypeEnum("repayment_type")
         .notNull(),
 

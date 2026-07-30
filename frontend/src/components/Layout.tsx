@@ -8,12 +8,14 @@ const NAV_ITEMS = [
   { to: "/loans", label: "Loans" },
   { to: "/collateral", label: "Collateral" },
   { to: "/documents", label: "Documents" },
+  { to: "/disbursements", label: "Disbursements" },
   { to: "/repayment", label: "Repayment Engine" },
   { to: "/payments", label: "Payments" },
   { to: "/collections", label: "Collections" },
   { to: "/reports", label: "Reports" },
   { to: "/accounting", label: "Accounting Export" },
   { to: "/accounting-entries", label: "Accounting Ledger" },
+  
 ];
 
 const ADMIN_NAV_ITEM = { to: "/admin/users", label: "Admin" };

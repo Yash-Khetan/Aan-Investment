@@ -40,6 +40,11 @@ export const collaterals = pgTable("collaterals", {
     securityType: securityTypeEnum("security_type")
         .notNull(),
 
+    /** Free-text label when securityType is OTHERS; unused otherwise. */
+    otherSecurityType: varchar("other_security_type", {
+        length: 255,
+    }),
+
     description: text("description"),
 
     /* ── Property Details ── */

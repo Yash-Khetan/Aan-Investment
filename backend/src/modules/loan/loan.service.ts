@@ -13,7 +13,7 @@ import {
 import type { PaginationMeta } from "../../common/http/apiResponse";
 import { db } from "../../db/index";
 import * as loanRepository from "./loan.repository";
-import { assertLoanInvariants } from "./loan.validators";
+import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators";
 import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
 import type {
@@ -100,6 +100,7 @@ export const createLoan = async (
     };
 
     if (input.securityType !== undefined) values.securityType = input.securityType;
+    if (input.otherSecurityType !== undefined) values.otherSecurityType = input.otherSecurityType;
     if (input.disbursedAmount !== undefined)
         values.disbursedAmount = toMoney(input.disbursedAmount);
     if (input.outstandingPrincipal !== undefined)
@@ -205,6 +206,11 @@ const assertMergedInvariants = (
                 : existing.firstDisbursementDate,
         maturityDate:
             "maturityDate" in input ? input.maturityDate : existing.maturityDate,
+        securityType: input.securityType ?? existing.securityType,
+        otherSecurityType:
+            "otherSecurityType" in input
+                ? input.otherSecurityType
+                : existing.otherSecurityType,
     };
 
     const issues: { path: PropertyKey[]; message: string }[] = [];
@@ -217,6 +223,7 @@ const assertMergedInvariants = (
         path: [] as PropertyKey[],
     } as unknown as z.RefinementCtx;
     assertLoanInvariants(merged, collectingCtx);
+    assertOtherSecurityType(merged, collectingCtx);
 
     if (issues.length > 0) {
         throw new ValidationError("Validation failed", {
@@ -257,6 +264,8 @@ export const updateLoan = async (
     if (input.borrowerId !== undefined) patch.borrowerId = input.borrowerId;
     if (input.loanType !== undefined) patch.loanType = input.loanType;
     if (input.securityType !== undefined) patch.securityType = input.securityType;
+    if ("otherSecurityType" in input)
+        patch.otherSecurityType = input.otherSecurityType ?? null;
     if (input.repaymentType !== undefined)
         patch.repaymentType = input.repaymentType;
     if (input.sanctionedAmount !== undefined)

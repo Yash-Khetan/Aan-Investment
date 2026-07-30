@@ -4,6 +4,7 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../../components/ui/States";
 import { listGuarantors, createGuarantor } from "../api";
+import { clearDraft } from "../../../hooks/useAutosaveDraft";
 import { GuarantorForm } from "./GuarantorForm";
 import { GuarantorRow } from "./GuarantorRow";
 import type { CreateGuarantorInput } from "../types";
@@ -20,6 +21,7 @@ function SectionTitle({ children }: { children: string }) {
 export function GuarantorsSection({ loanId }: { loanId: string }) {
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const draftKey = `guarantor:create:${loanId}`;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["guarantors", loanId],
@@ -30,6 +32,7 @@ export function GuarantorsSection({ loanId }: { loanId: string }) {
   const createMutation = useMutation({
     mutationFn: (input: CreateGuarantorInput) => createGuarantor(loanId, input),
     onSuccess: () => {
+      clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["guarantors", loanId] });
       setAdding(false);
     },
@@ -57,6 +60,7 @@ export function GuarantorsSection({ loanId }: { loanId: string }) {
             error={createMutation.error}
             onSubmit={(input) => createMutation.mutate(input as CreateGuarantorInput)}
             onCancel={() => setAdding(false)}
+            draftKey={draftKey}
           />
         </div>
       )}

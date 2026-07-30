@@ -19,6 +19,17 @@ export function assertValidCollateralType(securityType: string): asserts securit
     }
 }
 
+/** securityType "OTHERS" requires a free-text label; every other value must leave it unset. */
+export function assertValidOtherSecurityType(securityType: string, otherSecurityType?: string): void {
+    if (securityType === "OTHERS" && !otherSecurityType?.trim()) {
+        throw new ValidationError("otherSecurityType is required when securityType is OTHERS.");
+    }
+
+    if (securityType !== "OTHERS" && otherSecurityType) {
+        throw new ValidationError("otherSecurityType may only be set when securityType is OTHERS.");
+    }
+}
+
 export function assertValidCollateralStatus(status: string): asserts status is CollateralStatus {
     if (!entityStatusEnum.enumValues.includes(status as CollateralStatus)) {
         throw new ValidationError(
@@ -55,6 +66,7 @@ export function assertValidCreateInput(input: CreateCollateralInput): void {
         throw new ValidationError("securityType is required.");
     }
     assertValidCollateralType(input.securityType);
+    assertValidOtherSecurityType(input.securityType, input.otherSecurityType);
 
     if (input.estimatedValue === undefined || input.estimatedValue === null) {
         throw new ValidationError("estimatedValue is required.");

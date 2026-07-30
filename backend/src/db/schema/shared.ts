@@ -31,9 +31,10 @@ export const loanTypeEnum = pgEnum("loan_type", [
 export const securityTypeEnum = pgEnum("security_type", [
     "PROPERTY",
     "MORTGAGE",
-    "STRUCTURED_CREDIT",
+    "HYPOTHECATION_OF_RECEIVABLES",
     "PERSONAL_GUARANTEE",
     "CORPORATE_GUARANTEE",
+    "OTHERS",
     "NONE",
 ]);
 
@@ -135,6 +136,7 @@ export const documentTypeEnum = pgEnum("document_type", [
     "SANCTION_LETTER",
     "LOAN_AGREEMENT",
     "MORTGAGE_DEED",
+    "HYPOTHECATION_DEED",
     "DPN",
     "BOARD_RESOLUTION",
     "PERSONAL_GUARANTEE",

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { setAccessToken } from "../../lib/api";
+import { clearAllDrafts } from "../../hooks/useAutosaveDraft";
 import { getCurrentUser, login as loginRequest, logout as logoutRequest } from "./api";
 import type { LoginInput, PublicUser } from "./types";
 
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await logoutRequest();
     } finally {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
+      clearAllDrafts();
       setAccessToken(null);
       setUser(null);
       setStatus("unauthenticated");

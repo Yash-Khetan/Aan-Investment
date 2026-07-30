@@ -1,16 +1,21 @@
 export const ENTITY_TYPES = ["LOAN", "BORROWER"] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
+/**
+ * Document types selectable from the generic Documents tab dropdown. Types
+ * that belong to a specific collateral/security (MORTGAGE_DEED,
+ * HYPOTHECATION_DEED, PERSONAL_GUARANTEE, CORPORATE_GUARANTEE,
+ * VALUATION_REPORT) are deliberately excluded — those are uploaded from their
+ * own tile on the Security / Collateral page (see SECURITY_DOCUMENT_TYPE),
+ * scoped to a loan that's SECURED. An unsecured loan has no collateral
+ * documents to begin with, so surfacing them here would just be redundant.
+ */
 export const DOCUMENT_TYPES = [
   "SANCTION_LETTER",
   "LOAN_AGREEMENT",
-  "MORTGAGE_DEED",
   "DPN",
   "BOARD_RESOLUTION",
-  "PERSONAL_GUARANTEE",
-  "CORPORATE_GUARANTEE",
   "LEGAL_OPINION",
-  "VALUATION_REPORT",
   "INSURANCE",
   "KYC",
   "PAN_CARD",

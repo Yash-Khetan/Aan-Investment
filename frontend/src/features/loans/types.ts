@@ -3,13 +3,31 @@ export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
 export const SECURITY_TYPES = [
   "PROPERTY",
   "MORTGAGE",
-  "STRUCTURED_CREDIT",
+  "HYPOTHECATION_OF_RECEIVABLES",
   "PERSONAL_GUARANTEE",
   "CORPORATE_GUARANTEE",
+  "OTHERS",
   "NONE",
 ] as const;
 
 export const REPAYMENT_TYPES = ["EMI", "BULLET", "INTEREST_ONLY", "STRUCTURED", "CUSTOM"] as const;
+
+/**
+ * Tenure is never entered directly — it's derived from the disbursement and
+ * maturity dates. Whole months, floored, with a 1-month minimum whenever the
+ * maturity date is after the disbursement date (so a same-month loan doesn't
+ * round down to a rejected 0).
+ */
+export function calcTenureMonths(startDate: string, endDate: string): number {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+
+  let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months -= 1;
+  return Math.max(months, 1);
+}
 
 export const LOAN_STATUSES = ["PENDING", "OVERDUE", "CLOSED", "WRITTEN_OFF"] as const;
 
@@ -20,6 +38,7 @@ export interface Loan {
   borrowerName?: string | null;
   loanType: string;
   securityType: string | null;
+  otherSecurityType: string | null;
   repaymentType: string;
   sanctionedAmount: string;
   disbursedAmount: string | null;
@@ -58,6 +77,7 @@ export interface CreateLoanInput {
   borrowerId: string;
   loanType: string;
   securityType?: string;
+  otherSecurityType?: string;
   repaymentType: string;
   sanctionedAmount: number;
   disbursedAmount?: number;
@@ -80,6 +100,7 @@ export interface UpdateLoanInput {
   borrowerId: string;
   loanType: string;
   securityType: string;
+  otherSecurityType: string | null;
   repaymentType: string;
   sanctionedAmount: number;
   disbursedAmount: number;
@@ -102,13 +123,12 @@ export interface LoanFormState {
   borrowerId: string;
   loanType: string;
   securityType: string;
+  otherSecurityType: string;
   repaymentType: string;
   status: string;
   sanctionedAmount: string;
   disbursedAmount: string;
-  outstandingPrincipal: string;
   interestRate: string;
-  tenureMonths: string;
   moratoriumMonths: string;
   sanctionDate: string;
   firstDisbursementDate: string;
@@ -123,13 +143,12 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
   borrowerId: "",
   loanType: "SECURED",
   securityType: "NONE",
+  otherSecurityType: "",
   repaymentType: "EMI",
   status: "PENDING",
   sanctionedAmount: "",
   disbursedAmount: "",
-  outstandingPrincipal: "",
   interestRate: "",
-  tenureMonths: "",
   moratoriumMonths: "",
   sanctionDate: "",
   firstDisbursementDate: "",
@@ -145,13 +164,12 @@ export function loanToFormState(l: Loan): LoanFormState {
     borrowerId: l.borrowerId,
     loanType: l.loanType,
     securityType: l.securityType ?? "NONE",
+    otherSecurityType: l.otherSecurityType ?? "",
     repaymentType: l.repaymentType,
     status: l.status ?? "PENDING",
     sanctionedAmount: l.sanctionedAmount ?? "",
     disbursedAmount: l.disbursedAmount ?? "",
-    outstandingPrincipal: l.outstandingPrincipal ?? "",
     interestRate: l.interestRate ?? "",
-    tenureMonths: String(l.tenureMonths ?? ""),
     moratoriumMonths: String(l.moratoriumMonths ?? 0),
     sanctionDate: l.sanctionDate ?? "",
     firstDisbursementDate: l.firstDisbursementDate ?? "",
@@ -168,12 +186,12 @@ export function formStateToCreateInput(f: LoanFormState): CreateLoanInput {
     borrowerId: f.borrowerId,
     loanType: f.loanType,
     securityType: f.securityType || undefined,
+    otherSecurityType: f.securityType === "OTHERS" ? f.otherSecurityType || undefined : undefined,
     repaymentType: f.repaymentType,
     sanctionedAmount: Number(f.sanctionedAmount),
     disbursedAmount: f.disbursedAmount ? Number(f.disbursedAmount) : undefined,
-    outstandingPrincipal: f.outstandingPrincipal ? Number(f.outstandingPrincipal) : undefined,
     interestRate: Number(f.interestRate),
-    tenureMonths: Number(f.tenureMonths),
+    tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: f.moratoriumMonths ? Number(f.moratoriumMonths) : undefined,
     sanctionDate: f.sanctionDate || undefined,
     firstDisbursementDate: f.firstDisbursementDate || undefined,
@@ -191,12 +209,13 @@ export function formStateToUpdateInput(f: LoanFormState): UpdateLoanInput {
     borrowerId: f.borrowerId,
     loanType: f.loanType,
     securityType: f.securityType,
+    otherSecurityType: f.securityType === "OTHERS" ? f.otherSecurityType || null : null,
     repaymentType: f.repaymentType,
     sanctionedAmount: Number(f.sanctionedAmount),
     disbursedAmount: Number(f.disbursedAmount || 0),
-    outstandingPrincipal: Number(f.outstandingPrincipal || 0),
+    outstandingPrincipal: 0,
     interestRate: Number(f.interestRate),
-    tenureMonths: Number(f.tenureMonths),
+    tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: Number(f.moratoriumMonths || 0),
     sanctionDate: f.sanctionDate || null,
     firstDisbursementDate: f.firstDisbursementDate || null,

@@ -7,9 +7,13 @@ import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
 import { InterestSetup } from "../interest/InterestSetup";
 import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
+import { useAuth } from "../auth/AuthContext";
+import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { createLoan } from "./api";
 import { EMPTY_LOAN_FORM, formStateToCreateInput } from "./types";
 import type { Loan, LoanFormState } from "./types";
+
+const DRAFT_KEY = "loan:create";
 
 /**
  * Two-step loan creation. Interest setup and guarantors both need a persisted
@@ -49,12 +53,18 @@ function StepIndicator({ current }: { current: number }) {
 
 export function CreateLoanPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<LoanFormState>(EMPTY_LOAN_FORM);
+  const { status } = useAuth();
+  const [form, setForm] = useState<LoanFormState>(() => loadDraft<LoanFormState>(DRAFT_KEY) ?? EMPTY_LOAN_FORM);
   const [createdLoan, setCreatedLoan] = useState<Loan | null>(null);
+
+  useAutosaveDraft(DRAFT_KEY, form, status === "authenticated" && !createdLoan);
 
   const mutation = useMutation({
     mutationFn: createLoan,
-    onSuccess: (loan) => setCreatedLoan(loan),
+    onSuccess: (loan) => {
+      clearDraft(DRAFT_KEY);
+      setCreatedLoan(loan);
+    },
   });
 
   function patch(p: Partial<LoanFormState>) {

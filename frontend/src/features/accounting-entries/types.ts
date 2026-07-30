@@ -33,12 +33,6 @@ export interface JournalEntry {
   lines: JournalEntryLine[];
 }
 
-export interface RecordDisbursementInput {
-  loanId: string;
-  amount: number;
-  entryDate: string;
-}
-
 export interface RecordWriteOffInput {
   loanId: string;
   amount: number;

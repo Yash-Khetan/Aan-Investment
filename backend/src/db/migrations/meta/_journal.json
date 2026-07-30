@@ -50,6 +50,20 @@
       "when": 1784809707005,
       "tag": "0006_add_aadhaar_and_kyc_document_types",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785434458203,
+      "tag": "0007_strange_wrecking_crew",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785434968704,
+      "tag": "0008_glamorous_robin_chapel",
+      "breakpoints": true
     }
   ]
 }

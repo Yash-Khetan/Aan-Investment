@@ -9,10 +9,19 @@ import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
 import { createBorrower } from "./api";
 import { uploadDocument } from "../documents/api";
+import { useAuth } from "../auth/AuthContext";
+import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { EMPTY_BORROWER_FORM, formStateToCreateInput } from "./types";
 import type { BorrowerFormState, Promoter } from "./types";
 
 const emptyPromoter: Promoter = { name: "", designation: "", pan: "", phone: "", email: "" };
+
+const DRAFT_KEY = "borrower:create";
+
+interface BorrowerDraft {
+  form: BorrowerFormState;
+  promoters: Promoter[];
+}
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
@@ -20,12 +29,16 @@ function SectionTitle({ children }: { children: string }) {
 
 export function CreateBorrowerPage() {
   const navigate = useNavigate();
+  const { status } = useAuth();
+  const draft = loadDraft<BorrowerDraft>(DRAFT_KEY);
 
-  const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
-  const [promoters, setPromoters] = useState<Promoter[]>([]);
+  const [form, setForm] = useState<BorrowerFormState>(draft?.form ?? EMPTY_BORROWER_FORM);
+  const [promoters, setPromoters] = useState<Promoter[]>(draft?.promoters ?? []);
   const [panFile, setPanFile] = useState<File | null>(null);
   const [gstFile, setGstFile] = useState<File | null>(null);
   const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
+
+  useAutosaveDraft(DRAFT_KEY, { form, promoters }, status === "authenticated");
 
   const mutation = useMutation({
     mutationFn: async (input: ReturnType<typeof formStateToCreateInput>) => {
@@ -41,7 +54,10 @@ export function CreateBorrowerPage() {
       }
       return borrower;
     },
-    onSuccess: (borrower) => navigate(`/borrowers`, { state: { createdId: borrower.id } }),
+    onSuccess: (borrower) => {
+      clearDraft(DRAFT_KEY);
+      navigate(`/borrowers`, { state: { createdId: borrower.id } });
+    },
   });
 
   function patch(p: Partial<BorrowerFormState>) {

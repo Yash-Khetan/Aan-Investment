@@ -6,7 +6,9 @@ import { Button } from "../../../components/ui/Button";
 import { TextField } from "../../../components/ui/Field";
 import { formatCurrency, formatDate } from "../../../lib/format";
 import { deleteCollateral, getCollateralLtv, updateInsurance, updateValuation } from "../api";
+import { SECURITY_DOCUMENT_TYPE } from "../types";
 import type { CollateralRecord } from "../types";
+import { SecurityDocumentTile } from "./SecurityDocumentTile";
 
 export function CollateralRow({ collateral, loanId }: { collateral: CollateralRecord; loanId: string }) {
   const queryClient = useQueryClient();
@@ -53,12 +55,18 @@ export function CollateralRow({ collateral, loanId }: { collateral: CollateralRe
     setLtv(`${result.ltvPercentage}% (outstanding ${formatCurrency(result.loanOutstanding)} / value ${formatCurrency(result.marketValue)})`);
   }
 
+  const securityLabel =
+    collateral.securityType === "OTHERS" && collateral.otherSecurityType
+      ? collateral.otherSecurityType
+      : collateral.securityType;
+
   return (
-    <Card className="p-4">
+    <div className="flex flex-col gap-3">
+      <Card className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <Badge status={collateral.securityType} />
+            <Badge status={securityLabel} />
             <span className="text-sm font-medium text-slate-800">{collateral.description || "No description"}</span>
           </div>
           <div className="mt-1 text-xs text-slate-500">{collateral.propertyAddress}</div>
@@ -131,5 +139,12 @@ export function CollateralRow({ collateral, loanId }: { collateral: CollateralRe
         </form>
       )}
     </Card>
+
+      <SecurityDocumentTile
+        loanId={loanId}
+        documentType={SECURITY_DOCUMENT_TYPE[collateral.securityType] ?? "OTHER"}
+        title={securityLabel}
+      />
+    </div>
   );
 }

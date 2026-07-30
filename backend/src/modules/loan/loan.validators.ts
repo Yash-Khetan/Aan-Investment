@@ -146,6 +146,28 @@ export const assertLoanInvariants = (
     }
 };
 
+/** securityType "OTHERS" requires a free-text label; every other value must leave it unset. */
+export const assertOtherSecurityType = (
+    data: { securityType?: string | null; otherSecurityType?: string | null },
+    ctx: z.RefinementCtx,
+): void => {
+    if (data.securityType === "OTHERS" && !data.otherSecurityType?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["otherSecurityType"],
+            message: "otherSecurityType is required when securityType is OTHERS",
+        });
+    }
+
+    if (data.securityType !== "OTHERS" && data.otherSecurityType) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["otherSecurityType"],
+            message: "otherSecurityType may only be set when securityType is OTHERS",
+        });
+    }
+};
+
 /* ------------------------------------------------------------------ */
 /* Create                                                              */
 /* ------------------------------------------------------------------ */
@@ -160,6 +182,7 @@ export const createLoanSchema = z
         borrowerId: uuid,
         loanType: loanTypeSchema,
         securityType: securityTypeSchema.optional(),
+        otherSecurityType: z.string().trim().max(255).optional(),
         repaymentType: repaymentTypeSchema,
 
         sanctionedAmount: money({ allowZero: false }),
@@ -191,7 +214,10 @@ export const createLoanSchema = z
         createdBy: uuid.nullable().optional(),
     })
     .strict()
-    .superRefine((data, ctx) => assertLoanInvariants(data, ctx));
+    .superRefine((data, ctx) => {
+        assertLoanInvariants(data, ctx);
+        assertOtherSecurityType(data, ctx);
+    });
 
 /* ------------------------------------------------------------------ */
 /* Update (partial; cross-field rules re-checked in the service after  */
@@ -208,6 +234,7 @@ export const updateLoanSchema = z
         borrowerId: uuid,
         loanType: loanTypeSchema,
         securityType: securityTypeSchema,
+        otherSecurityType: z.string().trim().max(255).nullable(),
         repaymentType: repaymentTypeSchema,
         sanctionedAmount: money({ allowZero: false }),
         disbursedAmount: money({ allowZero: true }),
