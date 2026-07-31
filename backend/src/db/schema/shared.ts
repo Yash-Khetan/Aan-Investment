@@ -66,6 +66,16 @@ export const interestBasisEnum = pgEnum("interest_basis", [
     "FIXED_MONTHLY",
     "FULL_MONTH",
     "CUSTOM",
+    "MONTHLY_RATE_ACTUAL_30",
+]);
+
+/* ============================================================
+   INTEREST CALCULATION METHOD
+============================================================ */
+
+export const calculationMethodEnum = pgEnum("calculation_method", [
+    "RUNNING_BALANCE",
+    "SIMPLE_INTEREST",
 ]);
 
 /* ============================================================

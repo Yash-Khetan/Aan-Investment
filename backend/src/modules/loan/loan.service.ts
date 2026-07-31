@@ -16,6 +16,7 @@ import * as loanRepository from "./loan.repository";
 import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators";
 import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
+import { syncRepaymentSchedule } from "../repayment/repayment.service";
 import type {
     CreateLoanInput,
     ListLoansQuery,
@@ -300,10 +301,12 @@ export const updateLoan = async (
             ? input.disbursedAmount - previousDisbursed
             : 0;
 
+    let updated: LoanWithBorrower;
+
     if (disbursementIncrease > 0) {
-        return db.transaction(async (tx) => {
-            const updated = await loanRepository.update(id, patch, tx);
-            if (!updated) throw new NotFoundError(`Loan '${id}' not found`);
+        updated = await db.transaction(async (tx) => {
+            const result = await loanRepository.update(id, patch, tx);
+            if (!result) throw new NotFoundError(`Loan '${id}' not found`);
 
             const trancheNumber = (await loanRepository.countTranches(id, tx)) + 1;
             await loanRepository.createTranche(
@@ -317,12 +320,20 @@ export const updateLoan = async (
                 tx,
             );
 
-            return updated;
+            return result;
         });
+    } else {
+        const result = await loanRepository.update(id, patch);
+        if (!result) throw new NotFoundError(`Loan '${id}' not found`);
+        updated = result;
     }
 
-    const updated = await loanRepository.update(id, patch);
-    if (!updated) throw new NotFoundError(`Loan '${id}' not found`);
+    // Keep the repayment schedule in sync with whatever just changed —
+    // regenerates automatically if nothing's been paid yet, otherwise leaves
+    // it alone and lets the frontend flag it as stale. Never blocks the
+    // loan update itself if this fails for any reason.
+    await syncRepaymentSchedule(id);
+
     return updated;
 };
 

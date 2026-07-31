@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import { NotFoundError } from "../../common/errors";
 import { calculateInterestForLoan } from "./interest.service";
+import { syncRepaymentSchedule } from "../repayment/repayment.service";
 
 import { createInterestConfigRevision, getCurrentInterestConfig, createInterestRule, deleteInterestRule, createPenalRule, getPenalRulesForLoan, getInterestRulesForConfig } from "./interest.repository";
 
@@ -13,6 +14,9 @@ export const createInterestConfig: RequestHandler = async (req, res, next) => {
       ruleType?: string;
       effectiveFrom: string;
       remarks?: string;
+      customFormula?: string;
+      includeOpeningClosingDays?: boolean;
+      calculationMethod?: string;
     };
 
     const created = await createInterestConfigRevision({
@@ -22,7 +26,15 @@ export const createInterestConfig: RequestHandler = async (req, res, next) => {
       ruleType: body.ruleType,
       effectiveFrom: body.effectiveFrom,
       remarks: body.remarks,
+      customFormula: body.customFormula,
+      includeOpeningClosingDays: body.includeOpeningClosingDays,
+      calculationMethod: body.calculationMethod,
     });
+
+    // A new/changed interest config directly affects the repayment schedule's
+    // interest math — keep it in sync (auto-regenerates if nothing's been
+    // paid yet, otherwise leaves it for the operator to confirm).
+    await syncRepaymentSchedule(body.loanId);
 
     res.status(201).json({ success: true, data: created });
   } catch (err) {

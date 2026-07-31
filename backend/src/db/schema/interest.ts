@@ -15,6 +15,7 @@ import {
     interestRuleTypeEnum,
     penalInterestTypeEnum,
     penalInterestBaseEnum,
+    calculationMethodEnum,
     money,
     timestamps,
 } from "./shared";
@@ -61,6 +62,19 @@ export const interestConfigs = pgTable("interest_configs", {
     /* Only populated when interestBasis = CUSTOM. Evaluated safely via
        mathjs, not raw eval — see modules/interest/strategies/custom.strategy.ts */
     customFormula: text("custom_formula"),
+
+    /* When true, day-count for every days-based basis (ACTUAL_365, ACTUAL_360,
+       MONTHLY_RATE_ACTUAL_30) becomes inclusive of both period endpoints (+1
+       day) instead of the default exclusive-of-one-endpoint count. */
+    includeOpeningClosingDays: boolean("include_opening_closing_days")
+        .default(false),
+
+    /* RUNNING_BALANCE walks the loan's principal ledger (tranches +
+       repayments) day by day; SIMPLE_INTEREST always uses the loan's
+       original principal as a single point-in-time base. See
+       modules/interest/interest.service.ts. */
+    calculationMethod: calculationMethodEnum("calculation_method")
+        .default("SIMPLE_INTEREST"),
 
     ...timestamps,
 
