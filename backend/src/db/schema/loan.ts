@@ -12,8 +12,13 @@ import {
 } from "drizzle-orm/pg-core";
 
 import {
+    assetClassificationEnum,
+    cibilAccountStatusEnum,
+    cibilCollateralTypeEnum,
+    cibilCreditTypeEnum,
     loanStatusEnum,
     loanTypeEnum,
+    paymentFrequencyEnum,
     securityTypeEnum,
     repaymentTypeEnum,
     money,
@@ -46,6 +51,11 @@ export const loans = pgTable("loans", {
 
     securityType: securityTypeEnum("security_type")
         .default("NONE"),
+
+    /** Free-text label when securityType is OTHERS; unused otherwise. */
+    otherSecurityType: varchar("other_security_type", {
+        length: 255,
+    }),
 
     repaymentType: repaymentTypeEnum("repayment_type")
         .notNull(),
@@ -94,8 +104,41 @@ export const loans = pgTable("loans", {
 
     /* ── Status ── */
 
+    // Matches the database's own default; declaring PENDING here disagreed with
+    // every row actually written.
     status: loanStatusEnum("status")
-        .default("PENDING"),
+        .default("ACTIVE"),
+
+    /* ────────────────────────────────────────────────────────
+       CIBIL reporting
+
+       Kept alongside — not merged into — the operational
+       columns above. `status` drives the app's own workflow,
+       while `cibilAccountStatus` is what gets submitted; the
+       same distinction applies to creditType vs loanType and
+       paymentFrequency vs repaymentType.
+    ──────────────────────────────────────────────────────── */
+
+    /** CIBIL "CREDIT TYPE" (commercial) / "ACCOUNT TYPE" (consumer). */
+    creditType: cibilCreditTypeEnum("credit_type"),
+
+    /** CIBIL "Account STATUS". */
+    cibilAccountStatus: cibilAccountStatusEnum("cibil_account_status"),
+
+    /** CIBIL "ACCOUNT CLASSIFICATION" — asset/NPA staging. */
+    assetClassification: assetClassificationEnum("asset_classification"),
+
+    /** CIBIL "Payment Frequency" / "Repayment Frequency". */
+    paymentFrequency: paymentFrequencyEnum("payment_frequency"),
+
+    /** CIBIL "EMI Amount (If applicable)". */
+    emiAmount: money("emi_amount"),
+
+    /** CIBIL "Type of Collateral (If secured loan)". */
+    collateralType: cibilCollateralTypeEnum("collateral_type"),
+
+    /** CIBIL "Value of Collateral (If secured loan)". */
+    collateralValue: money("collateral_value"),
 
     /* ── Tracking ── */
 

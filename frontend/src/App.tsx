@@ -22,6 +22,7 @@ import { EditLoanPage } from "./features/loans/EditLoanPage";
 import { RepaymentEnginePage } from "./features/repayment/RepaymentEnginePage";
 import { PaymentsPage } from "./features/payments/PaymentsPage";
 import { AccountingLedgerPage } from "./features/accounting-entries/AccountingLedgerPage";
+import { DisbursementsPage } from "./features/disbursements/DisbursementsPage";
 import { UsersPage } from "./features/admin/UsersPage";
 import { CreateUserPage } from "./features/admin/CreateUserPage";
 
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/accounting" element={<AccountingPage />} />
           <Route path="/accounting-entries" element={<AccountingLedgerPage />} />
+          <Route path="/disbursements" element={<DisbursementsPage />} />
           <Route path="/collateral" element={<CollateralPage />} />
           <Route path="/collections" element={<CollectionsPage />} />
           <Route path="/documents" element={<DocumentsPage />} />

@@ -15,6 +15,8 @@ export interface CreateCollateralInput {
     loanId: string;
     ownerId?: string;
     securityType: CollateralType;
+    /** Free-text label when securityType is OTHERS; unused otherwise. */
+    otherSecurityType?: string;
     description?: string;
 
     propertyType?: string;
@@ -37,6 +39,7 @@ export interface CreateCollateralInput {
 export interface UpdateCollateralInput {
     ownerId?: string;
     securityType?: CollateralType;
+    otherSecurityType?: string;
     description?: string;
 
     propertyType?: string;
@@ -90,6 +93,7 @@ export interface CollateralRecord {
     loanId: string;
     ownerId: string | null;
     securityType: CollateralType;
+    otherSecurityType: string | null;
     description: string | null;
 
     propertyType: string | null;

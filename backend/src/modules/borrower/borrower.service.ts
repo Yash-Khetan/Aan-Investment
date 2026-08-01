@@ -58,6 +58,11 @@ const mapPromoters = (
     (input ?? []).map((p) => {
         const row: Omit<NewPromoter, "borrowerId"> = { name: p.name };
         if (p.designation !== undefined) row.designation = p.designation;
+        if (p.gender !== undefined) row.gender = p.gender;
+        if (p.relatedPersonType !== undefined)
+            row.relatedPersonType = p.relatedPersonType;
+        if (p.relationship !== undefined) row.relationship = p.relationship;
+        if (p.dateOfBirth !== undefined) row.dateOfBirth = p.dateOfBirth;
         if (p.pan !== undefined) row.pan = p.pan;
         if (p.aadhar !== undefined) row.aadhar = p.aadhar;
         if (p.din !== undefined) row.din = p.din;
@@ -65,6 +70,7 @@ const mapPromoters = (
         if (p.email !== undefined) row.email = p.email;
         if (p.addressLine1 !== undefined) row.addressLine1 = p.addressLine1;
         if (p.city !== undefined) row.city = p.city;
+        if (p.district !== undefined) row.district = p.district;
         if (p.state !== undefined) row.state = p.state;
         if (p.pincode !== undefined) row.pincode = p.pincode;
         if (p.shareholdingPercent !== undefined)
@@ -81,6 +87,7 @@ export const createBorrower = async (
     }
 
     const values: NewBorrower = {
+        borrowerType: input.borrowerType,
         borrowerCode: input.borrowerCode,
         name: input.name,
         constitution: input.constitution,
@@ -94,6 +101,7 @@ export const createBorrower = async (
     if (input.addressLine1 !== undefined) values.addressLine1 = input.addressLine1;
     if (input.addressLine2 !== undefined) values.addressLine2 = input.addressLine2;
     if (input.city !== undefined) values.city = input.city;
+    if (input.district !== undefined) values.district = input.district;
     if (input.state !== undefined) values.state = input.state;
     if (input.pincode !== undefined) values.pincode = input.pincode;
     if (input.pan !== undefined) values.pan = input.pan;
@@ -104,6 +112,28 @@ export const createBorrower = async (
         values.dateOfIncorporation = input.dateOfIncorporation;
     if (input.natureOfBusiness !== undefined)
         values.natureOfBusiness = input.natureOfBusiness;
+
+    /* CIBIL consumer fields */
+    if (input.gender !== undefined) values.gender = input.gender;
+    if (input.dateOfBirth !== undefined) values.dateOfBirth = input.dateOfBirth;
+    if (input.addressCategory !== undefined)
+        values.addressCategory = input.addressCategory;
+    if (input.residenceCode !== undefined)
+        values.residenceCode = input.residenceCode;
+    if (input.ownershipIndicator !== undefined)
+        values.ownershipIndicator = input.ownershipIndicator;
+    if (input.ckycNumber !== undefined) values.ckycNumber = input.ckycNumber;
+
+    /* CIBIL commercial fields */
+    if (input.businessCategory !== undefined)
+        values.businessCategory = input.businessCategory;
+    if (input.businessType !== undefined)
+        values.businessType = input.businessType;
+    if (input.classOfActivity1 !== undefined)
+        values.classOfActivity1 = input.classOfActivity1;
+    if (input.applicantType !== undefined)
+        values.applicantType = input.applicantType;
+
     if (input.internalRating !== undefined)
         values.internalRating = input.internalRating;
     if (input.ratingRemarks !== undefined)
@@ -155,6 +185,7 @@ export const updateBorrower = async (
     }
 
     const patch: Partial<NewBorrower> = {};
+    if (input.borrowerType !== undefined) patch.borrowerType = input.borrowerType;
     if (input.borrowerCode !== undefined) patch.borrowerCode = input.borrowerCode;
     if (input.name !== undefined) patch.name = input.name;
     if ("groupName" in input) patch.groupName = input.groupName ?? null;
@@ -166,6 +197,7 @@ export const updateBorrower = async (
     if ("addressLine1" in input) patch.addressLine1 = input.addressLine1 ?? null;
     if ("addressLine2" in input) patch.addressLine2 = input.addressLine2 ?? null;
     if ("city" in input) patch.city = input.city ?? null;
+    if ("district" in input) patch.district = input.district ?? null;
     if ("state" in input) patch.state = input.state ?? null;
     if ("pincode" in input) patch.pincode = input.pincode ?? null;
     if ("pan" in input) patch.pan = input.pan ?? null;
@@ -176,6 +208,27 @@ export const updateBorrower = async (
         patch.dateOfIncorporation = input.dateOfIncorporation ?? null;
     if ("natureOfBusiness" in input)
         patch.natureOfBusiness = input.natureOfBusiness ?? null;
+
+    /* CIBIL consumer fields */
+    if ("gender" in input) patch.gender = input.gender ?? null;
+    if ("dateOfBirth" in input) patch.dateOfBirth = input.dateOfBirth ?? null;
+    if ("addressCategory" in input)
+        patch.addressCategory = input.addressCategory ?? null;
+    if ("residenceCode" in input)
+        patch.residenceCode = input.residenceCode ?? null;
+    if ("ownershipIndicator" in input)
+        patch.ownershipIndicator = input.ownershipIndicator ?? null;
+    if ("ckycNumber" in input) patch.ckycNumber = input.ckycNumber ?? null;
+
+    /* CIBIL commercial fields */
+    if ("businessCategory" in input)
+        patch.businessCategory = input.businessCategory ?? null;
+    if ("businessType" in input) patch.businessType = input.businessType ?? null;
+    if ("classOfActivity1" in input)
+        patch.classOfActivity1 = input.classOfActivity1 ?? null;
+    if ("applicantType" in input)
+        patch.applicantType = input.applicantType ?? null;
+
     if ("internalRating" in input)
         patch.internalRating = input.internalRating ?? null;
     if ("ratingRemarks" in input)

@@ -1,11 +1,25 @@
 export const SECURITY_TYPES = [
   "PROPERTY",
   "MORTGAGE",
-  "STRUCTURED_CREDIT",
+  "HYPOTHECATION_OF_RECEIVABLES",
   "PERSONAL_GUARANTEE",
   "CORPORATE_GUARANTEE",
+  "OTHERS",
   "NONE",
 ] as const;
+
+/** Fixed display/creation order for collateral security types (Mortgage directly followed by Hypothecation of Receivables). */
+export const SECURITY_TYPE_ORDER: readonly string[] = SECURITY_TYPES.filter((t) => t !== "NONE");
+
+/** The document type each security's upload tile is scoped to (documents attach at the loan level, filtered by this type). */
+export const SECURITY_DOCUMENT_TYPE: Record<string, string> = {
+  PROPERTY: "VALUATION_REPORT",
+  MORTGAGE: "MORTGAGE_DEED",
+  HYPOTHECATION_OF_RECEIVABLES: "HYPOTHECATION_DEED",
+  PERSONAL_GUARANTEE: "PERSONAL_GUARANTEE",
+  CORPORATE_GUARANTEE: "CORPORATE_GUARANTEE",
+  OTHERS: "OTHER",
+};
 
 export interface InsuranceRecord {
   id: string;
@@ -23,6 +37,7 @@ export interface CollateralRecord {
   id: string;
   loanId: string;
   securityType: string;
+  otherSecurityType: string | null;
   description: string | null;
   propertyType: string | null;
   propertyAddress: string | null;
@@ -44,6 +59,7 @@ export interface CollateralRecord {
 export interface CreateCollateralInput {
   loanId: string;
   securityType: string;
+  otherSecurityType?: string;
   description?: string;
   propertyType?: string;
   propertyAddress?: string;

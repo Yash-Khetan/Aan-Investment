@@ -1,10 +1,12 @@
 import type { InputHTMLAttributes, PropsWithChildren, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { InfoTooltip } from "./Tooltip";
 
-function Label({ children, required }: PropsWithChildren<{ required?: boolean }>) {
+function Label({ children, required, tooltip }: PropsWithChildren<{ required?: boolean; tooltip?: string }>) {
   return (
     <label className="mb-1 block text-xs font-medium text-slate-600">
       {children}
       {required && <span className="text-red-500"> *</span>}
+      {tooltip && <InfoTooltip text={tooltip} />}
     </label>
   );
 }
@@ -15,11 +17,14 @@ const inputClasses =
 export function TextField({
   label,
   required,
+  tooltip,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; required?: boolean }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; required?: boolean; tooltip?: string }) {
   return (
     <div>
-      <Label required={required}>{label}</Label>
+      <Label required={required} tooltip={tooltip}>
+        {label}
+      </Label>
       <input className={inputClasses} required={required} {...props} />
     </div>
   );

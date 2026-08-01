@@ -13,9 +13,10 @@ import {
 import type { PaginationMeta } from "../../common/http/apiResponse";
 import { db } from "../../db/index";
 import * as loanRepository from "./loan.repository";
-import { assertLoanInvariants } from "./loan.validators";
+import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators";
 import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
+import { syncRepaymentSchedule } from "../repayment/repayment.service";
 import type {
     CreateLoanInput,
     ListLoansQuery,
@@ -100,6 +101,7 @@ export const createLoan = async (
     };
 
     if (input.securityType !== undefined) values.securityType = input.securityType;
+    if (input.otherSecurityType !== undefined) values.otherSecurityType = input.otherSecurityType;
     if (input.disbursedAmount !== undefined)
         values.disbursedAmount = toMoney(input.disbursedAmount);
     if (input.outstandingPrincipal !== undefined)
@@ -115,6 +117,21 @@ export const createLoan = async (
         values.approvalNotes = input.approvalNotes;
     if (input.remarks !== undefined) values.remarks = input.remarks;
     if (input.status !== undefined) values.status = input.status;
+
+    /* CIBIL reporting fields */
+    if (input.creditType !== undefined) values.creditType = input.creditType;
+    if (input.cibilAccountStatus !== undefined)
+        values.cibilAccountStatus = input.cibilAccountStatus;
+    if (input.assetClassification !== undefined)
+        values.assetClassification = input.assetClassification;
+    if (input.paymentFrequency !== undefined)
+        values.paymentFrequency = input.paymentFrequency;
+    if (input.emiAmount !== undefined) values.emiAmount = toMoney(input.emiAmount);
+    if (input.collateralType !== undefined)
+        values.collateralType = input.collateralType;
+    if (input.collateralValue !== undefined)
+        values.collateralValue = toMoney(input.collateralValue);
+
     if (input.relationshipManagerId !== undefined)
         values.relationshipManagerId = input.relationshipManagerId;
     if (input.createdBy !== undefined) values.createdBy = input.createdBy;
@@ -205,6 +222,11 @@ const assertMergedInvariants = (
                 : existing.firstDisbursementDate,
         maturityDate:
             "maturityDate" in input ? input.maturityDate : existing.maturityDate,
+        securityType: input.securityType ?? existing.securityType,
+        otherSecurityType:
+            "otherSecurityType" in input
+                ? input.otherSecurityType
+                : existing.otherSecurityType,
     };
 
     const issues: { path: PropertyKey[]; message: string }[] = [];
@@ -217,6 +239,7 @@ const assertMergedInvariants = (
         path: [] as PropertyKey[],
     } as unknown as z.RefinementCtx;
     assertLoanInvariants(merged, collectingCtx);
+    assertOtherSecurityType(merged, collectingCtx);
 
     if (issues.length > 0) {
         throw new ValidationError("Validation failed", {
@@ -257,6 +280,8 @@ export const updateLoan = async (
     if (input.borrowerId !== undefined) patch.borrowerId = input.borrowerId;
     if (input.loanType !== undefined) patch.loanType = input.loanType;
     if (input.securityType !== undefined) patch.securityType = input.securityType;
+    if ("otherSecurityType" in input)
+        patch.otherSecurityType = input.otherSecurityType ?? null;
     if (input.repaymentType !== undefined)
         patch.repaymentType = input.repaymentType;
     if (input.sanctionedAmount !== undefined)
@@ -278,6 +303,28 @@ export const updateLoan = async (
     if ("approvalNotes" in input) patch.approvalNotes = input.approvalNotes ?? null;
     if ("remarks" in input) patch.remarks = input.remarks ?? null;
     if (input.status !== undefined) patch.status = input.status;
+
+    /* CIBIL reporting fields */
+    if ("creditType" in input) patch.creditType = input.creditType ?? null;
+    if ("cibilAccountStatus" in input)
+        patch.cibilAccountStatus = input.cibilAccountStatus ?? null;
+    if ("assetClassification" in input)
+        patch.assetClassification = input.assetClassification ?? null;
+    if ("paymentFrequency" in input)
+        patch.paymentFrequency = input.paymentFrequency ?? null;
+    if ("emiAmount" in input)
+        patch.emiAmount =
+            input.emiAmount !== null && input.emiAmount !== undefined
+                ? toMoney(input.emiAmount)
+                : null;
+    if ("collateralType" in input)
+        patch.collateralType = input.collateralType ?? null;
+    if ("collateralValue" in input)
+        patch.collateralValue =
+            input.collateralValue !== null && input.collateralValue !== undefined
+                ? toMoney(input.collateralValue)
+                : null;
+
     if ("relationshipManagerId" in input)
         patch.relationshipManagerId = input.relationshipManagerId ?? null;
 
@@ -291,10 +338,12 @@ export const updateLoan = async (
             ? input.disbursedAmount - previousDisbursed
             : 0;
 
+    let updated: LoanWithBorrower;
+
     if (disbursementIncrease > 0) {
-        return db.transaction(async (tx) => {
-            const updated = await loanRepository.update(id, patch, tx);
-            if (!updated) throw new NotFoundError(`Loan '${id}' not found`);
+        updated = await db.transaction(async (tx) => {
+            const result = await loanRepository.update(id, patch, tx);
+            if (!result) throw new NotFoundError(`Loan '${id}' not found`);
 
             const trancheNumber = (await loanRepository.countTranches(id, tx)) + 1;
             await loanRepository.createTranche(
@@ -308,12 +357,20 @@ export const updateLoan = async (
                 tx,
             );
 
-            return updated;
+            return result;
         });
+    } else {
+        const result = await loanRepository.update(id, patch);
+        if (!result) throw new NotFoundError(`Loan '${id}' not found`);
+        updated = result;
     }
 
-    const updated = await loanRepository.update(id, patch);
-    if (!updated) throw new NotFoundError(`Loan '${id}' not found`);
+    // Keep the repayment schedule in sync with whatever just changed —
+    // regenerates automatically if nothing's been paid yet, otherwise leaves
+    // it alone and lets the frontend flag it as stale. Never blocks the
+    // loan update itself if this fails for any reason.
+    await syncRepaymentSchedule(id);
+
     return updated;
 };
 

@@ -5,25 +5,27 @@ import { PageHeader } from "../../components/Layout";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Table, type Column } from "../../components/ui/Table";
-import { TextField } from "../../components/ui/Field";
+import { SelectField, TextField } from "../../components/ui/Field";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { SlideOver } from "../../components/ui/SlideOver";
 import { formatDate } from "../../lib/format";
 import { useAuth } from "../auth/AuthContext";
 import { deleteBorrower, listBorrowers } from "./api";
 import { BorrowerDetailView } from "./components/BorrowerDetailView";
-import type { Borrower } from "./types";
+import { BORROWER_TYPES, BORROWER_TYPE_LABELS } from "./types";
+import type { Borrower, BorrowerType } from "./types";
 
 export function BorrowersPage() {
   const [search, setSearch] = useState("");
+  const [borrowerType, setBorrowerType] = useState<BorrowerType | "">("");
   const [viewingId, setViewingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.roles.includes("ADMIN") ?? false;
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["borrowers", search],
-    queryFn: () => listBorrowers({ search: search || undefined }),
+    queryKey: ["borrowers", search, borrowerType],
+    queryFn: () => listBorrowers({ search: search || undefined, borrowerType: borrowerType || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -41,7 +43,12 @@ export function BorrowersPage() {
     { key: "borrowerCode", header: "Code", render: (b) => b.borrowerCode },
     { key: "name", header: "Name", render: (b) => b.name },
     { key: "groupName", header: "Group", render: (b) => b.groupName ?? "—" },
-    { key: "constitution", header: "Constitution", render: (b) => b.constitution.replace(/_/g, " ") },
+    {
+      key: "borrowerType",
+      header: "Borrower Type",
+      // Constitution still shows on the Borrower Details slide-over.
+      render: (b) => (b.borrowerType === "CONSUMER" ? "Consumer" : "Commercial"),
+    },
     { key: "pan", header: "PAN", render: (b) => b.pan ?? "—" },
     { key: "status", header: "Status", render: (b) => <Badge status={b.status} /> },
     { key: "createdAt", header: "Created", render: (b) => formatDate(b.createdAt) },
@@ -72,8 +79,24 @@ export function BorrowersPage() {
       <PageHeader title="Borrowers" description="Borrower master data — promoters and internal ratings." />
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:w-80">
-          <TextField label="Search" placeholder="Name, code, PAN, GST…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="w-full sm:w-80">
+            <TextField label="Search" placeholder="Name, code, PAN, GST…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="w-full sm:w-56">
+            <SelectField
+              label="Borrower Type"
+              value={borrowerType}
+              onChange={(e) => setBorrowerType(e.target.value as BorrowerType | "")}
+            >
+              <option value="">All</option>
+              {BORROWER_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {BORROWER_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </SelectField>
+          </div>
         </div>
         <Link to="/borrowers/new">
           <Button>+ New Borrower</Button>

@@ -4,12 +4,15 @@ import {
     text,
     boolean,
     integer,
+    numeric,
     date,
     index,
 } from "drizzle-orm/pg-core";
 
 import {
     paymentStatusEnum,
+    interestBasisEnum,
+    calculationMethodEnum,
     money,
     timestamps,
 } from "./shared";
@@ -40,6 +43,26 @@ export const repaymentSchedules = pgTable("repayment_schedules", {
         .default(true),
 
     remarks: text("remarks"),
+
+    /* ── Generation snapshot ──
+       The loan/interest-config values this schedule was generated from, so a
+       later loan or interest-config edit can be detected as "stale" without
+       re-deriving anything. See repayment.service.ts's staleness check. */
+
+    generatedPrincipal: money("generated_principal"),
+
+    generatedAnnualRate: numeric("generated_annual_rate", {
+        precision: 8,
+        scale: 4,
+    }),
+
+    generatedInterestBasis: interestBasisEnum("generated_interest_basis"),
+
+    generatedCalculationMethod: calculationMethodEnum("generated_calculation_method"),
+
+    generatedTenureMonths: integer("generated_tenure_months"),
+
+    generatedDisbursementDate: date("generated_disbursement_date"),
 
     ...timestamps,
 
@@ -84,6 +107,12 @@ export const installments = pgTable("installments", {
         .default("0"),
 
     totalAmount: money("total_amount")
+        .default("0"),
+
+    /* Scheduled/projected remaining principal after this installment, as
+       generated — not affected by actual payments (see paidPrincipal below
+       for the live, payment-driven figures). */
+    outstandingBalance: money("outstanding_balance")
         .default("0"),
 
     /* ── Paid Amounts ── */

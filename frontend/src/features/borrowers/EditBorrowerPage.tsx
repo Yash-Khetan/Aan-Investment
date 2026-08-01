@@ -7,10 +7,13 @@ import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields } from "./components/BorrowerMasterFields";
+import { RelatedPersonsEditor } from "./components/RelatedPersonsEditor";
 import { getBorrower, updateBorrower } from "./api";
 import { listDocuments } from "../documents/api";
 import { UploadDocumentForm } from "../documents/components/UploadDocumentForm";
 import { DocumentCard } from "../documents/components/DocumentCard";
+import { useAuth } from "../auth/AuthContext";
+import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { EMPTY_BORROWER_FORM, borrowerToFormState, formStateToUpdateInput } from "./types";
 import type { BorrowerFormState } from "./types";
 
@@ -18,6 +21,8 @@ export function EditBorrowerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { status } = useAuth();
+  const draftKey = `borrower:edit:${id}`;
 
   const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
   const [loaded, setLoaded] = useState(false);
@@ -37,14 +42,19 @@ export function EditBorrowerPage() {
 
   useEffect(() => {
     if (data && !loaded) {
-      setForm(borrowerToFormState(data));
+      // A locally autosaved draft reflects unsaved edits in progress — it takes
+      // precedence over the persisted record until the user explicitly saves.
+      setForm(loadDraft<BorrowerFormState>(draftKey) ?? borrowerToFormState(data));
       setLoaded(true);
     }
-  }, [data, loaded]);
+  }, [data, loaded, draftKey]);
+
+  useAutosaveDraft(draftKey, form, status === "authenticated" && loaded);
 
   const mutation = useMutation({
     mutationFn: () => updateBorrower(id!, formStateToUpdateInput(form)),
     onSuccess: () => {
+      clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["borrowers"] });
       queryClient.invalidateQueries({ queryKey: ["borrower", id] });
       navigate("/borrowers");
@@ -69,21 +79,7 @@ export function EditBorrowerPage() {
 
       {data && loaded && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <BorrowerMasterFields form={form} onChange={patch} showStatus borrowerId={id} documents={documents} />
-
-          {data.promoters.length > 0 && (
-            <Card className="p-4">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Promoters</h2>
-              <p className="mb-3 text-xs text-slate-400">Read-only here — editing these isn't supported yet.</p>
-              <div className="flex flex-col gap-1.5 text-sm text-slate-700">
-                {data.promoters.map((p) => (
-                  <div key={p.id}>
-                    <span className="text-slate-400">Promoter —</span> {p.name} {p.designation ? `(${p.designation})` : ""}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <BorrowerMasterFields form={form} onChange={patch} showStatus />
 
           {mutation.isError && <FormErrors error={mutation.error} />}
 
@@ -96,6 +92,15 @@ export function EditBorrowerPage() {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* Related persons save individually against their own endpoints, so this
+          sits outside the borrower form rather than inside its submit. It is a
+          commercial-sheet block, so consumers never see it. */}
+      {id && data && loaded && form.borrowerType === "COMMERCIAL" && (
+        <div className="mt-6">
+          <RelatedPersonsEditor borrowerId={id} />
+        </div>
       )}
 
       {id && (

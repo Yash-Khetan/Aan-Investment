@@ -27,6 +27,8 @@ export interface Installment {
   principalAmount: string;
   interestAmount: string;
   totalAmount: string;
+  /** Scheduled/projected remaining principal after this installment — not affected by actual payments. */
+  outstandingBalance: string;
   paidPrincipal: string;
   paidInterest: string;
   paidTotal: string;
@@ -84,15 +86,12 @@ export function getDaysLate(dueDate: string, paymentDate: string): number {
 export interface ScheduleWithInstallments {
   schedule: RepaymentSchedule;
   installments: Installment[];
+  /** True when the loan/interest config changed since generation but couldn't auto-regenerate (payments already exist). */
+  isStale: boolean;
 }
 
+/** Everything else (principal, rate, basis, tenure, repayment type) is derived server-side from the loan + its interest config. */
 export interface GenerateScheduleInput {
   loanId: string;
-  principal: number;
-  annualRate: number;
-  tenureMonths: number;
-  moratoriumMonths?: number;
-  disbursementDate: string;
-  repaymentType: RepaymentType;
   remarks?: string;
 }

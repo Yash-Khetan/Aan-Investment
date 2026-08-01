@@ -6,7 +6,7 @@ import { Table, type Column } from "../../components/ui/Table";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { LoanSelect } from "../lookup/LoanSelect";
-import { getLedger, recordDisbursement, recordWriteOff } from "./api";
+import { getLedger, recordWriteOff } from "./api";
 import type { JournalEntry } from "./types";
 import { RecordJournalEntryForm } from "./components/RecordJournalEntryForm";
 
@@ -37,7 +37,7 @@ const COLUMNS: Column<JournalEntry>[] = [
   { key: "isExported", header: "Exported", render: (r) => (r.isExported ? "Yes" : "No") },
 ];
 
-type ActiveForm = "disbursement" | "write-off" | null;
+type ActiveForm = "write-off" | null;
 
 export function AccountingLedgerPage() {
   const [loanId, setLoanId] = useState("");
@@ -67,31 +67,14 @@ export function AccountingLedgerPage() {
           />
         </div>
         {loanId && (
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setActiveForm((f) => (f === "disbursement" ? null : "disbursement"))}
-            >
-              {activeForm === "disbursement" ? "Cancel" : "+ Record Disbursement"}
-            </Button>
-            <Button variant="secondary" onClick={() => setActiveForm((f) => (f === "write-off" ? null : "write-off"))}>
-              {activeForm === "write-off" ? "Cancel" : "+ Record Write-Off"}
-            </Button>
-          </>
+          <Button variant="secondary" onClick={() => setActiveForm((f) => (f === "write-off" ? null : "write-off"))}>
+            {activeForm === "write-off" ? "Cancel" : "+ Record Write-Off"}
+          </Button>
         )}
       </div>
 
       {!loanId && <EmptyState message="Select a loan to view or post journal entries." />}
 
-      {loanId && activeForm === "disbursement" && (
-        <RecordJournalEntryForm
-          loanId={loanId}
-          title="Record Disbursement"
-          submitLabel="Record Disbursement"
-          mutationFn={recordDisbursement}
-          onDone={() => setActiveForm(null)}
-        />
-      )}
       {loanId && activeForm === "write-off" && (
         <RecordJournalEntryForm
           loanId={loanId}

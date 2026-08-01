@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { TextField } from "../../../components/ui/Field";
+import { useAuth } from "../../auth/AuthContext";
+import { useAutosaveDraft, loadDraft } from "../../../hooks/useAutosaveDraft";
 import type { CreateGuarantorInput, Guarantor, UpdateGuarantorInput } from "../types";
 
 /** Matches the backend's Indian-mobile format (an optional +91 prefix, then a 10-digit number starting 6-9). */
@@ -61,6 +63,7 @@ export function GuarantorForm({
   error,
   onSubmit,
   onCancel,
+  draftKey,
 }: {
   initial?: Guarantor;
   submitLabel: string;
@@ -68,8 +71,16 @@ export function GuarantorForm({
   error?: unknown;
   onSubmit: (input: CreateGuarantorInput | UpdateGuarantorInput) => void;
   onCancel: () => void;
+  /** When set, autosaves this form's in-progress values to localStorage every 30s (used for the "add new" flow, not row-edit). */
+  draftKey?: string;
 }) {
-  const [form, setForm] = useState<FormValues>(initial ? guarantorToFormValues(initial) : EMPTY);
+  const { status } = useAuth();
+  const [form, setForm] = useState<FormValues>(() => {
+    if (initial) return guarantorToFormValues(initial);
+    return (draftKey && loadDraft<FormValues>(draftKey)) || EMPTY;
+  });
+
+  useAutosaveDraft(draftKey ?? "", form, !!draftKey && status === "authenticated");
 
   function patch(p: Partial<FormValues>) {
     setForm((f) => ({ ...f, ...p }));

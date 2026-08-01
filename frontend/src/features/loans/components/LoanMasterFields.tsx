@@ -1,11 +1,48 @@
 import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
-import { LOAN_TYPES, REPAYMENT_TYPES, SECURITY_TYPES } from "../types";
-import type { LoanFormState } from "../types";
+import {
+  ASSET_CLASSIFICATIONS,
+  CIBIL_ACCOUNT_STATUSES,
+  CIBIL_COLLATERAL_TYPES,
+  CREDIT_TYPES,
+  LOAN_TYPES,
+  PAYMENT_FREQUENCIES,
+  REPAYMENT_TYPES,
+  SECURITY_TYPES,
+  calcTenureMonths,
+} from "../types";
+import type { CodedOption, LoanFormState } from "../types";
+
+const MORATORIUM_TOOLTIP =
+  "Moratorium Period means the period during which no payments are collected from the borrower. However, interest continues to accrue during this period.";
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+}
+
+/** A coded CIBIL dropdown, blank until the user picks a value. */
+function CodedSelect({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: CodedOption[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">— Select {label} —</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </SelectField>
+  );
 }
 
 /** Loan master-data fields shared by the create and edit pages. */
@@ -19,6 +56,8 @@ export function LoanMasterFields({
   /** On edit, the borrower a loan belongs to isn't changeable — pass a display label to show it read-only instead of the picker. */
   lockedBorrowerLabel?: string;
 }) {
+  const tenureMonths = calcTenureMonths(form.firstDisbursementDate, form.maturityDate);
+
   return (
     <>
       <Card className="p-4">
@@ -42,20 +81,46 @@ export function LoanMasterFields({
               <BorrowerSelect value={form.borrowerId} onChange={(v) => onChange({ borrowerId: v })} required />
             )}
           </div>
-          <SelectField label="Loan Type" value={form.loanType} onChange={(e) => onChange({ loanType: e.target.value })} required>
+          <SelectField
+            label="Loan Type"
+            value={form.loanType}
+            onChange={(e) => {
+              const loanType = e.target.value;
+              onChange(
+                loanType === "UNSECURED"
+                  ? { loanType, securityType: "NONE", otherSecurityType: "" }
+                  : { loanType },
+              );
+            }}
+            required
+          >
             {LOAN_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
             ))}
           </SelectField>
-          <SelectField label="Security Type" value={form.securityType} onChange={(e) => onChange({ securityType: e.target.value })}>
-            {SECURITY_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace(/_/g, " ")}
-              </option>
-            ))}
-          </SelectField>
+          {form.loanType !== "UNSECURED" && (
+            <SelectField
+              label="Security Type"
+              value={form.securityType}
+              onChange={(e) => onChange({ securityType: e.target.value, otherSecurityType: "" })}
+            >
+              {SECURITY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, " ")}
+                </option>
+              ))}
+            </SelectField>
+          )}
+          {form.loanType !== "UNSECURED" && form.securityType === "OTHERS" && (
+            <TextField
+              label="Specify Security Type"
+              value={form.otherSecurityType}
+              onChange={(e) => onChange({ otherSecurityType: e.target.value })}
+              required
+            />
+          )}
           <SelectField
             label="Repayment Type"
             value={form.repaymentType}
@@ -100,14 +165,6 @@ export function LoanMasterFields({
             onChange={(e) => onChange({ disbursedAmount: e.target.value })}
           />
           <TextField
-            label="Outstanding Principal (INR)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.outstandingPrincipal}
-            onChange={(e) => onChange({ outstandingPrincipal: e.target.value })}
-          />
-          <TextField
             label="Interest Rate (% p.a.)"
             type="number"
             min="0"
@@ -117,21 +174,13 @@ export function LoanMasterFields({
             required
           />
           <TextField
-            label="Tenure (months)"
-            type="number"
-            min="1"
-            step="1"
-            value={form.tenureMonths}
-            onChange={(e) => onChange({ tenureMonths: e.target.value })}
-            required
-          />
-          <TextField
             label="Moratorium (months)"
             type="number"
             min="0"
             step="1"
             value={form.moratoriumMonths}
             onChange={(e) => onChange({ moratoriumMonths: e.target.value })}
+            tooltip={MORATORIUM_TOOLTIP}
           />
         </div>
       </Card>
@@ -145,9 +194,78 @@ export function LoanMasterFields({
             type="date"
             value={form.firstDisbursementDate}
             onChange={(e) => onChange({ firstDisbursementDate: e.target.value })}
+            required
           />
-          <TextField label="Maturity Date" type="date" value={form.maturityDate} onChange={(e) => onChange({ maturityDate: e.target.value })} />
+          <TextField
+            label="Maturity Date"
+            type="date"
+            value={form.maturityDate}
+            onChange={(e) => onChange({ maturityDate: e.target.value })}
+            required
+          />
+          <div>
+            <div className="mb-1 text-xs font-medium text-slate-600">Tenure (auto-calculated)</div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
+              {tenureMonths > 0 ? `${tenureMonths} month${tenureMonths === 1 ? "" : "s"}` : "Maturity Date - Sanction Date"}
+            </div>
+          </div>
         </div>
+      </Card>
+
+      <Card className="p-4">
+        <SectionTitle>CIBIL Reporting</SectionTitle>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <CodedSelect
+            label="Credit Type / Account Type"
+            options={CREDIT_TYPES}
+            value={form.creditType}
+            onChange={(v) => onChange({ creditType: v })}
+          />
+          <CodedSelect
+            label="Account Status"
+            options={CIBIL_ACCOUNT_STATUSES}
+            value={form.cibilAccountStatus}
+            onChange={(v) => onChange({ cibilAccountStatus: v })}
+          />
+          <CodedSelect
+            label="Account Classification"
+            options={ASSET_CLASSIFICATIONS}
+            value={form.assetClassification}
+            onChange={(v) => onChange({ assetClassification: v })}
+          />
+          <CodedSelect
+            label="Payment Frequency"
+            options={PAYMENT_FREQUENCIES}
+            value={form.paymentFrequency}
+            onChange={(v) => onChange({ paymentFrequency: v })}
+          />
+          <TextField
+            label="EMI Amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.emiAmount}
+            onChange={(e) => onChange({ emiAmount: e.target.value })}
+          />
+          <CodedSelect
+            label="Type of Collateral"
+            options={CIBIL_COLLATERAL_TYPES}
+            value={form.collateralType}
+            onChange={(v) => onChange({ collateralType: v })}
+          />
+          <TextField
+            label="Value of Collateral"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.collateralValue}
+            onChange={(e) => onChange({ collateralValue: e.target.value })}
+            disabled={form.collateralType === "NO_COLLATERAL"}
+          />
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Reported to CIBIL. Separate from Loan Type, Status and Repayment Type above, which drive the app's own workflow.
+        </p>
       </Card>
 
       <Card className="p-4">

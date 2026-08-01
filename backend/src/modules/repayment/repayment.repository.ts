@@ -1,5 +1,5 @@
-import { eq, and, desc, sql } from "drizzle-orm";
-import { db, repaymentSchedules, installments, paymentAllocations } from "../../db";
+import { eq, and, desc, gt, sql } from "drizzle-orm";
+import { db, repaymentSchedules, installments, paymentAllocations, loans } from "../../db";
 import { GeneratedInstallment } from "./repayment.types";
 
 /**
@@ -29,6 +29,7 @@ export async function getInstallmentsForSchedule(scheduleId: string) {
       principalAmount: installments.principalAmount,
       interestAmount: installments.interestAmount,
       totalAmount: installments.totalAmount,
+      outstandingBalance: installments.outstandingBalance,
       paidPrincipal: installments.paidPrincipal,
       paidInterest: installments.paidInterest,
       paidTotal: installments.paidTotal,
@@ -72,6 +73,14 @@ export async function createScheduleRevision(input: {
   loanId: string;
   generatedInstallments: GeneratedInstallment[];
   remarks?: string;
+  generationSnapshot: {
+    principal: number;
+    annualRate: number;
+    interestBasis: string;
+    calculationMethod: string;
+    tenureMonths: number;
+    disbursementDate: Date;
+  };
 }) {
   return db.transaction(async (tx) => {
     const previous = await tx
@@ -88,6 +97,7 @@ export async function createScheduleRevision(input: {
     }
 
     const nextVersion = (previous[0]?.version ?? 0) + 1;
+    const snapshot = input.generationSnapshot;
 
     const [schedule] = await tx
       .insert(repaymentSchedules)
@@ -96,6 +106,12 @@ export async function createScheduleRevision(input: {
         version: nextVersion,
         isCurrent: true,
         remarks: input.remarks,
+        generatedPrincipal: String(snapshot.principal),
+        generatedAnnualRate: String(snapshot.annualRate),
+        generatedInterestBasis: snapshot.interestBasis as any,
+        generatedCalculationMethod: snapshot.calculationMethod as any,
+        generatedTenureMonths: snapshot.tenureMonths,
+        generatedDisbursementDate: snapshot.disbursementDate.toISOString().slice(0, 10),
       })
       .returning();
       if (!schedule) {
@@ -111,10 +127,41 @@ export async function createScheduleRevision(input: {
           principalAmount: String(inst.principalAmount),
           interestAmount: String(inst.interestAmount),
           totalAmount: String(inst.totalAmount),
+          outstandingBalance: String(inst.outstandingBalance),
         }))
       );
     }
 
     return schedule;
   });
+}
+
+/** Loan fields needed to auto-generate a schedule and detect staleness. */
+export async function getLoanForSchedule(loanId: string) {
+  const rows = await db
+    .select({
+      id: loans.id,
+      disbursedAmount: loans.disbursedAmount,
+      sanctionedAmount: loans.sanctionedAmount,
+      repaymentType: loans.repaymentType,
+      moratoriumMonths: loans.moratoriumMonths,
+      firstDisbursementDate: loans.firstDisbursementDate,
+      maturityDate: loans.maturityDate,
+    })
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/** Whether any installment under this schedule has ever received a payment. */
+export async function hasPaymentsAgainstSchedule(scheduleId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: installments.id })
+    .from(installments)
+    .where(and(eq(installments.scheduleId, scheduleId), gt(installments.paidTotal, "0")))
+    .limit(1);
+
+  return rows.length > 0;
 }

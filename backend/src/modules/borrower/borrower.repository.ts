@@ -83,7 +83,8 @@ export const findById = async (
     const promoterRows = await db
         .select()
         .from(promoters)
-        .where(eq(promoters.borrowerId, id));
+        .where(and(eq(promoters.borrowerId, id), isNull(promoters.deletedAt)))
+        .orderBy(asc(promoters.createdAt));
 
     return {
         ...(row as BorrowerWithManager),
@@ -106,6 +107,8 @@ const buildFilters = (query: ListBorrowersQuery): SQL[] => {
     }
 
     if (query.status) filters.push(eq(borrowers.status, query.status));
+    if (query.borrowerType)
+        filters.push(eq(borrowers.borrowerType, query.borrowerType));
     if (query.constitution)
         filters.push(eq(borrowers.constitution, query.constitution));
     if (query.relationshipManagerId)

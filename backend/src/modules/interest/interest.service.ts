@@ -2,15 +2,19 @@ import {
   getCurrentInterestConfig,
   getInterestRulesForConfig,
   getCurrentPenalRule,
+  getLoanOriginalPrincipal,
+  getPrincipalLedgerEvents,
 } from "./interest.repository";
 import { interestStrategyRegistry } from "./strategies";
 import { resolveEffectiveRate } from "./rateResolver";
 import { calculatePenalInterest } from "./penalInterest.service";
 import { detectActiveEvents } from "./eventDetector";
 import { InstallmentSnapshot } from "./eventDetector.types";
-import { InterestRuleRow } from "./interest.types";
+import { InterestBasis, InterestRuleRow } from "./interest.types";
 import { PenalInterestRuleRow } from "./penalInterest.types";
 import { evaluateCustomFormula } from "./strategies/custom.strategy";
+import { getDailyRateFraction } from "./dailyRate";
+import { calculateRunningBalanceInterest } from "./runningBalance";
 
 export interface CalculateInterestInput {
   loanId: string;
@@ -37,6 +41,49 @@ function diffInMonths(start: Date, end: Date): number {
     (end.getFullYear() - start.getFullYear()) * 12 +
     (end.getMonth() - start.getMonth())
   );
+}
+
+/**
+ * A single point-in-time interest calculation for one period — the shared
+ * building block behind SIMPLE_INTEREST (used here) and the Repayment
+ * Engine's per-installment interest (each installment is one such period,
+ * fed either the loan's original principal or its own declining scheduled
+ * balance depending on the config's calculation method).
+ */
+export function calculatePeriodInterest(input: {
+  interestBasis: string;
+  annualRate: number;
+  periodStart: Date;
+  periodEnd: Date;
+  includeOpeningClosingDays: boolean;
+  principal: number;
+  customFormula?: string | null;
+}): number {
+  if (input.interestBasis === "CUSTOM") {
+    if (!input.customFormula) {
+      throw new Error("interestBasis is CUSTOM but no customFormula configured.");
+    }
+
+    return evaluateCustomFormula(input.customFormula, {
+      principal: input.principal,
+      annualRate: input.annualRate,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+    });
+  }
+
+  const strategy = interestStrategyRegistry[input.interestBasis as keyof typeof interestStrategyRegistry];
+  if (!strategy) {
+    throw new Error(`No strategy registered for interest basis: ${input.interestBasis}`);
+  }
+
+  return strategy.calculate({
+    principal: input.principal,
+    annualRate: input.annualRate,
+    periodStart: input.periodStart,
+    periodEnd: input.periodEnd,
+    includeOpeningClosingDays: input.includeOpeningClosingDays,
+  });
 }
 
 /**
@@ -81,32 +128,44 @@ export async function calculateInterestForLoan(
     activeEvents,
   });
 
+  const periodStart = new Date(config.effectiveFrom);
+  const includeOpeningClosingDays = config.includeOpeningClosingDays ?? false;
   let baseInterest: number;
 
-  if (config.interestBasis === "CUSTOM") {
-    if (!config.customFormula) {
+  if (config.calculationMethod === "RUNNING_BALANCE") {
+    // Validated at config-creation time, but re-checked here defensively
+    // since a config's basis/method combination is fixed once saved.
+    if (config.interestBasis === "FULL_MONTH" || config.interestBasis === "CUSTOM") {
       throw new Error(
-        `Loan ${input.loanId} has interestBasis CUSTOM but no customFormula configured.`
+        `Running Balance Method does not support interest basis ${config.interestBasis} for loan ${input.loanId}.`
       );
     }
 
-    baseInterest = evaluateCustomFormula(config.customFormula, {
-      principal: input.outstandingPrincipal,
-      annualRate: effectiveRate,
-      periodStart: new Date(config.effectiveFrom),
+    const events = await getPrincipalLedgerEvents(input.loanId);
+    const dailyRate = getDailyRateFraction(config.interestBasis as InterestBasis, effectiveRate);
+
+    baseInterest = calculateRunningBalanceInterest({
+      events,
+      periodStart,
       periodEnd: input.asOfDate,
+      dailyRate,
+      includeOpeningClosingDays,
     });
   } else {
-    const strategy = interestStrategyRegistry[config.interestBasis as keyof typeof interestStrategyRegistry];
-    if (!strategy) {
-      throw new Error(`No strategy registered for interest basis: ${config.interestBasis}`);
-    }
+    // SIMPLE_INTEREST — the loan's original principal (never reduced by
+    // repayments), calculated as a single point-in-time formula. There is no
+    // compounding path anywhere in this codebase, so "does not earn interest
+    // on unpaid interest" already holds by construction.
+    const originalPrincipal = await getLoanOriginalPrincipal(input.loanId);
 
-    baseInterest = strategy.calculate({
-      principal: input.outstandingPrincipal,
+    baseInterest = calculatePeriodInterest({
+      interestBasis: config.interestBasis,
       annualRate: effectiveRate,
-      periodStart: new Date(config.effectiveFrom),
+      periodStart,
       periodEnd: input.asOfDate,
+      includeOpeningClosingDays,
+      principal: originalPrincipal,
+      customFormula: config.customFormula,
     });
   }
 

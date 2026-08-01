@@ -6,6 +6,7 @@ import {
     assertValidUuid,
     assertValidCreateInput,
     assertValidCollateralType,
+    assertValidOtherSecurityType,
     assertValidCollateralStatus,
     assertValidInsuranceInput,
     assertNonNegativeAmount,
@@ -60,6 +61,7 @@ function toCollateralRecord(row: CollateralRow, insurance: InsuranceRow | null):
         loanId: row.loanId,
         ownerId: row.ownerId,
         securityType: row.securityType,
+        otherSecurityType: row.otherSecurityType,
         description: row.description,
 
         propertyType: row.propertyType,
@@ -115,6 +117,7 @@ export class CollateralService {
                     loanId: input.loanId,
                     ownerId: input.ownerId,
                     securityType: input.securityType,
+                    otherSecurityType: input.otherSecurityType,
                     description: input.description,
                     propertyType: input.propertyType,
                     propertyAddress: input.propertyAddress,
@@ -148,6 +151,12 @@ export class CollateralService {
         const existing = await this.getActiveCollateralRowOrThrow(id);
 
         if (input.securityType !== undefined) assertValidCollateralType(input.securityType);
+        if (input.securityType !== undefined || input.otherSecurityType !== undefined) {
+            assertValidOtherSecurityType(
+                input.securityType ?? existing.securityType,
+                input.otherSecurityType ?? existing.otherSecurityType ?? undefined,
+            );
+        }
         if (input.status !== undefined) assertValidCollateralStatus(input.status);
         if (input.estimatedValue !== undefined) assertNonNegativeAmount(input.estimatedValue, "estimatedValue");
         if (input.areaInSqFt !== undefined) assertNonNegativeAmount(input.areaInSqFt, "areaInSqFt");
@@ -167,6 +176,7 @@ export class CollateralService {
                 .set({
                     ownerId: input.ownerId,
                     securityType: input.securityType,
+                    otherSecurityType: input.otherSecurityType,
                     description: input.description,
                     propertyType: input.propertyType,
                     propertyAddress: input.propertyAddress,
