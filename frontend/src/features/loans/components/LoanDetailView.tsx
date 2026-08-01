@@ -6,6 +6,20 @@ import { formatCurrency, formatDate, formatPercent } from "../../../lib/format";
 import { getLoan } from "../api";
 import { listGuarantors } from "../../guarantors/api";
 import { listDocuments, downloadDocument } from "../../documents/api";
+import {
+  ASSET_CLASSIFICATIONS,
+  CIBIL_ACCOUNT_STATUSES,
+  CIBIL_COLLATERAL_TYPES,
+  CREDIT_TYPES,
+  PAYMENT_FREQUENCIES,
+} from "../types";
+import type { CodedOption } from "../types";
+
+/** Show the workbook's own wording for a coded value, falling back to the raw code. */
+function labelOf(options: CodedOption[], value: string | null): string | null {
+  if (!value) return null;
+  return options.find((o) => o.value === value)?.label ?? value;
+}
 
 /** Read-only loan summary shown in the View slide-over — the loan itself is locked once created. */
 export function LoanDetailView({ loanId }: { loanId: string }) {
@@ -59,6 +73,16 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
         <DetailField label="First Disbursement" value={formatDate(loan.firstDisbursementDate)} />
         <DetailField label="Maturity Date" value={formatDate(loan.maturityDate)} />
         <DetailField label="Tenure (months)" value={loan.tenureMonths} />
+      </DetailSection>
+
+      <DetailSection title="CIBIL Reporting">
+        <DetailField label="Credit / Account Type" value={labelOf(CREDIT_TYPES, loan.creditType)} />
+        <DetailField label="Account Status" value={labelOf(CIBIL_ACCOUNT_STATUSES, loan.cibilAccountStatus)} />
+        <DetailField label="Account Classification" value={labelOf(ASSET_CLASSIFICATIONS, loan.assetClassification)} />
+        <DetailField label="Payment Frequency" value={labelOf(PAYMENT_FREQUENCIES, loan.paymentFrequency)} />
+        <DetailField label="EMI Amount" value={loan.emiAmount ? formatCurrency(loan.emiAmount) : null} />
+        <DetailField label="Type of Collateral" value={labelOf(CIBIL_COLLATERAL_TYPES, loan.collateralType)} />
+        <DetailField label="Value of Collateral" value={loan.collateralValue ? formatCurrency(loan.collateralValue) : null} />
       </DetailSection>
 
       {loan.purpose && (

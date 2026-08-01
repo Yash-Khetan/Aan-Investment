@@ -4,17 +4,25 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { TextField } from "../../components/ui/Field";
+import { SelectField, TextField } from "../../components/ui/Field";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
+import { ChooseOption } from "./components/borrowerFormShared";
 import { createBorrower } from "./api";
-import { uploadDocument } from "../documents/api";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
-import { EMPTY_BORROWER_FORM, formStateToCreateInput } from "./types";
+import {
+  EMPTY_BORROWER_FORM,
+  GENDERS,
+  RELATED_PERSON_RELATIONSHIPS,
+  RELATED_PERSON_TYPES,
+  formStateToCreateInput,
+  todayIso,
+} from "./types";
 import type { BorrowerFormState, Promoter } from "./types";
 
-const emptyPromoter: Promoter = { name: "", designation: "", pan: "", phone: "", email: "" };
+/** A blank CIBIL "Related Person" row. */
+const emptyPromoter: Promoter = { name: "", pan: "", phone: "" };
 
 const DRAFT_KEY = "borrower:create";
 
@@ -34,26 +42,11 @@ export function CreateBorrowerPage() {
 
   const [form, setForm] = useState<BorrowerFormState>(draft?.form ?? EMPTY_BORROWER_FORM);
   const [promoters, setPromoters] = useState<Promoter[]>(draft?.promoters ?? []);
-  const [panFile, setPanFile] = useState<File | null>(null);
-  const [gstFile, setGstFile] = useState<File | null>(null);
-  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
 
   useAutosaveDraft(DRAFT_KEY, { form, promoters }, status === "authenticated");
 
   const mutation = useMutation({
-    mutationFn: async (input: ReturnType<typeof formStateToCreateInput>) => {
-      const borrower = await createBorrower(input);
-      if (panFile) {
-        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "PAN_CARD", name: "PAN", file: panFile });
-      }
-      if (gstFile) {
-        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "GSTIN_CERTIFICATE", name: "GSTIN", file: gstFile });
-      }
-      if (aadhaarFile) {
-        await uploadDocument({ entityType: "BORROWER", entityId: borrower.id, documentType: "AADHAAR", name: "Aadhaar", file: aadhaarFile });
-      }
-      return borrower;
-    },
+    mutationFn: (input: ReturnType<typeof formStateToCreateInput>) => createBorrower(input),
     onSuccess: (borrower) => {
       clearDraft(DRAFT_KEY);
       navigate(`/borrowers`, { state: { createdId: borrower.id } });
@@ -78,66 +71,93 @@ export function CreateBorrowerPage() {
       <PageHeader title="New Borrower" description="Borrower master — identity, address, and internal details." />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <BorrowerMasterFields
-          form={form}
-          onChange={patch}
-          panFile={panFile}
-          onPanFileChange={setPanFile}
-          gstFile={gstFile}
-          onGstFileChange={setGstFile}
-          aadhaarFile={aadhaarFile}
-          onAadhaarFileChange={setAadhaarFile}
-        />
+        <BorrowerMasterFields form={form} onChange={patch} />
 
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <SectionTitle>Promoters</SectionTitle>
-            <Button type="button" variant="secondary" onClick={() => setPromoters((rows) => [...rows, { ...emptyPromoter }])}>
-              + Add Promoter
-            </Button>
-          </div>
-          {promoters.length === 0 && <p className="text-sm text-slate-400">No promoters added.</p>}
-          <div className="flex flex-col gap-3">
-            {promoters.map((p, i) => (
-              <div key={i} className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-4">
-                <TextField label="Name" value={p.name} onChange={(e) => updatePromoter(i, { name: e.target.value })} required />
-                <TextField
-                  label="Designation"
-                  value={p.designation ?? ""}
-                  onChange={(e) => updatePromoter(i, { designation: e.target.value })}
-                />
-                <TextField label="PAN" value={p.pan ?? ""} onChange={(e) => updatePromoter(i, { pan: e.target.value.toUpperCase() })} />
-                <TextField
-                  label="Phone"
-                  type="tel"
-                  value={p.phone ?? ""}
-                  onChange={(e) => updatePromoter(i, { phone: e.target.value })}
-                  pattern={PHONE_PATTERN}
-                  title={PHONE_TITLE}
-                />
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={p.email ?? ""}
-                  onChange={(e) => updatePromoter(i, { email: e.target.value })}
-                />
-                <TextField
-                  label="Shareholding %"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={p.shareholdingPercent ?? ""}
-                  onChange={(e) => updatePromoter(i, { shareholdingPercent: e.target.value ? Number(e.target.value) : undefined })}
-                />
-                <div className="flex items-end">
-                  <Button type="button" variant="ghost" onClick={() => setPromoters((rows) => rows.filter((_, idx) => idx !== i))}>
-                    Remove
-                  </Button>
+        {/* "Related Person" is a Commercial-sheet block — consumers have none. */}
+        {form.borrowerType === "COMMERCIAL" && (
+          <Card className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <SectionTitle>Related Persons</SectionTitle>
+              <Button type="button" variant="secondary" onClick={() => setPromoters((rows) => [...rows, { ...emptyPromoter }])}>
+                + Add Related Person
+              </Button>
+            </div>
+            {promoters.length === 0 && <p className="text-sm text-slate-400">No related persons added.</p>}
+            <div className="flex flex-col gap-3">
+              {promoters.map((p, i) => (
+                <div key={i} className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <TextField label="Full Name" value={p.name} onChange={(e) => updatePromoter(i, { name: e.target.value })} required />
+                  <SelectField
+                    label="Gender"
+                    value={p.gender ?? ""}
+                    onChange={(e) => updatePromoter(i, { gender: e.target.value || undefined })}
+                  >
+                    <ChooseOption label="Gender" />
+                    {GENDERS.map((g) => (
+                      <option key={g.value} value={g.value}>
+                        {g.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <SelectField
+                    label="Related Type"
+                    value={p.relatedPersonType ?? ""}
+                    onChange={(e) => updatePromoter(i, { relatedPersonType: e.target.value || undefined })}
+                  >
+                    <ChooseOption label="Related Type" />
+                    {RELATED_PERSON_TYPES.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <SelectField
+                    label="Relationship"
+                    value={p.relationship ?? ""}
+                    onChange={(e) => updatePromoter(i, { relationship: e.target.value || undefined })}
+                  >
+                    <ChooseOption label="Relationship" />
+                    {RELATED_PERSON_RELATIONSHIPS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <TextField
+                    label="Date of Birth"
+                    type="date"
+                    max={todayIso()}
+                    value={p.dateOfBirth ?? ""}
+                    onChange={(e) => updatePromoter(i, { dateOfBirth: e.target.value || undefined })}
+                  />
+                  <TextField label="PAN" value={p.pan ?? ""} onChange={(e) => updatePromoter(i, { pan: e.target.value.toUpperCase() })} />
+                  <TextField
+                    label="Address"
+                    value={p.addressLine1 ?? ""}
+                    onChange={(e) => updatePromoter(i, { addressLine1: e.target.value })}
+                  />
+                  <TextField label="City" value={p.city ?? ""} onChange={(e) => updatePromoter(i, { city: e.target.value })} />
+                  <TextField label="District" value={p.district ?? ""} onChange={(e) => updatePromoter(i, { district: e.target.value })} />
+                  <TextField label="State" value={p.state ?? ""} onChange={(e) => updatePromoter(i, { state: e.target.value })} />
+                  <TextField label="Pin Code" value={p.pincode ?? ""} onChange={(e) => updatePromoter(i, { pincode: e.target.value })} />
+                  <TextField
+                    label="Mobile"
+                    type="tel"
+                    value={p.phone ?? ""}
+                    onChange={(e) => updatePromoter(i, { phone: e.target.value })}
+                    pattern={PHONE_PATTERN}
+                    title={PHONE_TITLE}
+                  />
+                  <div className="flex items-end">
+                    <Button type="button" variant="ghost" onClick={() => setPromoters((rows) => rows.filter((_, idx) => idx !== i))}>
+                      Remove
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {mutation.isError && <FormErrors error={mutation.error} />}
 

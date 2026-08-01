@@ -1,14 +1,48 @@
 import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
-import { LOAN_TYPES, REPAYMENT_TYPES, SECURITY_TYPES, calcTenureMonths } from "../types";
-import type { LoanFormState } from "../types";
+import {
+  ASSET_CLASSIFICATIONS,
+  CIBIL_ACCOUNT_STATUSES,
+  CIBIL_COLLATERAL_TYPES,
+  CREDIT_TYPES,
+  LOAN_TYPES,
+  PAYMENT_FREQUENCIES,
+  REPAYMENT_TYPES,
+  SECURITY_TYPES,
+  calcTenureMonths,
+} from "../types";
+import type { CodedOption, LoanFormState } from "../types";
 
 const MORATORIUM_TOOLTIP =
   "Moratorium Period means the period during which no payments are collected from the borrower. However, interest continues to accrue during this period.";
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+}
+
+/** A coded CIBIL dropdown, blank until the user picks a value. */
+function CodedSelect({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: CodedOption[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">— Select {label} —</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </SelectField>
+  );
 }
 
 /** Loan master-data fields shared by the create and edit pages. */
@@ -176,6 +210,62 @@ export function LoanMasterFields({
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card className="p-4">
+        <SectionTitle>CIBIL Reporting</SectionTitle>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <CodedSelect
+            label="Credit Type / Account Type"
+            options={CREDIT_TYPES}
+            value={form.creditType}
+            onChange={(v) => onChange({ creditType: v })}
+          />
+          <CodedSelect
+            label="Account Status"
+            options={CIBIL_ACCOUNT_STATUSES}
+            value={form.cibilAccountStatus}
+            onChange={(v) => onChange({ cibilAccountStatus: v })}
+          />
+          <CodedSelect
+            label="Account Classification"
+            options={ASSET_CLASSIFICATIONS}
+            value={form.assetClassification}
+            onChange={(v) => onChange({ assetClassification: v })}
+          />
+          <CodedSelect
+            label="Payment Frequency"
+            options={PAYMENT_FREQUENCIES}
+            value={form.paymentFrequency}
+            onChange={(v) => onChange({ paymentFrequency: v })}
+          />
+          <TextField
+            label="EMI Amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.emiAmount}
+            onChange={(e) => onChange({ emiAmount: e.target.value })}
+          />
+          <CodedSelect
+            label="Type of Collateral"
+            options={CIBIL_COLLATERAL_TYPES}
+            value={form.collateralType}
+            onChange={(v) => onChange({ collateralType: v })}
+          />
+          <TextField
+            label="Value of Collateral"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.collateralValue}
+            onChange={(e) => onChange({ collateralValue: e.target.value })}
+            disabled={form.collateralType === "NO_COLLATERAL"}
+          />
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Reported to CIBIL. Separate from Loan Type, Status and Repayment Type above, which drive the app's own workflow.
+        </p>
       </Card>
 
       <Card className="p-4">

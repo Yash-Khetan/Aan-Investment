@@ -117,6 +117,21 @@ export const createLoan = async (
         values.approvalNotes = input.approvalNotes;
     if (input.remarks !== undefined) values.remarks = input.remarks;
     if (input.status !== undefined) values.status = input.status;
+
+    /* CIBIL reporting fields */
+    if (input.creditType !== undefined) values.creditType = input.creditType;
+    if (input.cibilAccountStatus !== undefined)
+        values.cibilAccountStatus = input.cibilAccountStatus;
+    if (input.assetClassification !== undefined)
+        values.assetClassification = input.assetClassification;
+    if (input.paymentFrequency !== undefined)
+        values.paymentFrequency = input.paymentFrequency;
+    if (input.emiAmount !== undefined) values.emiAmount = toMoney(input.emiAmount);
+    if (input.collateralType !== undefined)
+        values.collateralType = input.collateralType;
+    if (input.collateralValue !== undefined)
+        values.collateralValue = toMoney(input.collateralValue);
+
     if (input.relationshipManagerId !== undefined)
         values.relationshipManagerId = input.relationshipManagerId;
     if (input.createdBy !== undefined) values.createdBy = input.createdBy;
@@ -288,6 +303,28 @@ export const updateLoan = async (
     if ("approvalNotes" in input) patch.approvalNotes = input.approvalNotes ?? null;
     if ("remarks" in input) patch.remarks = input.remarks ?? null;
     if (input.status !== undefined) patch.status = input.status;
+
+    /* CIBIL reporting fields */
+    if ("creditType" in input) patch.creditType = input.creditType ?? null;
+    if ("cibilAccountStatus" in input)
+        patch.cibilAccountStatus = input.cibilAccountStatus ?? null;
+    if ("assetClassification" in input)
+        patch.assetClassification = input.assetClassification ?? null;
+    if ("paymentFrequency" in input)
+        patch.paymentFrequency = input.paymentFrequency ?? null;
+    if ("emiAmount" in input)
+        patch.emiAmount =
+            input.emiAmount !== null && input.emiAmount !== undefined
+                ? toMoney(input.emiAmount)
+                : null;
+    if ("collateralType" in input)
+        patch.collateralType = input.collateralType ?? null;
+    if ("collateralValue" in input)
+        patch.collateralValue =
+            input.collateralValue !== null && input.collateralValue !== undefined
+                ? toMoney(input.collateralValue)
+                : null;
+
     if ("relationshipManagerId" in input)
         patch.relationshipManagerId = input.relationshipManagerId ?? null;
 

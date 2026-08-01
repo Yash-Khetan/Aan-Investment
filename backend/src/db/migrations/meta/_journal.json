@@ -78,6 +78,27 @@
       "when": 1785506239787,
       "tag": "0010_great_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785575444581,
+      "tag": "0011_borrower_type_cibil_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785584704703,
+      "tag": "0012_cibil_loan_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785585645541,
+      "tag": "0013_verify_no_drift",
+      "breakpoints": true
     }
   ]
 }
