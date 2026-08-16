@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// THIRTY_360 and MONTHLY are retired from selection (no longer offered by
+// the frontend) but stay valid here so any pre-existing config referencing
+// them keeps working — see strategies/index.ts.
 const interestBasisValues = [
   "ACTUAL_365",
   "ACTUAL_360",
@@ -8,9 +11,12 @@ const interestBasisValues = [
   "FIXED_MONTHLY",
   "FULL_MONTH",
   "CUSTOM",
+  "MONTHLY_RATE_ACTUAL_30",
 ] as const;
 
 const ruleTypeValues = ["NORMAL", "STEP_UP", "STEP_DOWN", "EVENT_BASED", "CUSTOM"] as const;
+
+const calculationMethodValues = ["RUNNING_BALANCE", "SIMPLE_INTEREST"] as const;
 
 export const createInterestConfigSchema = z.object({
   loanId: z.string().uuid(),
@@ -20,9 +26,19 @@ export const createInterestConfigSchema = z.object({
   effectiveFrom: z.string().date(),
   remarks: z.string().optional(),
   customFormula: z.string().optional(),
+  includeOpeningClosingDays: z.boolean().optional().default(false),
+  calculationMethod: z.enum(calculationMethodValues).optional().default("SIMPLE_INTEREST"),
 }).refine(
   (data) => data.interestBasis !== "CUSTOM" || !!data.customFormula,
   { message: "customFormula is required when interestBasis is CUSTOM", path: ["customFormula"] }
+).refine(
+  (data) =>
+    data.calculationMethod !== "RUNNING_BALANCE" ||
+    (data.interestBasis !== "FULL_MONTH" && data.interestBasis !== "CUSTOM"),
+  {
+    message: "Running Balance Method isn't supported for FULL_MONTH or CUSTOM interest basis",
+    path: ["calculationMethod"],
+  }
 );
 
 export const loanIdParamSchema = z.object({

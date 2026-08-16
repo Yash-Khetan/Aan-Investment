@@ -6,7 +6,7 @@ import { LoadingState, ErrorState } from "../../components/ui/States";
 import { formatDate } from "../../lib/format";
 import { ApiError } from "../../lib/api";
 import { getInterestConfig } from "./api";
-import { INTEREST_BASIS_OPTIONS } from "./types";
+import { CALCULATION_METHOD_OPTIONS, INTEREST_BASIS_OPTIONS } from "./types";
 import { CreateInterestConfigForm } from "./components/CreateInterestConfigForm";
 import { CalculateInterestPanel } from "./components/CalculateInterestPanel";
 import { InterestRulesPanel } from "./components/InterestRulesPanel";
@@ -29,6 +29,9 @@ export function InterestSetup({ loanId }: { loanId: string }) {
   const notFound = error instanceof ApiError && error.status === 404;
   const basisLabel = data
     ? (INTEREST_BASIS_OPTIONS.find((o) => o.value === data.interestBasis)?.label ?? data.interestBasis)
+    : null;
+  const methodLabel = data
+    ? (CALCULATION_METHOD_OPTIONS.find((o) => o.value === data.calculationMethod)?.label ?? data.calculationMethod)
     : null;
 
   if (isLoading) return <LoadingState label="Loading interest configuration..." />;
@@ -85,6 +88,14 @@ export function InterestSetup({ loanId }: { loanId: string }) {
               <div>
                 <div className="text-xs font-medium text-slate-500">Effective From</div>
                 <div className="mt-1 text-sm text-slate-900">{formatDate(data.effectiveFrom)}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Method</div>
+                <div className="mt-1 text-sm text-slate-900">{methodLabel}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">Include Opening &amp; Closing Days</div>
+                <div className="mt-1 text-sm text-slate-900">{data.includeOpeningClosingDays ? "Yes" : "No"}</div>
               </div>
               {data.customFormula && (
                 <div className="col-span-2 lg:col-span-4">

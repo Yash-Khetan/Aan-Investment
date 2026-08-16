@@ -24,6 +24,11 @@ const COLUMNS: Column<Installment>[] = [
     header: "Total",
     render: (r) => <span className="font-medium">{formatCurrency(r.totalAmount, 2)}</span>,
   },
+  {
+    key: "outstandingBalance",
+    header: "Outstanding Balance",
+    render: (r) => formatCurrency(r.outstandingBalance, 2),
+  },
   { key: "paidTotal", header: "Paid", render: (r) => formatCurrency(r.paidTotal, 2) },
   { key: "penaltyPaid", header: "Penalty", render: (r) => formatCurrency(r.penaltyPaid, 2) },
   {
@@ -101,6 +106,18 @@ export function RepaymentEnginePage() {
       )}
       {loanId && notFound && !showForm && (
         <EmptyState message="No repayment schedule generated for this loan yet." />
+      )}
+
+      {loanId && data?.isStale && !showForm && (
+        <div className="mb-4 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>
+            The loan or interest details have changed since this schedule was generated. It wasn't
+            auto-regenerated because payments already exist against it.
+          </span>
+          <Button variant="secondary" onClick={() => setShowForm(true)}>
+            Regenerate Now
+          </Button>
+        </div>
       )}
 
       {loanId && data && (

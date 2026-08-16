@@ -1,14 +1,30 @@
+// THIRTY_360 and MONTHLY are retired — no longer offered here. The backend
+// still accepts them for any pre-existing config that used one.
 export const INTEREST_BASIS_OPTIONS = [
   { value: "ACTUAL_365", label: "Actual Days / 365" },
   { value: "ACTUAL_360", label: "Actual Days / 360" },
-  { value: "THIRTY_360", label: "30/360 Method" },
-  { value: "MONTHLY", label: "Monthly Basis" },
+  { value: "MONTHLY_RATE_ACTUAL_30", label: "Monthly Rate × Actual Days / 30" },
   { value: "FIXED_MONTHLY", label: "Fixed Monthly Interest" },
   { value: "FULL_MONTH", label: "Full Month Interest on Disbursement" },
   { value: "CUSTOM", label: "Customized Formula" },
 ] as const;
 
 export type InterestBasis = (typeof INTEREST_BASIS_OPTIONS)[number]["value"];
+
+export const INCLUDE_OPENING_CLOSING_DAYS_OPTIONS = [
+  { value: false, label: "No" },
+  { value: true, label: "Yes" },
+] as const;
+
+export const CALCULATION_METHOD_OPTIONS = [
+  { value: "SIMPLE_INTEREST", label: "Simple Interest Method" },
+  { value: "RUNNING_BALANCE", label: "Running Balance Method" },
+] as const;
+
+export type CalculationMethod = (typeof CALCULATION_METHOD_OPTIONS)[number]["value"];
+
+/** Running Balance Method has no daily-rate concept for these two bases — block them client-side too. */
+export const RUNNING_BALANCE_UNSUPPORTED_BASES: readonly InterestBasis[] = ["FULL_MONTH", "CUSTOM"];
 
 export const INTEREST_RULE_TYPES = ["NORMAL", "STEP_UP", "STEP_DOWN", "EVENT_BASED", "CUSTOM"] as const;
 
@@ -25,6 +41,8 @@ export interface InterestConfig {
   isCurrent: boolean;
   remarks: string | null;
   customFormula: string | null;
+  includeOpeningClosingDays: boolean;
+  calculationMethod: CalculationMethod;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +55,8 @@ export interface CreateInterestConfigInput {
   effectiveFrom: string;
   remarks?: string;
   customFormula?: string;
+  includeOpeningClosingDays?: boolean;
+  calculationMethod?: CalculationMethod;
 }
 
 export interface CalculateInterestInput {

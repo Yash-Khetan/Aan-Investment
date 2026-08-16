@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import {
+    assetClassificationEnum,
+    cibilAccountStatusEnum,
+    cibilCollateralTypeEnum,
+    cibilCreditTypeEnum,
     loanTypeEnum,
+    paymentFrequencyEnum,
     securityTypeEnum,
     repaymentTypeEnum,
     loanStatusEnum,
@@ -55,6 +60,14 @@ const loanTypeSchema = z.enum(loanTypeEnum.enumValues);
 const securityTypeSchema = z.enum(securityTypeEnum.enumValues);
 const repaymentTypeSchema = z.enum(repaymentTypeEnum.enumValues);
 const loanStatusSchema = z.enum(loanStatusEnum.enumValues);
+
+/* CIBIL reporting code lists — see the loans schema for why these sit
+   alongside, rather than replace, the operational enums above. */
+const creditTypeSchema = z.enum(cibilCreditTypeEnum.enumValues);
+const cibilAccountStatusSchema = z.enum(cibilAccountStatusEnum.enumValues);
+const assetClassificationSchema = z.enum(assetClassificationEnum.enumValues);
+const paymentFrequencySchema = z.enum(paymentFrequencyEnum.enumValues);
+const cibilCollateralTypeSchema = z.enum(cibilCollateralTypeEnum.enumValues);
 
 /* ------------------------------------------------------------------ */
 /* Cross-field business rules                                          */
@@ -146,6 +159,37 @@ export const assertLoanInvariants = (
     }
 };
 
+/**
+ * CIBIL pairs "Type of Collateral" with "Value of Collateral", both qualified
+ * "(If secured loan)". Keep the two consistent: a value needs a type to explain
+ * it, and declaring NO_COLLATERAL contradicts carrying a value.
+ */
+export const assertCollateralPair = (
+    data: { collateralType?: string | null; collateralValue?: number | null },
+    ctx: z.RefinementCtx,
+): void => {
+    const hasValue =
+        data.collateralValue !== undefined &&
+        data.collateralValue !== null &&
+        data.collateralValue > 0;
+
+    if (hasValue && !data.collateralType) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["collateralType"],
+            message: "collateralType is required when collateralValue is provided",
+        });
+    }
+
+    if (data.collateralType === "NO_COLLATERAL" && hasValue) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["collateralValue"],
+            message: "collateralValue must be zero or omitted when collateralType is NO_COLLATERAL",
+        });
+    }
+};
+
 /** securityType "OTHERS" requires a free-text label; every other value must leave it unset. */
 export const assertOtherSecurityType = (
     data: { securityType?: string | null; otherSecurityType?: string | null },
@@ -209,6 +253,16 @@ export const createLoanSchema = z
         remarks: z.string().trim().optional(),
 
         status: loanStatusSchema.optional(),
+
+        /* CIBIL reporting fields */
+        creditType: creditTypeSchema.optional(),
+        cibilAccountStatus: cibilAccountStatusSchema.optional(),
+        assetClassification: assetClassificationSchema.optional(),
+        paymentFrequency: paymentFrequencySchema.optional(),
+        emiAmount: money({ allowZero: true }).optional(),
+        collateralType: cibilCollateralTypeSchema.optional(),
+        collateralValue: money({ allowZero: true }).optional(),
+
         // Nullable so clients may send `null` to mean "no manager / not set".
         relationshipManagerId: uuid.nullable().optional(),
         createdBy: uuid.nullable().optional(),
@@ -217,6 +271,7 @@ export const createLoanSchema = z
     .superRefine((data, ctx) => {
         assertLoanInvariants(data, ctx);
         assertOtherSecurityType(data, ctx);
+        assertCollateralPair(data, ctx);
     });
 
 /* ------------------------------------------------------------------ */
@@ -249,12 +304,30 @@ export const updateLoanSchema = z
         approvalNotes: z.string().trim().nullable(),
         remarks: z.string().trim().nullable(),
         status: loanStatusSchema,
+
+        /* CIBIL reporting fields */
+        creditType: creditTypeSchema.nullable(),
+        cibilAccountStatus: cibilAccountStatusSchema.nullable(),
+        assetClassification: assetClassificationSchema.nullable(),
+        paymentFrequency: paymentFrequencySchema.nullable(),
+        emiAmount: money({ allowZero: true }).nullable(),
+        collateralType: cibilCollateralTypeSchema.nullable(),
+        collateralValue: money({ allowZero: true }).nullable(),
+
         relationshipManagerId: uuid.nullable(),
     })
     .partial()
     .strict()
     .refine((data) => Object.keys(data).length > 0, {
         message: "At least one field must be provided",
+    })
+    .superRefine((data, ctx) => {
+        // Only checkable when the payload carries both halves of the pair; a
+        // patch touching just one is reconciled against the stored row in the
+        // service, matching how the other cross-field rules are handled here.
+        if ("collateralType" in data && "collateralValue" in data) {
+            assertCollateralPair(data, ctx);
+        }
     });
 
 /* ------------------------------------------------------------------ */

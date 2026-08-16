@@ -1,65 +1,75 @@
 import { RepaymentStrategy, GenerateScheduleInput, GeneratedInstallment } from "../repayment.types";
 import { addMonths } from "../../../common/date-utils";
+import { calculatePeriodInterest } from "../../interest/interest.service";
 
 /**
- * EMI (Equated Monthly Installment): each installment has an equal TOTAL
- * amount (principal + interest combined), calculated via the standard
- * amortization formula. The principal/interest split shifts over time —
- * more interest is paid early, more principal later.
- *
- * Formula: EMI = P * r * (1+r)^n / ((1+r)^n - 1)
- *   where P = principal, r = monthly rate, n = number of installments.
- *
- * Moratorium months are excluded from the installment count and schedule
- * entirely — no installments are generated for that period.
+ * EMI (Equated Monthly Installment): principal is split equally across every
+ * installment (the last one absorbs any rounding residue). Interest for each
+ * installment is computed via the loan's actual configured Interest Engine
+ * basis/method — RUNNING_BALANCE prices interest on that period's declining
+ * scheduled balance, SIMPLE_INTEREST always prices it on the original
+ * principal. Because the interest portion isn't assumed to be constant
+ * month to month (it depends on the real configured basis, not a fixed
+ * monthly-compounding formula), the total installment amount can vary
+ * slightly instead of being a single constant EMI figure.
  */
 export const emiStrategy: RepaymentStrategy = {
   generate(input: GenerateScheduleInput): GeneratedInstallment[] {
-    const { principal, annualRate, tenureMonths, moratoriumMonths, disbursementDate } = input;
+    const {
+      principal,
+      annualRate,
+      interestBasis,
+      calculationMethod,
+      includeOpeningClosingDays,
+      customFormula,
+      tenureMonths,
+      moratoriumMonths,
+      disbursementDate,
+    } = input;
 
     const repaymentMonths = tenureMonths - moratoriumMonths;
     if (repaymentMonths <= 0) {
       throw new Error("tenureMonths must exceed moratoriumMonths for EMI schedules.");
     }
 
-    const monthlyRate = annualRate / 100 / 12;
+    const equalPrincipal = round2(principal / repaymentMonths);
     const installments: GeneratedInstallment[] = [];
 
-    let outstandingPrincipal = principal;
-
-    const emiAmount =
-      monthlyRate === 0
-        ? principal / repaymentMonths
-        : (principal * monthlyRate * Math.pow(1 + monthlyRate, repaymentMonths)) /
-          (Math.pow(1 + monthlyRate, repaymentMonths) - 1);
+    let outstandingBalance = principal;
+    let periodStart = disbursementDate;
 
     for (let i = 1; i <= repaymentMonths; i++) {
-      const interestAmount = outstandingPrincipal * monthlyRate;
-      let principalAmount = emiAmount - interestAmount;
+      const dueDate = addMonths(disbursementDate, moratoriumMonths + i);
+      const isLast = i === repaymentMonths;
 
-      // Last installment: clear any rounding residue exactly.
-      if (i === repaymentMonths) {
-        principalAmount = outstandingPrincipal;
-      }
+      // Last installment clears any rounding residue exactly.
+      const principalAmount = isLast ? round2(outstandingBalance) : equalPrincipal;
 
-      outstandingPrincipal -= principalAmount;
+      const interestBase = calculationMethod === "RUNNING_BALANCE" ? outstandingBalance : principal;
+      const interestAmount = round2(
+        calculatePeriodInterest({
+          interestBasis,
+          annualRate,
+          periodStart,
+          periodEnd: dueDate,
+          includeOpeningClosingDays,
+          principal: interestBase,
+          customFormula,
+        })
+      );
 
-      // Round principal/interest first, then derive totalAmount from those rounded values —
-      // never from the unrounded intermediates. Rounding principal and interest independently
-      // from a totalAmount computed before that rounding can leave totalAmount a paisa off from
-      // principalAmount + interestAmount, which then permanently blocks an installment from ever
-      // reaching SUCCESS status even when it's fully paid (paidTotal is built from the same two
-      // rounded fields, so it can never catch up to a totalAmount that was rounded independently).
-      const roundedPrincipal = round2(principalAmount);
-      const roundedInterest = round2(interestAmount);
+      outstandingBalance = round2(outstandingBalance - principalAmount);
 
       installments.push({
         installmentNumber: i,
-        dueDate: addMonths(disbursementDate, moratoriumMonths + i),
-        principalAmount: roundedPrincipal,
-        interestAmount: roundedInterest,
-        totalAmount: round2(roundedPrincipal + roundedInterest),
+        dueDate,
+        principalAmount,
+        interestAmount,
+        totalAmount: round2(principalAmount + interestAmount),
+        outstandingBalance,
       });
+
+      periodStart = dueDate;
     }
 
     return installments;

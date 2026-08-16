@@ -5,6 +5,8 @@ import type {
     createBorrowerSchema,
     updateBorrowerSchema,
     listBorrowersQuerySchema,
+    promoterSchema,
+    updatePromoterSchema,
 } from "./borrower.validators";
 
 /** Rows as stored/returned by the database. */
@@ -19,6 +21,10 @@ export type NewPromoter = typeof promoters.$inferInsert;
 export type CreateBorrowerInput = z.infer<typeof createBorrowerSchema>;
 export type UpdateBorrowerInput = z.infer<typeof updateBorrowerSchema>;
 export type ListBorrowersQuery = z.infer<typeof listBorrowersQuerySchema>;
+
+/** Related-person ("promoter") API inputs. */
+export type CreatePromoterInput = z.infer<typeof promoterSchema>;
+export type UpdatePromoterInput = z.infer<typeof updatePromoterSchema>;
 
 /** Borrower enriched with relationship-manager name for list/detail views. */
 export type BorrowerWithManager = Borrower & {

@@ -5,6 +5,23 @@ import { DetailField, DetailSection } from "../../../components/ui/SlideOver";
 import { formatDate } from "../../../lib/format";
 import { getBorrower } from "../api";
 import { listDocuments, downloadDocument } from "../../documents/api";
+import {
+  ADDRESS_CATEGORIES,
+  APPLICANT_TYPES,
+  BORROWER_TYPE_LABELS,
+  BUSINESS_CATEGORIES,
+  BUSINESS_TYPES,
+  GENDERS,
+  OWNERSHIP_INDICATORS,
+  RESIDENCE_CODES,
+} from "../types";
+import type { CodedOption } from "../types";
+
+/** Show the CIBIL sheet's own wording for a coded value, falling back to the raw code. */
+function labelOf(options: CodedOption[], value: string | null): string | null {
+  if (!value) return null;
+  return options.find((o) => o.value === value)?.label ?? value;
+}
 
 /** Read-only borrower summary shown in the View slide-over — the borrower itself is locked once created. */
 export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
@@ -22,6 +39,8 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
   if (isError) return <ErrorState message={error instanceof Error ? error.message : "Failed to load borrower."} />;
   if (!borrower) return null;
 
+  const isConsumer = borrower.borrowerType === "CONSUMER";
+
   return (
     <div>
       <div className="mb-6">
@@ -29,52 +48,81 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
       </div>
 
       <DetailSection title="Basic Details">
-        <DetailField label="Borrower Code" value={borrower.borrowerCode} />
+        <div className="col-span-2">
+          <DetailField label="Borrower Type" value={BORROWER_TYPE_LABELS[borrower.borrowerType] ?? borrower.borrowerType} />
+        </div>
+        <DetailField label={isConsumer ? "Account Number" : "Borrower Code"} value={borrower.borrowerCode} />
         <DetailField label="Name" value={borrower.name} />
-        <DetailField label="Group Name" value={borrower.groupName} />
-        <DetailField label="Constitution" value={borrower.constitution?.replace(/_/g, " ")} />
-        <DetailField label="Date of Incorporation" value={formatDate(borrower.dateOfIncorporation)} />
-        <DetailField label="Nature of Business" value={borrower.natureOfBusiness} />
+        {isConsumer ? (
+          <>
+            <DetailField label="Gender" value={labelOf(GENDERS, borrower.gender)} />
+            <DetailField label="Date of Birth" value={formatDate(borrower.dateOfBirth)} />
+          </>
+        ) : (
+          <>
+            <DetailField label="Borrower Legal Constitution" value={borrower.constitution?.replace(/_/g, " ")} />
+            <DetailField label="Applicant Type" value={labelOf(APPLICANT_TYPES, borrower.applicantType)} />
+            <DetailField label="Date of Incorporation" value={formatDate(borrower.dateOfIncorporation)} />
+            <DetailField label="Business Category" value={labelOf(BUSINESS_CATEGORIES, borrower.businessCategory)} />
+            <DetailField label="Business Type" value={labelOf(BUSINESS_TYPES, borrower.businessType)} />
+            <DetailField label="Class of Activity 1" value={borrower.classOfActivity1} />
+          </>
+        )}
       </DetailSection>
 
       <DetailSection title="Identity">
-        <DetailField label="PAN" value={borrower.pan} />
-        <DetailField label="GSTIN" value={borrower.gst} />
-        <DetailField label="CIN" value={borrower.cin} />
-        <DetailField label="Aadhaar" value={borrower.aadhaar} />
+        {isConsumer ? (
+          <>
+            <DetailField label="Income Tax ID Number (PAN)" value={borrower.pan} />
+            <DetailField label="Aadhaar" value={borrower.aadhaar} />
+            <DetailField label="CKYC Number" value={borrower.ckycNumber} />
+          </>
+        ) : (
+          <DetailField label="PAN" value={borrower.pan} />
+        )}
       </DetailSection>
 
       <DetailSection title="Contact">
-        <DetailField label="Email" value={borrower.email} />
-        <DetailField label="Phone" value={borrower.phone} />
-        <DetailField label="Alternate Phone" value={borrower.alternatePhone} />
+        <DetailField label={isConsumer ? "Email ID" : "Email"} value={borrower.email} />
+        <DetailField label={isConsumer ? "Mobile No." : "Mobile"} value={borrower.phone} />
       </DetailSection>
 
-      <DetailSection title="Registered Address">
+      <DetailSection title={isConsumer ? "Address" : "Registered Address"}>
         <div className="col-span-2">
-          <DetailField
-            label="Address"
-            value={[borrower.addressLine1, borrower.addressLine2].filter(Boolean).join(", ") || null}
-          />
+          <DetailField label="Address" value={borrower.addressLine1} />
         </div>
-        <DetailField label="City" value={borrower.city} />
+        {!isConsumer && (
+          <>
+            <DetailField label="City" value={borrower.city} />
+            <DetailField label="District" value={borrower.district} />
+          </>
+        )}
         <DetailField label="State" value={borrower.state} />
         <DetailField label="Pincode" value={borrower.pincode} />
+        {isConsumer && (
+          <>
+            <DetailField label="Address Category" value={labelOf(ADDRESS_CATEGORIES, borrower.addressCategory)} />
+            <DetailField label="Residence Code" value={labelOf(RESIDENCE_CODES, borrower.residenceCode)} />
+            <DetailField label="Ownership Indicator" value={labelOf(OWNERSHIP_INDICATORS, borrower.ownershipIndicator)} />
+          </>
+        )}
       </DetailSection>
 
-      <DetailSection title="Internal">
-        <DetailField label="Internal Rating" value={borrower.internalRating} />
-        <div className="col-span-2">
-          <DetailField label="Rating Remarks" value={borrower.ratingRemarks} />
-        </div>
-        <div className="col-span-2">
-          <DetailField label="Remarks" value={borrower.notes} />
-        </div>
-      </DetailSection>
+      {!isConsumer && (
+        <DetailSection title="Internal">
+          <DetailField label="Internal Rating" value={borrower.internalRating} />
+          <div className="col-span-2">
+            <DetailField label="Rating Remarks" value={borrower.ratingRemarks} />
+          </div>
+          <div className="col-span-2">
+            <DetailField label="Remarks" value={borrower.notes} />
+          </div>
+        </DetailSection>
+      )}
 
       {borrower.promoters.length > 0 && (
         <div className="mb-6">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Promoters</h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Related Persons</h3>
           <div className="flex flex-col gap-2">
             {borrower.promoters.map((p) => (
               <div key={p.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">

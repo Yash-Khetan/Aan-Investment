@@ -5,8 +5,14 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { createInterestConfig, getLoanInterestRate } from "../api";
-import { INTEREST_BASIS_OPTIONS, INTEREST_RULE_TYPES } from "../types";
-import type { InterestBasis, InterestRuleType } from "../types";
+import {
+  CALCULATION_METHOD_OPTIONS,
+  INCLUDE_OPENING_CLOSING_DAYS_OPTIONS,
+  INTEREST_BASIS_OPTIONS,
+  INTEREST_RULE_TYPES,
+  RUNNING_BALANCE_UNSUPPORTED_BASES,
+} from "../types";
+import type { CalculationMethod, InterestBasis, InterestRuleType } from "../types";
 
 export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
@@ -19,6 +25,22 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [customFormula, setCustomFormula] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [calculationMethod, setCalculationMethod] = useState<CalculationMethod>("SIMPLE_INTEREST");
+  const [includeOpeningClosingDays, setIncludeOpeningClosingDays] = useState(false);
+
+  // Running Balance Method has no daily-rate concept for FULL_MONTH/CUSTOM — hide those options
+  // instead of letting the operator pick an invalid combination and hit a server-side error.
+  const basisOptions =
+    calculationMethod === "RUNNING_BALANCE"
+      ? INTEREST_BASIS_OPTIONS.filter((o) => !RUNNING_BALANCE_UNSUPPORTED_BASES.includes(o.value))
+      : INTEREST_BASIS_OPTIONS;
+
+  function handleMethodChange(method: CalculationMethod) {
+    setCalculationMethod(method);
+    if (method === "RUNNING_BALANCE" && RUNNING_BALANCE_UNSUPPORTED_BASES.includes(interestBasis)) {
+      setInterestBasis("ACTUAL_365");
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: createInterestConfig,
@@ -39,6 +61,8 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
       effectiveFrom,
       remarks: remarks || undefined,
       customFormula: interestBasis === "CUSTOM" ? customFormula : undefined,
+      includeOpeningClosingDays,
+      calculationMethod,
     });
   }
 
@@ -61,7 +85,7 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
             onChange={(e) => setInterestBasis(e.target.value as InterestBasis)}
             required
           >
-            {INTEREST_BASIS_OPTIONS.map((o) => (
+            {basisOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -85,6 +109,28 @@ export function CreateInterestConfigForm({ loanId, onDone }: { loanId: string; o
             onChange={(e) => setEffectiveFrom(e.target.value)}
             required
           />
+          <SelectField
+            label="Method"
+            value={calculationMethod}
+            onChange={(e) => handleMethodChange(e.target.value as CalculationMethod)}
+          >
+            {CALCULATION_METHOD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Include Opening & Closing Days"
+            value={includeOpeningClosingDays ? "yes" : "no"}
+            onChange={(e) => setIncludeOpeningClosingDays(e.target.value === "yes")}
+          >
+            {INCLUDE_OPENING_CLOSING_DAYS_OPTIONS.map((o) => (
+              <option key={String(o.value)} value={o.value ? "yes" : "no"}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
         </div>
 
         {interestBasis === "CUSTOM" && (

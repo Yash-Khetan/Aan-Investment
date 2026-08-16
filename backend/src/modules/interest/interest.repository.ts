@@ -1,5 +1,15 @@
-import { eq, and } from "drizzle-orm";
-import { db, interestConfigs, interestRules, penalInterestRules } from "../../db";
+import { eq, and, gt } from "drizzle-orm";
+import {
+  db,
+  interestConfigs,
+  interestRules,
+  penalInterestRules,
+  loans,
+  loanTranches,
+  payments,
+  paymentAllocations,
+} from "../../db";
+import type { PrincipalLedgerEvent } from "./interest.types";
 
 /**
  * Fetches the currently active interest configuration for a loan.
@@ -57,6 +67,8 @@ export async function createInterestConfigRevision(input: {
   effectiveFrom: string;
   remarks?: string;
   customFormula?: string;
+  includeOpeningClosingDays?: boolean;
+  calculationMethod?: string;
 }) {
   return db.transaction(async (tx) => {
     const previous = await tx
@@ -83,6 +95,8 @@ export async function createInterestConfigRevision(input: {
         isCurrent: true,
         remarks: input.remarks,
         customFormula: input.customFormula,
+        includeOpeningClosingDays: input.includeOpeningClosingDays ?? false,
+        calculationMethod: (input.calculationMethod ?? "SIMPLE_INTEREST") as any,
       })
       .returning();
 
@@ -172,4 +186,52 @@ export async function getPenalRulesForLoan(loanId: string) {
     .select()
     .from(penalInterestRules)
     .where(eq(penalInterestRules.loanId, loanId));
+}
+
+/**
+ * The loan's original principal for the Simple Interest Method — the
+ * cumulative amount actually disbursed to date (never reduced by
+ * repayments), falling back to the sanctioned amount if nothing has been
+ * disbursed yet.
+ */
+export async function getLoanOriginalPrincipal(loanId: string): Promise<number> {
+  const rows = await db
+    .select({ disbursedAmount: loans.disbursedAmount, sanctionedAmount: loans.sanctionedAmount })
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
+
+  const loan = rows[0];
+  if (!loan) return 0;
+
+  const disbursed = Number(loan.disbursedAmount ?? 0);
+  return disbursed > 0 ? disbursed : Number(loan.sanctionedAmount ?? 0);
+}
+
+/**
+ * Every event that changed the loan's outstanding principal, oldest first —
+ * disbursement tranches (positive) and principal repayments (negative). Feeds
+ * the Running Balance Method's day-by-day walk.
+ */
+export async function getPrincipalLedgerEvents(loanId: string): Promise<PrincipalLedgerEvent[]> {
+  const tranches = await db
+    .select({ disbursementDate: loanTranches.disbursementDate, amount: loanTranches.amount })
+    .from(loanTranches)
+    .where(eq(loanTranches.loanId, loanId));
+
+  const repayments = await db
+    .select({ paymentDate: payments.paymentDate, principalApplied: paymentAllocations.principalApplied })
+    .from(paymentAllocations)
+    .innerJoin(payments, eq(paymentAllocations.paymentId, payments.id))
+    .where(and(eq(payments.loanId, loanId), gt(paymentAllocations.principalApplied, "0")));
+
+  const events: PrincipalLedgerEvent[] = [
+    ...tranches
+      .filter((t) => t.disbursementDate)
+      .map((t) => ({ date: new Date(t.disbursementDate as string), delta: Number(t.amount) })),
+    ...repayments.map((r) => ({ date: new Date(r.paymentDate), delta: -Number(r.principalApplied) })),
+  ];
+
+  events.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return events;
 }

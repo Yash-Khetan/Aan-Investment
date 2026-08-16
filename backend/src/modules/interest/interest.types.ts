@@ -3,6 +3,8 @@ export interface InterestCalculationInput {
   annualRate: number; // percentage, e.g. 18 means 18%
   periodStart: Date;
   periodEnd: Date;
+  /** When true, day-count is inclusive of both periodStart and periodEnd (+1 day). */
+  includeOpeningClosingDays?: boolean;
 }
 
 export interface InterestStrategy {
@@ -16,7 +18,17 @@ export type InterestBasis =
   | "MONTHLY"
   | "FIXED_MONTHLY"
   | "FULL_MONTH"
-  | "CUSTOM";
+  | "CUSTOM"
+  | "MONTHLY_RATE_ACTUAL_30";
+
+export type CalculationMethod = "RUNNING_BALANCE" | "SIMPLE_INTEREST";
+
+/** A single principal-changing event on a loan's timeline, used by the Running Balance Method. */
+export interface PrincipalLedgerEvent {
+  date: Date;
+  /** Positive for a disbursement tranche, negative for a principal repayment. */
+  delta: number;
+}
 
   export interface InterestRuleRow {
   id: string;

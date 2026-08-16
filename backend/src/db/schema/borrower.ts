@@ -10,9 +10,19 @@ import {
 } from "drizzle-orm/pg-core";
 
 import {
+    addressCategoryEnum,
+    applicantTypeEnum,
+    borrowerTypeEnum,
+    businessCategoryEnum,
+    businessTypeEnum,
     constitutionEnum,
     entityStatusEnum,
+    genderEnum,
     money,
+    ownershipIndicatorEnum,
+    relatedPersonRelationshipEnum,
+    relatedPersonTypeEnum,
+    residenceCodeEnum,
     timestamps,
 } from "./shared";
 
@@ -27,6 +37,15 @@ export const borrowers = pgTable("borrowers", {
     id: uuid("id")
         .defaultRandom()
         .primaryKey(),
+
+    /**
+     * Which CIBIL submission format this borrower is captured under.
+     * Drives which set of fields the Add/Edit Borrower page collects and
+     * which of them are mandatory.
+     */
+    borrowerType: borrowerTypeEnum("borrower_type")
+        .notNull()
+        .default("COMMERCIAL"),
 
     borrowerCode: varchar("borrower_code", {
         length: 50,
@@ -67,6 +86,11 @@ export const borrowers = pgTable("borrowers", {
         length: 100,
     }),
 
+    /** CIBIL commercial "District". */
+    district: varchar("district", {
+        length: 100,
+    }),
+
     state: varchar("state", {
         length: 100,
     }),
@@ -98,6 +122,37 @@ export const borrowers = pgTable("borrowers", {
     dateOfIncorporation: date("date_of_incorporation"),
 
     natureOfBusiness: text("nature_of_business"),
+
+    /* ── CIBIL Consumer (borrowerType = CONSUMER) ── */
+
+    gender: genderEnum("gender"),
+
+    dateOfBirth: date("date_of_birth"),
+
+    addressCategory: addressCategoryEnum("address_category"),
+
+    residenceCode: residenceCodeEnum("residence_code"),
+
+    ownershipIndicator: ownershipIndicatorEnum("ownership_indicator"),
+
+    /** CIBIL "CKYC No." — 14-digit Central KYC Registry identifier. */
+    ckycNumber: varchar("ckyc_number", {
+        length: 14,
+    }),
+
+    /* ── CIBIL Commercial (borrowerType = COMMERCIAL) ── */
+
+    businessCategory: businessCategoryEnum("business_category"),
+
+    businessType: businessTypeEnum("business_type"),
+
+    /** CIBIL "Class of Activity 1" — 5-digit code from the handbook of instructions. */
+    classOfActivity1: varchar("class_of_activity_1", {
+        length: 5,
+    }),
+
+    /** CIBIL commercial "Borrower Type" column: Applicant / Co-Applicant. */
+    applicantType: applicantTypeEnum("applicant_type"),
 
     /* ── Internal Rating ── */
 
@@ -132,6 +187,9 @@ export const borrowers = pgTable("borrowers", {
     borrowerRmIdx: index("borrower_rm_idx")
         .on(table.relationshipManagerId),
 
+    borrowerTypeIdx: index("borrower_type_idx")
+        .on(table.borrowerType),
+
 }));
 
 /* ============================================================
@@ -158,6 +216,16 @@ export const promoters = pgTable("promoters", {
         length: 150,
     }),
 
+    /* ── CIBIL commercial "Related Person" attributes ── */
+
+    gender: genderEnum("gender"),
+
+    relatedPersonType: relatedPersonTypeEnum("related_person_type"),
+
+    relationship: relatedPersonRelationshipEnum("relationship"),
+
+    dateOfBirth: date("date_of_birth"),
+
     pan: varchar("pan", {
         length: 10,
     }),
@@ -181,6 +249,11 @@ export const promoters = pgTable("promoters", {
     addressLine1: text("address_line_1"),
 
     city: varchar("city", {
+        length: 100,
+    }),
+
+    /** CIBIL commercial "Related Person (District)". */
+    district: varchar("district", {
         length: 100,
     }),
 

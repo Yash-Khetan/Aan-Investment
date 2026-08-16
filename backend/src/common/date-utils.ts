@@ -1,8 +1,15 @@
-export function diffInDays(start: Date, end: Date): number {
+/**
+ * Days between two dates. By default exclusive of one endpoint (the
+ * standard convention already used everywhere in this codebase). Pass
+ * `inclusive: true` to count both periodStart and periodEnd (+1 day) —
+ * the "Include Opening & Closing Days" interest config setting.
+ */
+export function diffInDays(start: Date, end: Date, inclusive = false): number {
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
   const startUTC = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
   const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-  return Math.round((endUTC - startUTC) / MS_PER_DAY);
+  const days = Math.round((endUTC - startUTC) / MS_PER_DAY);
+  return inclusive ? days + 1 : days;
 }
 
 export function diffInMonths(start: Date, end: Date): number {

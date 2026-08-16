@@ -6,27 +6,10 @@ export const generateSchedule: RequestHandler = async (req, res, next) => {
   try {
     const body = req.valid!.body as {
       loanId: string;
-      principal: number;
-      annualRate: number;
-      tenureMonths: number;
-      moratoriumMonths: number;
-      disbursementDate: string;
-      repaymentType: string;
       remarks?: string;
     };
 
-    const schedule = await generateAndSaveSchedule(
-      {
-        loanId: body.loanId,
-        principal: body.principal,
-        annualRate: body.annualRate,
-        tenureMonths: body.tenureMonths,
-        moratoriumMonths: body.moratoriumMonths,
-        disbursementDate: new Date(body.disbursementDate),
-        repaymentType: body.repaymentType as any,
-      },
-      body.remarks
-    );
+    const schedule = await generateAndSaveSchedule(body.loanId, body.remarks);
 
     res.status(201).json({ success: true, data: schedule });
   } catch (err) {

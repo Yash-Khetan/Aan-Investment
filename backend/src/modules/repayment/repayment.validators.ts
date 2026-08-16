@@ -1,15 +1,11 @@
 import { z } from "zod";
 
-const repaymentTypeValues = ["EMI", "BULLET", "INTEREST_ONLY", "STRUCTURED", "CUSTOM"] as const;
-
+// Every scheduling input (principal, rate, tenure, disbursement date, repayment
+// type) is now derived entirely from the loan + its interest config — see
+// repayment.service.ts's buildScheduleInput. The only thing the operator can
+// still provide is an optional remark.
 export const generateScheduleSchema = z.object({
   loanId: z.string().uuid(),
-  principal: z.coerce.number().positive(),
-  annualRate: z.coerce.number().nonnegative(),
-  tenureMonths: z.coerce.number().int().positive(),
-  moratoriumMonths: z.coerce.number().int().nonnegative().default(0),
-  disbursementDate: z.string().date(),
-  repaymentType: z.enum(repaymentTypeValues),
   remarks: z.string().optional(),
 });
 
