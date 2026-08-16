@@ -20,6 +20,7 @@ import { LoansPage } from "./features/loans/LoansPage";
 import { CreateLoanPage } from "./features/loans/CreateLoanPage";
 import { EditLoanPage } from "./features/loans/EditLoanPage";
 import { RepaymentEnginePage } from "./features/repayment/RepaymentEnginePage";
+import { GetKpiPage } from "./features/get-kpi/GetKpiPage";
 import { PaymentsPage } from "./features/payments/PaymentsPage";
 import { AccountingLedgerPage } from "./features/accounting-entries/AccountingLedgerPage";
 import { DisbursementsPage } from "./features/disbursements/DisbursementsPage";
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/borrowers/:id/edit" element={<EditBorrowerPage />} />
             <Route path="/loans/:id/edit" element={<EditLoanPage />} />
           </Route>
+          <Route path="/get-kpi" element={<GetKpiPage />} />
           <Route path="/repayment" element={<RepaymentEnginePage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
