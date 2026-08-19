@@ -566,3 +566,21 @@ export const waterfallBucketTypeEnum = pgEnum("waterfall_bucket_type", [
     "PRINCIPAL",
     "SPECIFIC_TRANCHE",
 ]);
+
+
+/* ============================================================
+   BORROWER LEDGER VOUCHER TYPE
+
+   Standalone borrower-level running-account ledger (the "Borrower
+   Ledger" tab) — Payment/Receipt are manually recorded by an
+   employee; Journal Interest/TDS are auto-generated month-end
+   pairs. Deliberately separate from `accounting_entry_type`, which
+   is loan-scoped double-entry bookkeeping.
+============================================================ */
+
+export const ledgerVchTypeEnum = pgEnum("ledger_vch_type", [
+    "PAYMENT",
+    "RECEIPT",
+    "JOURNAL_INTEREST",
+    "JOURNAL_TDS",
+]);
