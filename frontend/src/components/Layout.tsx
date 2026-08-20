@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "/documents", label: "Documents" },
   { to: "/disbursements", label: "Disbursements" },
   { to: "/get-kpi", label: "Get KPI" },
+  { to: "/borrower-ledger", label: "Borrower Ledger" },
   { to: "/repayment", label: "Repayment Engine" },
   { to: "/payments", label: "Payments" },
   { to: "/collections", label: "Collections" },
