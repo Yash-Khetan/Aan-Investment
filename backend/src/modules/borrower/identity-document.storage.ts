@@ -17,12 +17,12 @@ const OBJECT_PREFIX = "borrower-identity";
 /** Matches the document vault's cap, so the two behave the same way for users. */
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
-export const ALLOWED_MIME_TYPES = [
-    "application/pdf",
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-] as const;
+/**
+ * Photos only. Identity scans are meant to be readable by OCR, and Tesseract
+ * reads pixels - a PDF has nothing for it to look at - so accepting one would
+ * store a file the auto-read could never use.
+ */
+export const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png"] as const;
 
 let client: SupabaseClient | null = null;
 

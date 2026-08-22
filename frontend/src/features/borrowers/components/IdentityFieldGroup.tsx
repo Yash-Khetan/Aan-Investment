@@ -89,19 +89,14 @@ export function IdentityFieldGroup({
       />
 
       {ocrStatus === "idle" && (
-        <p className="mt-1.5 text-xs text-slate-400">
-          Optional. Upload a clear photo (JPG/PNG) and the number can be read for you &mdash; PDFs upload fine but
-          can&rsquo;t be read.
-        </p>
+        <p className="mt-1.5 text-xs text-slate-400">Upload a clear photo (JPG/PNG)</p>
       )}
       {ocrStatus === "reading" && <p className="mt-1.5 text-xs text-slate-400">Reading the image&hellip;</p>}
       {ocrStatus === "empty" && (
         <p className="mt-1.5 text-xs text-slate-400">Couldn&rsquo;t read a number from this image &mdash; type it above.</p>
       )}
       {ocrStatus === "skipped" && (
-        <p className="mt-1.5 text-xs text-slate-400">
-          PDFs can&rsquo;t be read automatically &mdash; type the number above, or upload a photo instead.
-        </p>
+        <p className="mt-1.5 text-xs text-slate-400">Only JPG and PNG photos can be read &mdash; type the number above.</p>
       )}
       {ocrStatus === "failed" && (
         <p className="mt-1.5 text-xs text-slate-400">Auto-read failed &mdash; type the number above.</p>

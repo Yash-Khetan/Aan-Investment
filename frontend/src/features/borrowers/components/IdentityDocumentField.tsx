@@ -10,14 +10,14 @@ import {
 import { OCR_DOCUMENT_TYPE_FOR_KIND, type StoredIdentityDocument } from "../BorrowerDocumentsContext";
 import { extractDocumentData } from "../../ocr/api";
 
-/** Extensions offered in the picker. The backend enforces the real allowlist and a 10 MB cap. */
-const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,.webp";
+/** Photos only. The backend enforces the same allowlist and a 10 MB cap. */
+const ACCEPTED_FILE_TYPES = ".jpg,.jpeg,.png";
 
 /**
- * Formats OCR can read. Tesseract reads pixels, so a PDF has nothing for it to
- * look at - those upload normally but are never sent for auto-read.
+ * Formats OCR can read. Same list as the picker allows - `accept` is only a
+ * hint to the file dialog and can be bypassed, so this still has to be checked.
  */
-const OCR_READABLE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const OCR_READABLE_TYPES = new Set(["image/jpeg", "image/png"]);
 
 export type OcrStatus = "idle" | "reading" | "done" | "empty" | "skipped" | "failed";
 
