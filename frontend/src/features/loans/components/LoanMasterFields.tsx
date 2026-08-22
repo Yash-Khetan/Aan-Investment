@@ -2,8 +2,6 @@ import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
 import {
-  ASSET_CLASSIFICATIONS,
-  CIBIL_ACCOUNT_STATUSES,
   CIBIL_COLLATERAL_TYPES,
   CREDIT_TYPES,
   LOAN_TYPES,
@@ -27,14 +25,16 @@ function CodedSelect({
   options,
   value,
   onChange,
+  required,
 }: {
   label: string;
   options: CodedOption[];
   value: string;
   onChange: (value: string) => void;
+  required?: boolean;
 }) {
   return (
-    <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+    <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)} required={required}>
       <option value="">— Select {label} —</option>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -57,6 +57,8 @@ export function LoanMasterFields({
   lockedBorrowerLabel?: string;
 }) {
   const tenureMonths = calcTenureMonths(form.firstDisbursementDate, form.maturityDate);
+  /** Drives both the disabled state and the required flag on Value of Collateral. */
+  const noCollateral = form.collateralType === "NO_COLLATERAL";
 
   return (
     <>
@@ -220,24 +222,14 @@ export function LoanMasterFields({
             options={CREDIT_TYPES}
             value={form.creditType}
             onChange={(v) => onChange({ creditType: v })}
-          />
-          <CodedSelect
-            label="Account Status"
-            options={CIBIL_ACCOUNT_STATUSES}
-            value={form.cibilAccountStatus}
-            onChange={(v) => onChange({ cibilAccountStatus: v })}
-          />
-          <CodedSelect
-            label="Account Classification"
-            options={ASSET_CLASSIFICATIONS}
-            value={form.assetClassification}
-            onChange={(v) => onChange({ assetClassification: v })}
+            required
           />
           <CodedSelect
             label="Payment Frequency"
             options={PAYMENT_FREQUENCIES}
             value={form.paymentFrequency}
             onChange={(v) => onChange({ paymentFrequency: v })}
+            required
           />
           <TextField
             label="EMI Amount"
@@ -246,12 +238,14 @@ export function LoanMasterFields({
             step="0.01"
             value={form.emiAmount}
             onChange={(e) => onChange({ emiAmount: e.target.value })}
+            required
           />
           <CodedSelect
             label="Type of Collateral"
             options={CIBIL_COLLATERAL_TYPES}
             value={form.collateralType}
             onChange={(v) => onChange({ collateralType: v })}
+            required
           />
           <TextField
             label="Value of Collateral"
@@ -260,7 +254,11 @@ export function LoanMasterFields({
             step="0.01"
             value={form.collateralValue}
             onChange={(e) => onChange({ collateralValue: e.target.value })}
-            disabled={form.collateralType === "NO_COLLATERAL"}
+            disabled={noCollateral}
+            /* A loan with no collateral has no value to state, so the field is
+               disabled and cannot be required - requiring it would make such a
+               loan impossible to save. */
+            required={!noCollateral}
           />
         </div>
         <p className="mt-2 text-xs text-slate-400">
