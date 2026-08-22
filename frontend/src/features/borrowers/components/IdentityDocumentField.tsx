@@ -7,22 +7,33 @@ import {
   viewIdentityDocument,
   type IdentityDocumentKind,
 } from "../identityDocumentApi";
-import type { StoredIdentityDocument } from "../BorrowerDocumentsContext";
+import { OCR_DOCUMENT_TYPE_FOR_KIND, type StoredIdentityDocument } from "../BorrowerDocumentsContext";
+import { extractDocumentData } from "../../ocr/api";
 
 /** Extensions offered in the picker. The backend enforces the real allowlist and a 10 MB cap. */
 const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,.webp";
 
 /**
+ * Formats OCR can read. Tesseract reads pixels, so a PDF has nothing for it to
+ * look at - those upload normally but are never sent for auto-read.
+ */
+const OCR_READABLE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+export type OcrStatus = "idle" | "reading" | "done" | "empty" | "skipped" | "failed";
+
+/**
  * Compact upload control nested inside an `IdentityFieldGroup` (so it renders
- * no label of its own — the group's heading already says which document this
- * is).
+ * no label of its own - the group's heading already says which document this is).
  *
- * Create mode (no `borrowerId`): the file is held in memory and uploaded by
- * the caller once the borrower exists. Edit mode (`borrowerId` set): the file
- * uploads immediately, and any stored scan is shown for view, download or
- * removal.
+ * Create mode (no `borrowerId`): the file is held in memory and uploaded by the
+ * caller once the borrower exists. Edit mode (`borrowerId` set): the file
+ * uploads immediately, and any stored scan is shown for view, download or removal.
  *
- * Uploading is always optional — this control never renders a required input.
+ * Picking an image also sends a copy for OCR, reported upward via `onOcrResult`
+ * so the group can offer it as a suggestion. That runs alongside the upload and
+ * never gates it: OCR failing has no effect on whether the file is stored.
+ *
+ * Uploading is always optional - this control never renders a required input.
  */
 export function IdentityDocumentField({
   kind,
@@ -30,12 +41,14 @@ export function IdentityDocumentField({
   storedDoc,
   pendingFile,
   onPendingFileChange,
+  onOcrResult,
 }: {
   kind: IdentityDocumentKind;
   borrowerId?: string;
   storedDoc?: StoredIdentityDocument;
   pendingFile?: File | null;
   onPendingFileChange?: (file: File | null) => void;
+  onOcrResult?: (status: OcrStatus, value: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [viewError, setViewError] = useState<string | null>(null);
@@ -50,6 +63,23 @@ export function IdentityDocumentField({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
+  /** Best-effort. Every outcome is reported so the group can say what happened. */
+  function runOcr(file: File) {
+    if (!onOcrResult) return;
+
+    if (!OCR_READABLE_TYPES.has(file.type)) {
+      onOcrResult("skipped", null);
+      return;
+    }
+
+    onOcrResult("reading", null);
+    extractDocumentData(file, OCR_DOCUMENT_TYPE_FOR_KIND[kind])
+      .then(({ extractedValue }) =>
+        onOcrResult(extractedValue ? "done" : "empty", extractedValue),
+      )
+      .catch(() => onOcrResult("failed", null));
+  }
+
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     // Reset so re-picking the same filename still fires a change event.
@@ -58,6 +88,14 @@ export function IdentityDocumentField({
 
     if (borrowerId) uploadMutation.mutate(file);
     else onPendingFileChange?.(file);
+
+    runOcr(file);
+  }
+
+  function clearFile() {
+    onOcrResult?.("idle", null);
+    if (borrowerId) deleteMutation.mutate();
+    else onPendingFileChange?.(null);
   }
 
   function handleView() {
@@ -70,7 +108,7 @@ export function IdentityDocumentField({
       return;
     }
 
-    // Not uploaded yet — preview the file straight out of browser memory. No
+    // Not uploaded yet - preview the file straight out of browser memory. No
     // await here, so the click's user-gesture context is intact and the popup
     // blocker stays quiet.
     if (!pendingFile) return;
@@ -112,7 +150,7 @@ export function IdentityDocumentField({
             <button
               type="button"
               className="text-xs text-red-600 underline"
-              onClick={() => (borrowerId ? deleteMutation.mutate() : onPendingFileChange?.(null))}
+              onClick={clearFile}
               disabled={deleteMutation.isPending}
             >
               Remove

@@ -15,6 +15,16 @@ const GSTIN_IN_TEXT = /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]/;
  * a garbage 12-digit number instead of not matching at all.
  */
 const AADHAAR_IN_TEXT = /\b(\d{4}) ?(\d{4}) ?(\d{4})\b/;
+/**
+ * CKYC numbers are a plain 14-digit run - the least distinctive thing on a
+ * page, so this is the weakest extractor here and the one most likely to pick
+ * up an unrelated number. The `\b` boundaries stop it matching a slice out of
+ * a longer digit run (a 16-digit account number would otherwise yield its
+ * first 14), and no internal separator is allowed: unlike Aadhaar, CKYC is
+ * printed unbroken, so permitting spaces would let this splice two unrelated
+ * fields together.
+ */
+const CKYC_IN_TEXT = /\b\d{14}\b/;
 
 export function extractPan(text: string): string | null {
     const match = text.toUpperCase().match(PAN_IN_TEXT);
@@ -32,12 +42,17 @@ export function extractAadhaar(text: string): string | null {
     return `${match[1]}${match[2]}${match[3]}`;
 }
 
-export type OcrDocumentType = "PAN_CARD" | "GSTIN_CERTIFICATE" | "AADHAAR";
+export function extractCkyc(text: string): string | null {
+    return text.match(CKYC_IN_TEXT)?.[0] ?? null;
+}
+
+export type OcrDocumentType = "PAN_CARD" | "GSTIN_CERTIFICATE" | "AADHAAR" | "CKYC";
 
 const EXTRACTORS: Record<OcrDocumentType, (text: string) => string | null> = {
     PAN_CARD: extractPan,
     GSTIN_CERTIFICATE: extractGstin,
     AADHAAR: extractAadhaar,
+    CKYC: extractCkyc,
 };
 
 /** Runs the extractor matching the declared document type against OCR'd text. */

@@ -1,6 +1,6 @@
 import { API_BASE_URL, ApiError, getAccessToken } from "../../lib/api";
 
-export type OcrDocumentType = "PAN_CARD" | "GSTIN_CERTIFICATE" | "AADHAAR";
+export type OcrDocumentType = "PAN_CARD" | "GSTIN_CERTIFICATE" | "AADHAAR" | "CKYC";
 
 interface Envelope<T> {
   success: true;

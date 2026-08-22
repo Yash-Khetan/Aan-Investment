@@ -1,11 +1,23 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { IdentityDocumentKind } from "./identityDocumentApi";
+import type { OcrDocumentType } from "../ocr/api";
 import type { Borrower } from "./types";
 
 /** Display names, used in error messages and as the heading fallback. */
 export const IDENTITY_DOCUMENT_LABELS: Record<IdentityDocumentKind, string> = {
   pan: "PAN",
   aadhaar: "Aadhaar",
+  ckyc: "CKYC",
+};
+
+/**
+ * Maps an identity field to the document type the OCR module knows it by. The
+ * two vocabularies are deliberately separate - OCR names documents, this module
+ * names borrower fields - so neither has to rename anything to talk to the other.
+ */
+export const OCR_DOCUMENT_TYPE_FOR_KIND: Record<IdentityDocumentKind, OcrDocumentType> = {
+  pan: "PAN_CARD",
+  aadhaar: "AADHAAR",
   ckyc: "CKYC",
 };
 
