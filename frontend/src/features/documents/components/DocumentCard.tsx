@@ -35,6 +35,9 @@ export function DocumentCard({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-800">{doc.name}</span>
           <Badge status={doc.documentType} />
+          {/* Only IDENTITY is called out - GENERAL is the norm and labelling it
+              would add noise to every row on the page. */}
+          {doc.source === "IDENTITY" && <Badge status="IDENTITY" label="identity field" />}
         </div>
         <div className="mt-1 text-xs text-slate-500">
           {formatBytes(doc.sizeBytes)} · {doc.mimeType} · uploaded {formatDate(doc.createdAt)}

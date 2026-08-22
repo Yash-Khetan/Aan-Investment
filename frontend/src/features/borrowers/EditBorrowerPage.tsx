@@ -35,9 +35,18 @@ export function EditBorrowerPage() {
     enabled: !!id,
   });
 
+  // Two deliberately separate lists. The identity boxes above render the
+  // IDENTITY ones; the Documents card below renders only GENERAL, so a PAN
+  // attached from its identity field never also appears in the generic list.
+  const { data: identityDocuments } = useQuery({
+    queryKey: ["documents", "BORROWER", id, "IDENTITY"],
+    queryFn: () => listDocuments("BORROWER", id!, "IDENTITY"),
+    enabled: !!id,
+  });
+
   const { data: documents } = useQuery({
-    queryKey: ["documents", "BORROWER", id],
-    queryFn: () => listDocuments("BORROWER", id!),
+    queryKey: ["documents", "BORROWER", id, "GENERAL"],
+    queryFn: () => listDocuments("BORROWER", id!, "GENERAL"),
     enabled: !!id,
   });
 
@@ -84,7 +93,7 @@ export function EditBorrowerPage() {
               nothing is ever held pending here. */}
           <BorrowerDocumentsProvider
             borrowerId={id}
-            documents={documents}
+            documents={identityDocuments}
             pendingFiles={{}}
             setPendingFile={() => {}}
           >

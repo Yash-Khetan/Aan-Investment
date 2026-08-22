@@ -21,3 +21,10 @@ export const DEFAULT_SIGNED_URL_EXPIRY_SECONDS = 300; // 5 minutes
 
 /** documentType used when a caller doesn't classify the upload. */
 export const DEFAULT_DOCUMENT_TYPE = "OTHER";
+
+/**
+ * source used when a caller doesn't say which surface produced the upload.
+ * GENERAL, so anything going through the generic Documents page - and every row
+ * that predates this column - is classified correctly without extra work.
+ */
+export const DEFAULT_DOCUMENT_SOURCE = "GENERAL";

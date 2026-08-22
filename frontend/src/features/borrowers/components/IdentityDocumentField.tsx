@@ -40,13 +40,20 @@ export function IdentityDocumentField({
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) =>
-      uploadDocument({ entityType: "BORROWER", entityId: borrowerId!, documentType, name: label, file }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId] }),
+      uploadDocument({
+        entityType: "BORROWER",
+        entityId: borrowerId!,
+        documentType,
+        source: "IDENTITY",
+        name: label,
+        file,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId, "IDENTITY"] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteDocument(existingDoc!.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId, "IDENTITY"] }),
   });
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {

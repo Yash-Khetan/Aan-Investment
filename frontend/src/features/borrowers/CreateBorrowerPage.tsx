@@ -63,8 +63,8 @@ export function CreateBorrowerPage() {
   // Only fetched after creation, so successfully uploaded documents render as
   // attached rather than reverting to an empty picker.
   const { data: createdDocuments } = useQuery({
-    queryKey: ["documents", "BORROWER", createdBorrowerId],
-    queryFn: () => listDocuments("BORROWER", createdBorrowerId!),
+    queryKey: ["documents", "BORROWER", createdBorrowerId, "IDENTITY"],
+    queryFn: () => listDocuments("BORROWER", createdBorrowerId!, "IDENTITY"),
     enabled: !!createdBorrowerId,
   });
 
@@ -94,6 +94,7 @@ export function CreateBorrowerPage() {
           entityType: "BORROWER",
           entityId: borrowerId,
           documentType,
+          source: "IDENTITY",
           name: BORROWER_DOCUMENT_LABELS[documentType],
           file,
         }),

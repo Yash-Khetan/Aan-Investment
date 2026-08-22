@@ -11,6 +11,7 @@ import {
 import {
     documentTypeEnum,
     documentOwnerEnum,
+    documentSourceEnum,
     timestamps,
 } from "./shared";
 
@@ -38,6 +39,15 @@ export const documents = pgTable("documents", {
 
     documentType: documentTypeEnum("document_type")
         .notNull(),
+
+    /**
+     * Which surface produced this row. Defaults to GENERAL so every existing
+     * row - all of which came from the Documents page - stays correct without a
+     * backfill.
+     */
+    source: documentSourceEnum("source")
+        .notNull()
+        .default("GENERAL"),
 
     name: varchar("name", {
         length: 255,
@@ -82,5 +92,8 @@ export const documents = pgTable("documents", {
 
     docTypeIdx: index("doc_type_idx")
         .on(table.documentType),
+
+    docSourceIdx: index("doc_source_idx")
+        .on(table.ownerType, table.ownerId, table.source),
 
 }));

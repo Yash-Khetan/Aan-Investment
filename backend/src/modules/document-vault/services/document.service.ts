@@ -5,6 +5,7 @@ import {
     assertValidEntityType,
     assertValidEntityId,
     assertValidDocumentType,
+    assertValidDocumentSource,
     assertFilePresent,
     assertValidMimeType,
     assertValidFileSize,
@@ -13,9 +14,10 @@ import { generateStorageFileName, buildStoragePath } from "../utils/filename.uti
 import { uploadObject, downloadObject, removeObject, createSignedUrl } from "../utils/storage.util";
 import { documentLogger } from "../utils/logger";
 import { DocumentNotFoundError, DocumentPersistenceError } from "../utils/errors";
-import { DEFAULT_DOCUMENT_TYPE, DEFAULT_SIGNED_URL_EXPIRY_SECONDS } from "../constants/document.constants";
+import { DEFAULT_DOCUMENT_SOURCE, DEFAULT_DOCUMENT_TYPE, DEFAULT_SIGNED_URL_EXPIRY_SECONDS } from "../constants/document.constants";
 import type {
     UploadDocumentInput,
+    DocumentSource,
     DocumentMetadata,
     DownloadResult,
     SignedUrlResult,
@@ -30,6 +32,7 @@ function toDocumentMetadata(row: DocumentRow): DocumentMetadata {
         entityType: row.ownerType as EntityType,
         entityId: row.ownerId,
         documentType: row.documentType,
+        source: row.source,
         name: row.name,
         fileName: row.fileName,
         storagePath: row.storagePath,
@@ -63,6 +66,9 @@ export class DocumentService {
         const documentType = input.documentType ?? DEFAULT_DOCUMENT_TYPE;
         assertValidDocumentType(documentType);
 
+        const source = input.source ?? DEFAULT_DOCUMENT_SOURCE;
+        assertValidDocumentSource(source);
+
         const storageFileName = generateStorageFileName(file.originalName);
         const storagePath = buildStoragePath(entityType, entityId, storageFileName);
         const context = `${entityType}/${entityId}`;
@@ -76,6 +82,7 @@ export class DocumentService {
                     ownerType: entityType,
                     ownerId: entityId,
                     documentType,
+                    source,
                     name: input.name ?? file.originalName,
                     fileName: storageFileName,
                     storagePath,
@@ -127,14 +134,27 @@ export class DocumentService {
         }
     }
 
-    static async list(entityType: string, entityId: string): Promise<DocumentMetadata[]> {
+    /**
+     * Documents attached to an entity. Pass `source` to get only one kind - the
+     * borrower form asks for IDENTITY, the generic Documents page asks for
+     * GENERAL - so the same file never appears in both places at once.
+     */
+    static async list(entityType: string, entityId: string, source?: string): Promise<DocumentMetadata[]> {
         assertValidEntityType(entityType);
         assertValidEntityId(entityId);
+        if (source !== undefined) assertValidDocumentSource(source);
 
         const rows = await db
             .select()
             .from(documents)
-            .where(and(eq(documents.ownerType, entityType), eq(documents.ownerId, entityId), isNull(documents.deletedAt)));
+            .where(
+                and(
+                    eq(documents.ownerType, entityType),
+                    eq(documents.ownerId, entityId),
+                    isNull(documents.deletedAt),
+                    source === undefined ? undefined : eq(documents.source, source as DocumentSource),
+                )
+            );
 
         documentLogger.success("LIST", `${entityType}/${entityId}`);
         return rows.map(toDocumentMetadata);

@@ -25,11 +25,20 @@ export const DOCUMENT_TYPES = [
   "OTHER",
 ] as const;
 
+/**
+ * Which surface produced a document. IDENTITY rows come from an entity's own
+ * identity fields (the borrower form's PAN / Aadhaar / CKYC boxes); GENERAL
+ * rows come from the Documents page. documentType alone cannot separate them -
+ * a PAN card can arrive from either.
+ */
+export type DocumentSource = "IDENTITY" | "GENERAL";
+
 export interface DocumentMetadata {
   id: string;
   entityType: string;
   entityId: string;
   documentType: string;
+  source: DocumentSource;
   name: string;
   fileName: string | null;
   mimeType: string | null;
