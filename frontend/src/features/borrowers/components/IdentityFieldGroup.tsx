@@ -1,6 +1,5 @@
 import type { InputHTMLAttributes } from "react";
-import type { DocumentMetadata } from "../../documents/types";
-import type { OcrDocumentType } from "../../ocr/api";
+import { useBorrowerDocument, type BorrowerDocumentType } from "../BorrowerDocumentsContext";
 import { IdentityDocumentField } from "./IdentityDocumentField";
 
 /**
@@ -8,6 +7,8 @@ import { IdentityDocumentField } from "./IdentityDocumentField";
  * upload directly beneath, both under a single heading. Keeps the pairing
  * between "PAN number" and "PAN file" visually obvious, instead of the two
  * living as unrelated-looking cells scattered across a generic form grid.
+ *
+ * `required` applies to the number only. The upload is always optional.
  */
 export function IdentityFieldGroup({
   heading,
@@ -16,22 +17,16 @@ export function IdentityFieldGroup({
   value,
   onValueChange,
   inputProps,
-  borrowerId,
-  documents,
-  pendingFile,
-  onPendingFileChange,
 }: {
   heading: string;
-  documentType: OcrDocumentType;
+  documentType: BorrowerDocumentType;
   required?: boolean;
   value: string;
   onValueChange: (value: string) => void;
   inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">;
-  borrowerId?: string;
-  documents?: DocumentMetadata[];
-  pendingFile?: File | null;
-  onPendingFileChange?: (file: File | null) => void;
 }) {
+  const { borrowerId, existingDoc, pendingFile, setPendingFile } = useBorrowerDocument(documentType);
+
   return (
     <div className="rounded-lg border border-slate-200 p-3">
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -49,13 +44,11 @@ export function IdentityFieldGroup({
         label={heading}
         documentType={documentType}
         borrowerId={borrowerId}
-        existingDoc={documents?.find((d) => d.documentType === documentType)}
+        existingDoc={existingDoc}
         pendingFile={pendingFile}
-        onPendingFileChange={onPendingFileChange}
-        onExtracted={onValueChange}
-        required={required}
+        onPendingFileChange={setPendingFile}
       />
-      <p className="mt-1.5 text-xs text-slate-400">Upload a clear, well-lit photo/scan for best auto-fill results.</p>
+      <p className="mt-1.5 text-xs text-slate-400">Optional &mdash; attach a PDF or photo of this document.</p>
     </div>
   );
 }

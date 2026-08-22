@@ -1,21 +1,23 @@
 import { useState, type ChangeEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteDocument, downloadDocument, uploadDocument } from "../../documents/api";
-import { extractDocumentData, type OcrDocumentType } from "../../ocr/api";
+import { deleteDocument, downloadDocument, uploadDocument, viewDocument } from "../../documents/api";
 import type { DocumentMetadata } from "../../documents/types";
+import type { BorrowerDocumentType } from "../BorrowerDocumentsContext";
 
-/** Image types OCR can actually read — Tesseract reads pixels, not a PDF's text layer. */
-const OCR_ELIGIBLE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+/** Extensions offered in the picker. The backend enforces the real allowlist and a 10 MB cap. */
+const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,.webp";
 
 /**
  * Compact upload control nested inside an `IdentityFieldGroup` (so it renders
  * no label of its own — the group's heading already says which document this
- * is). Create mode (no borrowerId): file is held in memory and uploaded by the
- * caller once the borrower exists. Edit mode (borrowerId set): file uploads
- * immediately, and any existing doc is shown for download/removal.
- * On file select, best-effort OCR runs in the background and — if it finds a
- * matching value — calls onExtracted so the caller can pre-fill the paired
- * text field. The user can still edit/override whatever gets suggested.
+ * is).
+ *
+ * Create mode (no `borrowerId`): the file is held in memory and uploaded by
+ * the caller once the borrower exists. Edit mode (`borrowerId` set): the file
+ * uploads immediately, and any existing document is shown for view, download
+ * or removal.
+ *
+ * Uploading is always optional — this control never renders a required input.
  */
 export function IdentityDocumentField({
   documentType,
@@ -24,21 +26,17 @@ export function IdentityDocumentField({
   existingDoc,
   pendingFile,
   onPendingFileChange,
-  onExtracted,
-  required,
 }: {
-  documentType: OcrDocumentType;
-  /** Used only as the display name stored with the uploaded document, never rendered here. */
+  documentType: BorrowerDocumentType;
+  /** Stored as the uploaded document's display name. Never rendered here. */
   label: string;
   borrowerId?: string;
   existingDoc?: DocumentMetadata;
   pendingFile?: File | null;
   onPendingFileChange?: (file: File | null) => void;
-  onExtracted?: (value: string) => void;
-  required?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const [ocrStatus, setOcrStatus] = useState<"idle" | "reading" | "done" | "failed">("idle");
+  const [viewError, setViewError] = useState<string | null>(null);
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) =>
@@ -51,27 +49,22 @@ export function IdentityDocumentField({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId] }),
   });
 
-  function runOcr(file: File) {
-    if (!OCR_ELIGIBLE_TYPES.has(file.type)) return; // PDFs etc. — silently skipped, no auto-fill
-    setOcrStatus("reading");
-    extractDocumentData(file, documentType)
-      .then(({ extractedValue }) => {
-        setOcrStatus("done");
-        if (extractedValue) onExtracted?.(extractedValue);
-      })
-      .catch(() => setOcrStatus("failed"));
-  }
-
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    // Reset so re-picking the same filename still fires a change event.
     e.target.value = "";
     if (!file) return;
-    if (borrowerId) {
-      uploadMutation.mutate(file);
-    } else {
-      onPendingFileChange?.(file);
-    }
-    runOcr(file);
+
+    if (borrowerId) uploadMutation.mutate(file);
+    else onPendingFileChange?.(file);
+  }
+
+  function handleView() {
+    if (!existingDoc) return;
+    setViewError(null);
+    viewDocument(existingDoc.id).catch((error) =>
+      setViewError(error instanceof Error ? error.message : "Couldn't open this document."),
+    );
   }
 
   const uploadedFileName = borrowerId ? existingDoc?.fileName ?? existingDoc?.name : pendingFile?.name;
@@ -82,18 +75,23 @@ export function IdentityDocumentField({
       {hasFile ? (
         <div className="flex items-center justify-between gap-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 text-emerald-600">✓</span>
+            <span className="shrink-0 text-emerald-600">&#10003;</span>
             <span className="truncate text-slate-700">{uploadedFileName}</span>
           </span>
           <div className="flex flex-wrap gap-2">
-            {borrowerId && existingDoc && (
-              <button
-                type="button"
-                className="text-xs text-slate-500 underline"
-                onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
-              >
-                Download
-              </button>
+            {existingDoc && (
+              <>
+                <button type="button" className="text-xs text-slate-500 underline" onClick={handleView}>
+                  View
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 underline"
+                  onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
+                >
+                  Download
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -108,23 +106,25 @@ export function IdentityDocumentField({
       ) : (
         <input
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          accept={ACCEPTED_FILE_TYPES}
           onChange={handleFileChange}
           disabled={uploadMutation.isPending}
-          required={required}
           className="block w-full text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-slate-900 file:px-2.5 file:py-1 file:text-xs file:text-white"
         />
       )}
 
-      {ocrStatus === "reading" && <p className="mt-1 text-xs text-slate-400">Reading document…</p>}
-      {ocrStatus === "failed" && (
-        <p className="mt-1 text-xs text-slate-400">Couldn't auto-read this file — enter the value manually.</p>
-      )}
+      {uploadMutation.isPending && <p className="mt-1 text-xs text-slate-400">Uploading&hellip;</p>}
       {uploadMutation.isError && (
         <p className="mt-1 text-xs text-red-600">
           {uploadMutation.error instanceof Error ? uploadMutation.error.message : "Upload failed."}
         </p>
       )}
+      {deleteMutation.isError && (
+        <p className="mt-1 text-xs text-red-600">
+          {deleteMutation.error instanceof Error ? deleteMutation.error.message : "Couldn't remove this document."}
+        </p>
+      )}
+      {viewError && <p className="mt-1 text-xs text-red-600">{viewError}</p>}
     </div>
   );
 }
