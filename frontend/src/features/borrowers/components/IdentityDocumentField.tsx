@@ -19,8 +19,6 @@ const ACCEPTED_FILE_TYPES = ".jpg,.jpeg,.png";
  */
 const OCR_READABLE_TYPES = new Set(["image/jpeg", "image/png"]);
 
-export type OcrStatus = "idle" | "reading" | "done" | "empty" | "skipped" | "failed";
-
 /**
  * Compact upload control nested inside an `IdentityFieldGroup` (so it renders
  * no label of its own - the group's heading already says which document this is).
@@ -29,9 +27,11 @@ export type OcrStatus = "idle" | "reading" | "done" | "empty" | "skipped" | "fai
  * caller once the borrower exists. Edit mode (`borrowerId` set): the file
  * uploads immediately, and any stored scan is shown for view, download or removal.
  *
- * Picking an image also sends a copy for OCR, reported upward via `onOcrResult`
- * so the group can offer it as a suggestion. That runs alongside the upload and
- * never gates it: OCR failing has no effect on whether the file is stored.
+ * Picking a photo also sends a copy for OCR, reported upward via
+ * `onOcrSuggestion` so the group can offer it as a suggestion. That runs
+ * alongside the upload and never gates it: OCR failing has no effect on whether
+ * the file is stored, and is not surfaced - the user can always just type the
+ * number.
  *
  * Uploading is always optional - this control never renders a required input.
  */
@@ -41,14 +41,14 @@ export function IdentityDocumentField({
   storedDoc,
   pendingFile,
   onPendingFileChange,
-  onOcrResult,
+  onOcrSuggestion,
 }: {
   kind: IdentityDocumentKind;
   borrowerId?: string;
   storedDoc?: StoredIdentityDocument;
   pendingFile?: File | null;
   onPendingFileChange?: (file: File | null) => void;
-  onOcrResult?: (status: OcrStatus, value: string | null) => void;
+  onOcrSuggestion?: (value: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [viewError, setViewError] = useState<string | null>(null);
@@ -63,21 +63,16 @@ export function IdentityDocumentField({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
-  /** Best-effort. Every outcome is reported so the group can say what happened. */
+  /**
+   * Best-effort, and deliberately silent on failure: a read that finds nothing,
+   * errors, or gets an unreadable format simply produces no suggestion.
+   */
   function runOcr(file: File) {
-    if (!onOcrResult) return;
+    if (!onOcrSuggestion || !OCR_READABLE_TYPES.has(file.type)) return;
 
-    if (!OCR_READABLE_TYPES.has(file.type)) {
-      onOcrResult("skipped", null);
-      return;
-    }
-
-    onOcrResult("reading", null);
     extractDocumentData(file, OCR_DOCUMENT_TYPE_FOR_KIND[kind])
-      .then(({ extractedValue }) =>
-        onOcrResult(extractedValue ? "done" : "empty", extractedValue),
-      )
-      .catch(() => onOcrResult("failed", null));
+      .then(({ extractedValue }) => onOcrSuggestion(extractedValue))
+      .catch(() => onOcrSuggestion(null));
   }
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -93,7 +88,7 @@ export function IdentityDocumentField({
   }
 
   function clearFile() {
-    onOcrResult?.("idle", null);
+    onOcrSuggestion?.(null);
     if (borrowerId) deleteMutation.mutate();
     else onPendingFileChange?.(null);
   }

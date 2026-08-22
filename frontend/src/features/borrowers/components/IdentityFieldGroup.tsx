@@ -1,7 +1,7 @@
 import { useState, type InputHTMLAttributes } from "react";
 import { useBorrowerDocument } from "../BorrowerDocumentsContext";
 import type { IdentityDocumentKind } from "../identityDocumentApi";
-import { IdentityDocumentField, type OcrStatus } from "./IdentityDocumentField";
+import { IdentityDocumentField } from "./IdentityDocumentField";
 
 /**
  * One bordered unit per identity document - number field on top, its matching
@@ -9,10 +9,13 @@ import { IdentityDocumentField, type OcrStatus } from "./IdentityDocumentField";
  * between "PAN number" and "PAN file" visually obvious, instead of the two
  * living as unrelated-looking cells scattered across a generic form grid.
  *
- * When an uploaded image is read successfully, the value is offered as a
+ * When an uploaded photo is read successfully, the value is offered as a
  * suggestion rather than written into the field. OCR guesses, and a mis-read
- * must never silently replace something the user typed - so filling the field
+ * must never silently replace a number the user typed - so filling the field
  * stays an explicit click.
+ *
+ * A failed or empty read says nothing at all: auto-fill is a convenience, and
+ * the user can always just type the number, so there is nothing to report.
  *
  * `required` applies to the number only. The upload is always optional.
  */
@@ -32,23 +35,17 @@ export function IdentityFieldGroup({
   inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">;
 }) {
   const { borrowerId, storedDoc, pendingFile, setPendingFile } = useBorrowerDocument(kind);
-  const [ocrStatus, setOcrStatus] = useState<OcrStatus>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
-
-  function handleOcrResult(status: OcrStatus, extracted: string | null) {
-    setOcrStatus(status);
-    setSuggestion(extracted);
-  }
 
   function applySuggestion() {
     if (!suggestion) return;
     onValueChange(suggestion);
     setSuggestion(null);
-    setOcrStatus("idle");
   }
 
-  // Nothing to offer once the field already holds what OCR read.
-  const showSuggestion = ocrStatus === "done" && suggestion !== null && suggestion !== value;
+  // Nothing to offer once the field already holds what was read.
+  const showSuggestion = suggestion !== null && suggestion !== value;
+  const hasFile = borrowerId ? Boolean(storedDoc) : Boolean(pendingFile);
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
@@ -85,22 +82,10 @@ export function IdentityFieldGroup({
         storedDoc={storedDoc}
         pendingFile={pendingFile}
         onPendingFileChange={setPendingFile}
-        onOcrResult={handleOcrResult}
+        onOcrSuggestion={setSuggestion}
       />
 
-      {ocrStatus === "idle" && (
-        <p className="mt-1.5 text-xs text-slate-400">Upload a clear photo (JPG/PNG)</p>
-      )}
-      {ocrStatus === "reading" && <p className="mt-1.5 text-xs text-slate-400">Reading the image&hellip;</p>}
-      {ocrStatus === "empty" && (
-        <p className="mt-1.5 text-xs text-slate-400">Couldn&rsquo;t read a number from this image &mdash; type it above.</p>
-      )}
-      {ocrStatus === "skipped" && (
-        <p className="mt-1.5 text-xs text-slate-400">Only JPG and PNG photos can be read &mdash; type the number above.</p>
-      )}
-      {ocrStatus === "failed" && (
-        <p className="mt-1.5 text-xs text-slate-400">Auto-read failed &mdash; type the number above.</p>
-      )}
+      {!hasFile && <p className="mt-1.5 text-xs text-slate-400">Upload a clear photo (JPG/PNG)</p>}
     </div>
   );
 }
