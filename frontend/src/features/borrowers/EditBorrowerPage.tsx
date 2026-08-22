@@ -10,6 +10,7 @@ import { BorrowerMasterFields } from "./components/BorrowerMasterFields";
 import { RelatedPersonsEditor } from "./components/RelatedPersonsEditor";
 import { getBorrower, updateBorrower } from "./api";
 import { listDocuments } from "../documents/api";
+import { BorrowerDocumentsProvider } from "./BorrowerDocumentsContext";
 import { UploadDocumentForm } from "../documents/components/UploadDocumentForm";
 import { DocumentCard } from "../documents/components/DocumentCard";
 import { useAuth } from "../auth/AuthContext";
@@ -79,7 +80,16 @@ export function EditBorrowerPage() {
 
       {data && loaded && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <BorrowerMasterFields form={form} onChange={patch} showStatus />
+          {/* The borrower already exists, so identity uploads fire immediately -
+              nothing is ever held pending here. */}
+          <BorrowerDocumentsProvider
+            borrowerId={id}
+            documents={documents}
+            pendingFiles={{}}
+            setPendingFile={() => {}}
+          >
+            <BorrowerMasterFields form={form} onChange={patch} showStatus />
+          </BorrowerDocumentsProvider>
 
           {mutation.isError && <FormErrors error={mutation.error} />}
 

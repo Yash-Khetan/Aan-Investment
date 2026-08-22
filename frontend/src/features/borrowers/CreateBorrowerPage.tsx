@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
 import { Card } from "../../components/ui/Card";
@@ -9,6 +9,13 @@ import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
 import { ChooseOption } from "./components/borrowerFormShared";
 import { createBorrower } from "./api";
+import { listDocuments, uploadDocument } from "../documents/api";
+import {
+  BORROWER_DOCUMENT_LABELS,
+  BorrowerDocumentsProvider,
+  type BorrowerDocumentType,
+  type PendingBorrowerFiles,
+} from "./BorrowerDocumentsContext";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import {
@@ -43,11 +50,79 @@ export function CreateBorrowerPage() {
   const [form, setForm] = useState<BorrowerFormState>(draft?.form ?? EMPTY_BORROWER_FORM);
   const [promoters, setPromoters] = useState<Promoter[]>(draft?.promoters ?? []);
 
+  // Deliberately NOT part of the autosaved draft: useAutosaveDraft JSON-serializes
+  // to localStorage, and a File serializes to {}. Picked files are lost on reload,
+  // which is correct - the bytes were never persisted anywhere.
+  const [pendingFiles, setPendingFiles] = useState<PendingBorrowerFiles>({});
+
+  // Set once the borrower row exists. From that point the identity fields switch
+  // to edit mode (immediate upload), and submitting must not create a second borrower.
+  const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
+  const [failedUploads, setFailedUploads] = useState<string[]>([]);
+
+  // Only fetched after creation, so successfully uploaded documents render as
+  // attached rather than reverting to an empty picker.
+  const { data: createdDocuments } = useQuery({
+    queryKey: ["documents", "BORROWER", createdBorrowerId],
+    queryFn: () => listDocuments("BORROWER", createdBorrowerId!),
+    enabled: !!createdBorrowerId,
+  });
+
+  function setPendingFile(documentType: BorrowerDocumentType, file: File | null) {
+    setPendingFiles((prev) => {
+      const next = { ...prev };
+      if (file) next[documentType] = file;
+      else delete next[documentType];
+      return next;
+    });
+  }
+
   useAutosaveDraft(DRAFT_KEY, { form, promoters }, status === "authenticated");
+
+  /**
+   * Uploads every held file against the freshly created borrower. Returns the
+   * display names of the ones that failed - an empty array means all succeeded.
+   * Uses allSettled so one failure cannot abandon the others.
+   */
+  async function uploadPendingFiles(borrowerId: string): Promise<string[]> {
+    const entries = Object.entries(pendingFiles) as [BorrowerDocumentType, File][];
+    if (entries.length === 0) return [];
+
+    const results = await Promise.allSettled(
+      entries.map(([documentType, file]) =>
+        uploadDocument({
+          entityType: "BORROWER",
+          entityId: borrowerId,
+          documentType,
+          name: BORROWER_DOCUMENT_LABELS[documentType],
+          file,
+        }),
+      ),
+    );
+
+    const failed: string[] = [];
+    entries.forEach(([documentType], i) => {
+      if (results[i].status === "fulfilled") setPendingFile(documentType, null);
+      else failed.push(BORROWER_DOCUMENT_LABELS[documentType]);
+    });
+
+    return failed;
+  }
 
   const mutation = useMutation({
     mutationFn: (input: ReturnType<typeof formStateToCreateInput>) => createBorrower(input),
-    onSuccess: (borrower) => {
+    onSuccess: async (borrower) => {
+      // Recorded before the uploads run: the borrower now exists, so a second
+      // submit must never POST /borrowers again.
+      setCreatedBorrowerId(borrower.id);
+
+      const failed = await uploadPendingFiles(borrower.id);
+      if (failed.length > 0) {
+        // Stay put so the user can retry in place - the fields are in edit mode now.
+        setFailedUploads(failed);
+        return;
+      }
+
       clearDraft(DRAFT_KEY);
       navigate(`/borrowers`, { state: { createdId: borrower.id } });
     },
@@ -63,6 +138,15 @@ export function CreateBorrowerPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // The borrower was already created and only the uploads failed. Submitting
+    // now means "I'm done retrying" - never "create another borrower".
+    if (createdBorrowerId) {
+      clearDraft(DRAFT_KEY);
+      navigate(`/borrowers`, { state: { createdId: createdBorrowerId } });
+      return;
+    }
+
     mutation.mutate(formStateToCreateInput(form, promoters));
   }
 
@@ -71,7 +155,14 @@ export function CreateBorrowerPage() {
       <PageHeader title="New Borrower" description="Borrower master — identity, address, and internal details." />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <BorrowerMasterFields form={form} onChange={patch} />
+        <BorrowerDocumentsProvider
+          borrowerId={createdBorrowerId ?? undefined}
+          documents={createdDocuments}
+          pendingFiles={pendingFiles}
+          setPendingFile={setPendingFile}
+        >
+          <BorrowerMasterFields form={form} onChange={patch} />
+        </BorrowerDocumentsProvider>
 
         {/* "Related Person" is a Commercial-sheet block — consumers have none. */}
         {form.borrowerType === "COMMERCIAL" && (
@@ -161,9 +252,19 @@ export function CreateBorrowerPage() {
 
         {mutation.isError && <FormErrors error={mutation.error} />}
 
+        {failedUploads.length > 0 && (
+          <Card className="border-amber-300 bg-amber-50 p-4">
+            <p className="text-sm text-amber-800">
+              Borrower created, but {failedUploads.join(" and ")} failed to upload. Pick{" "}
+              {failedUploads.length > 1 ? "those files" : "that file"} again above to retry &mdash; it uploads straight
+              away now &mdash; then press Done.
+            </p>
+          </Card>
+        )}
+
         <div className="flex gap-2">
           <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Create Borrower"}
+            {createdBorrowerId ? "Done" : mutation.isPending ? "Saving..." : "Create Borrower"}
           </Button>
           <Button type="button" variant="ghost" onClick={() => navigate("/borrowers")}>
             Cancel
