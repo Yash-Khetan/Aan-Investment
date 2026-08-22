@@ -89,7 +89,7 @@ export const borrowerTypeEnum = pgEnum("borrower_type", [
 export const genderEnum = pgEnum("gender", [
     "MALE",
     "FEMALE",
-    "TRANSGENDER",
+    "OTHERS",
 ]);
 
 /** CIBIL "Address Category": 01 Permanent, 02 Residence, 03 Office, 04 Not Categorized. */

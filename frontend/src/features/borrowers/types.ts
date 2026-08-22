@@ -43,7 +43,7 @@ export const BORROWER_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export const GENDERS: CodedOption[] = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
-  { value: "TRANSGENDER", label: "Transgender" },
+  { value: "OTHERS", label: "Others" },
 ];
 
 export const ADDRESS_CATEGORIES: CodedOption[] = [
