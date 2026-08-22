@@ -60,11 +60,28 @@ export function IdentityDocumentField({
   }
 
   function handleView() {
-    if (!existingDoc) return;
     setViewError(null);
-    viewDocument(existingDoc.id).catch((error) =>
-      setViewError(error instanceof Error ? error.message : "Couldn't open this document."),
-    );
+
+    if (existingDoc) {
+      viewDocument(existingDoc.id).catch((error) =>
+        setViewError(error instanceof Error ? error.message : "Couldn't open this document."),
+      );
+      return;
+    }
+
+    // Not uploaded yet - there is no document id to fetch, so preview the file
+    // straight out of browser memory. No await here, so the click's
+    // user-gesture context is intact and the popup blocker stays quiet.
+    if (!pendingFile) return;
+    const objectUrl = URL.createObjectURL(pendingFile);
+    const tab = window.open(objectUrl, "_blank");
+    if (!tab) {
+      URL.revokeObjectURL(objectUrl);
+      setViewError("Allow pop-ups for this site to preview the file.");
+      return;
+    }
+    // Revoking immediately would race the new tab's own load of the blob.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   }
 
   const uploadedFileName = borrowerId ? existingDoc?.fileName ?? existingDoc?.name : pendingFile?.name;
@@ -79,19 +96,17 @@ export function IdentityDocumentField({
             <span className="truncate text-slate-700">{uploadedFileName}</span>
           </span>
           <div className="flex flex-wrap gap-2">
+            <button type="button" className="text-xs text-slate-500 underline" onClick={handleView}>
+              View
+            </button>
             {existingDoc && (
-              <>
-                <button type="button" className="text-xs text-slate-500 underline" onClick={handleView}>
-                  View
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-slate-500 underline"
-                  onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
-                >
-                  Download
-                </button>
-              </>
+              <button
+                type="button"
+                className="text-xs text-slate-500 underline"
+                onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
+              >
+                Download
+              </button>
             )}
             <button
               type="button"

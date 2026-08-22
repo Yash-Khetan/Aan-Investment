@@ -48,7 +48,6 @@ export function IdentityFieldGroup({
         pendingFile={pendingFile}
         onPendingFileChange={setPendingFile}
       />
-      <p className="mt-1.5 text-xs text-slate-400">Optional &mdash; attach a PDF or photo of this document.</p>
     </div>
   );
 }
