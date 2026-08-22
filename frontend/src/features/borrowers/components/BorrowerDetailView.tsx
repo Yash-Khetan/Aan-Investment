@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../../components/ui/Sta
 import { DetailField, DetailSection } from "../../../components/ui/SlideOver";
 import { formatDate } from "../../../lib/format";
 import { getBorrower } from "../api";
-import { listDocuments, downloadDocument } from "../../documents/api";
+import { listDocuments, downloadDocument, viewDocument } from "../../documents/api";
 import {
   ADDRESS_CATEGORIES,
   APPLICANT_TYPES,
@@ -141,13 +141,18 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
           {documents?.map((doc) => (
             <div key={doc.id} className="flex items-center justify-between rounded-md border border-slate-100 px-3 py-2 text-sm">
               <span className="truncate text-slate-700">{doc.name}</span>
-              <button
-                type="button"
-                className="shrink-0 text-xs text-slate-500 underline"
-                onClick={() => downloadDocument(doc.id, doc.fileName ?? doc.name)}
-              >
-                Download
-              </button>
+              <span className="flex shrink-0 gap-2">
+                <button type="button" className="text-xs text-slate-500 underline" onClick={() => viewDocument(doc.id)}>
+                  View
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 underline"
+                  onClick={() => downloadDocument(doc.id, doc.fileName ?? doc.name)}
+                >
+                  Download
+                </button>
+              </span>
             </div>
           ))}
         </div>
