@@ -37,14 +37,6 @@ export class InvalidDocumentTypeError extends DocumentVaultError {
     }
 }
 
-/** Thrown when `source` isn't a value of the `document_source` enum. */
-export class InvalidDocumentSourceError extends DocumentVaultError {
-    constructor(message: string) {
-        super(message);
-        this.name = "InvalidDocumentSourceError";
-    }
-}
-
 /** Thrown when an uploaded file's MIME type isn't in the allow-list. */
 export class InvalidMimeTypeError extends DocumentVaultError {
     constructor(message: string) {

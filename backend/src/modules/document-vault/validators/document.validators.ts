@@ -1,15 +1,14 @@
-import { documentOwnerEnum, documentSourceEnum, documentTypeEnum } from "../../../db/schema";
+import { documentOwnerEnum, documentTypeEnum } from "../../../db/schema";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "../constants/document.constants";
 import {
     InvalidEntityTypeError,
     InvalidEntityIdError,
     InvalidDocumentTypeError,
-    InvalidDocumentSourceError,
     InvalidMimeTypeError,
     FileTooLargeError,
     MissingFileError,
 } from "../utils/errors";
-import type { EntityType, DocumentClassification, DocumentSource, UploadFileInput } from "../types/document.types";
+import type { EntityType, DocumentClassification, UploadFileInput } from "../types/document.types";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -31,14 +30,6 @@ export function assertValidDocumentType(documentType: string): asserts documentT
     if (!documentTypeEnum.enumValues.includes(documentType as DocumentClassification)) {
         throw new InvalidDocumentTypeError(
             `Invalid documentType "${documentType}". Must be one of: ${documentTypeEnum.enumValues.join(", ")}.`
-        );
-    }
-}
-
-export function assertValidDocumentSource(source: string): asserts source is DocumentSource {
-    if (!documentSourceEnum.enumValues.includes(source as DocumentSource)) {
-        throw new InvalidDocumentSourceError(
-            `Invalid source "${source}". Must be one of: ${documentSourceEnum.enumValues.join(", ")}.`
         );
     }
 }

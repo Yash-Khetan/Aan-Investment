@@ -1,8 +1,13 @@
 import { useState, type ChangeEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteDocument, downloadDocument, uploadDocument, viewDocument } from "../../documents/api";
-import type { DocumentMetadata } from "../../documents/types";
-import type { BorrowerDocumentType } from "../BorrowerDocumentsContext";
+import {
+  deleteIdentityDocument,
+  downloadIdentityDocument,
+  uploadIdentityDocument,
+  viewIdentityDocument,
+  type IdentityDocumentKind,
+} from "../identityDocumentApi";
+import type { StoredIdentityDocument } from "../BorrowerDocumentsContext";
 
 /** Extensions offered in the picker. The backend enforces the real allowlist and a 10 MB cap. */
 const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,.webp";
@@ -14,24 +19,21 @@ const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,.webp";
  *
  * Create mode (no `borrowerId`): the file is held in memory and uploaded by
  * the caller once the borrower exists. Edit mode (`borrowerId` set): the file
- * uploads immediately, and any existing document is shown for view, download
- * or removal.
+ * uploads immediately, and any stored scan is shown for view, download or
+ * removal.
  *
  * Uploading is always optional — this control never renders a required input.
  */
 export function IdentityDocumentField({
-  documentType,
-  label,
+  kind,
   borrowerId,
-  existingDoc,
+  storedDoc,
   pendingFile,
   onPendingFileChange,
 }: {
-  documentType: BorrowerDocumentType;
-  /** Stored as the uploaded document's display name. Never rendered here. */
-  label: string;
+  kind: IdentityDocumentKind;
   borrowerId?: string;
-  existingDoc?: DocumentMetadata;
+  storedDoc?: StoredIdentityDocument;
   pendingFile?: File | null;
   onPendingFileChange?: (file: File | null) => void;
 }) {
@@ -39,21 +41,13 @@ export function IdentityDocumentField({
   const [viewError, setViewError] = useState<string | null>(null);
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) =>
-      uploadDocument({
-        entityType: "BORROWER",
-        entityId: borrowerId!,
-        documentType,
-        source: "IDENTITY",
-        name: label,
-        file,
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId, "IDENTITY"] }),
+    mutationFn: (file: File) => uploadIdentityDocument(borrowerId!, kind, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteDocument(existingDoc!.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId, "IDENTITY"] }),
+    mutationFn: () => deleteIdentityDocument(borrowerId!, kind),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -69,16 +63,16 @@ export function IdentityDocumentField({
   function handleView() {
     setViewError(null);
 
-    if (existingDoc) {
-      viewDocument(existingDoc.id).catch((error) =>
+    if (borrowerId && storedDoc) {
+      viewIdentityDocument(borrowerId, kind).catch((error) =>
         setViewError(error instanceof Error ? error.message : "Couldn't open this document."),
       );
       return;
     }
 
-    // Not uploaded yet - there is no document id to fetch, so preview the file
-    // straight out of browser memory. No await here, so the click's
-    // user-gesture context is intact and the popup blocker stays quiet.
+    // Not uploaded yet — preview the file straight out of browser memory. No
+    // await here, so the click's user-gesture context is intact and the popup
+    // blocker stays quiet.
     if (!pendingFile) return;
     const objectUrl = URL.createObjectURL(pendingFile);
     const tab = window.open(objectUrl, "_blank");
@@ -91,8 +85,8 @@ export function IdentityDocumentField({
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   }
 
-  const uploadedFileName = borrowerId ? existingDoc?.fileName ?? existingDoc?.name : pendingFile?.name;
-  const hasFile = borrowerId ? Boolean(existingDoc) : Boolean(pendingFile);
+  const displayName = borrowerId ? storedDoc?.name ?? storedDoc?.path : pendingFile?.name;
+  const hasFile = borrowerId ? Boolean(storedDoc) : Boolean(pendingFile);
 
   return (
     <div>
@@ -100,17 +94,17 @@ export function IdentityDocumentField({
         <div className="flex items-center justify-between gap-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="shrink-0 text-emerald-600">&#10003;</span>
-            <span className="truncate text-slate-700">{uploadedFileName}</span>
+            <span className="truncate text-slate-700">{displayName}</span>
           </span>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="text-xs text-slate-500 underline" onClick={handleView}>
               View
             </button>
-            {existingDoc && (
+            {borrowerId && storedDoc && (
               <button
                 type="button"
                 className="text-xs text-slate-500 underline"
-                onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
+                onClick={() => downloadIdentityDocument(borrowerId, kind, storedDoc.name ?? `${kind}-document`)}
               >
                 Download
               </button>

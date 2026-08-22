@@ -20,8 +20,6 @@ const PALETTE: Record<string, string> = {
   OPEN: "bg-blue-100 text-blue-800",
   PROMISE_TO_PAY: "bg-purple-100 text-purple-800",
   FOLLOW_UP: "bg-amber-100 text-amber-800",
-  // document source
-  IDENTITY: "bg-indigo-100 text-indigo-800",
   // insurance / generic
   EXPIRED: "bg-red-100 text-red-800",
   NOT_INSURED: "bg-slate-100 text-slate-700",

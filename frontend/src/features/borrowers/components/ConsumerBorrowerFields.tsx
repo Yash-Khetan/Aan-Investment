@@ -81,7 +81,7 @@ export function ConsumerBorrowerFields({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <IdentityFieldGroup
             heading="Income Tax ID Number (PAN)"
-            documentType="PAN_CARD"
+            kind="pan"
             required
             value={form.pan}
             onValueChange={(v) => onChange({ pan: v.toUpperCase() })}
@@ -89,14 +89,14 @@ export function ConsumerBorrowerFields({
           />
           <IdentityFieldGroup
             heading="Aadhaar"
-            documentType="AADHAAR"
+            kind="aadhaar"
             value={form.aadhaar}
             onValueChange={(v) => onChange({ aadhaar: v.replace(/\D/g, "") })}
             inputProps={{ placeholder: "123412341234", pattern: AADHAAR_PATTERN, title: AADHAAR_TITLE }}
           />
           <IdentityFieldGroup
             heading="CKYC Number"
-            documentType="KYC"
+            kind="ckyc"
             value={form.ckycNumber}
             onValueChange={(v) => onChange({ ckycNumber: v.replace(/\D/g, "") })}
             inputProps={{ placeholder: "14-digit CKYC number", pattern: CKYC_PATTERN, title: CKYC_TITLE }}

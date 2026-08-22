@@ -1,22 +1,14 @@
 import { apiRequest, downloadFile, getAccessToken, API_BASE_URL, ApiError } from "../../lib/api";
-import type { DocumentMetadata, DocumentSource } from "./types";
+import type { DocumentMetadata } from "./types";
 
-/** Pass `source` to get only identity-field uploads, or only Documents-page uploads. */
-export function listDocuments(
-  entityType: string,
-  entityId: string,
-  source?: DocumentSource,
-): Promise<DocumentMetadata[]> {
-  const query = source ? `?source=${source}` : "";
-  return apiRequest<DocumentMetadata[]>(`/documents/entity/${entityType}/${entityId}${query}`);
+export function listDocuments(entityType: string, entityId: string): Promise<DocumentMetadata[]> {
+  return apiRequest<DocumentMetadata[]>(`/documents/entity/${entityType}/${entityId}`);
 }
 
 export async function uploadDocument(input: {
   entityType: string;
   entityId: string;
   documentType: string;
-  /** Omitted means GENERAL - the backend's default for the Documents page. */
-  source?: DocumentSource;
   name?: string;
   remarks?: string;
   file: File;
@@ -25,7 +17,6 @@ export async function uploadDocument(input: {
   formData.append("entityType", input.entityType);
   formData.append("entityId", input.entityId);
   formData.append("documentType", input.documentType);
-  if (input.source) formData.append("source", input.source);
   if (input.name) formData.append("name", input.name);
   if (input.remarks) formData.append("remarks", input.remarks);
   formData.append("file", input.file);

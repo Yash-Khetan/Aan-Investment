@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes } from "react";
-import { useBorrowerDocument, type BorrowerDocumentType } from "../BorrowerDocumentsContext";
+import { useBorrowerDocument } from "../BorrowerDocumentsContext";
+import type { IdentityDocumentKind } from "../identityDocumentApi";
 import { IdentityDocumentField } from "./IdentityDocumentField";
 
 /**
@@ -12,20 +13,20 @@ import { IdentityDocumentField } from "./IdentityDocumentField";
  */
 export function IdentityFieldGroup({
   heading,
-  documentType,
+  kind,
   required,
   value,
   onValueChange,
   inputProps,
 }: {
   heading: string;
-  documentType: BorrowerDocumentType;
+  kind: IdentityDocumentKind;
   required?: boolean;
   value: string;
   onValueChange: (value: string) => void;
   inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">;
 }) {
-  const { borrowerId, existingDoc, pendingFile, setPendingFile } = useBorrowerDocument(documentType);
+  const { borrowerId, storedDoc, pendingFile, setPendingFile } = useBorrowerDocument(kind);
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
@@ -41,10 +42,9 @@ export function IdentityFieldGroup({
         {...inputProps}
       />
       <IdentityDocumentField
-        label={heading}
-        documentType={documentType}
+        kind={kind}
         borrowerId={borrowerId}
-        existingDoc={existingDoc}
+        storedDoc={storedDoc}
         pendingFile={pendingFile}
         onPendingFileChange={setPendingFile}
       />

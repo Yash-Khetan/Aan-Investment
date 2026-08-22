@@ -8,12 +8,11 @@ import { SelectField, TextField } from "../../components/ui/Field";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
 import { ChooseOption } from "./components/borrowerFormShared";
-import { createBorrower } from "./api";
-import { listDocuments, uploadDocument } from "../documents/api";
+import { createBorrower, getBorrower } from "./api";
+import { uploadIdentityDocument, type IdentityDocumentKind } from "./identityDocumentApi";
 import {
-  BORROWER_DOCUMENT_LABELS,
+  IDENTITY_DOCUMENT_LABELS,
   BorrowerDocumentsProvider,
-  type BorrowerDocumentType,
   type PendingBorrowerFiles,
 } from "./BorrowerDocumentsContext";
 import { useAuth } from "../auth/AuthContext";
@@ -60,19 +59,19 @@ export function CreateBorrowerPage() {
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [failedUploads, setFailedUploads] = useState<string[]>([]);
 
-  // Only fetched after creation, so successfully uploaded documents render as
-  // attached rather than reverting to an empty picker.
-  const { data: createdDocuments } = useQuery({
-    queryKey: ["documents", "BORROWER", createdBorrowerId, "IDENTITY"],
-    queryFn: () => listDocuments("BORROWER", createdBorrowerId!, "IDENTITY"),
+  // Refetched after creation so successfully uploaded scans render as attached
+  // rather than reverting to an empty picker.
+  const { data: createdBorrower } = useQuery({
+    queryKey: ["borrower", createdBorrowerId],
+    queryFn: () => getBorrower(createdBorrowerId!),
     enabled: !!createdBorrowerId,
   });
 
-  function setPendingFile(documentType: BorrowerDocumentType, file: File | null) {
+  function setPendingFile(kind: IdentityDocumentKind, file: File | null) {
     setPendingFiles((prev) => {
       const next = { ...prev };
-      if (file) next[documentType] = file;
-      else delete next[documentType];
+      if (file) next[kind] = file;
+      else delete next[kind];
       return next;
     });
   }
@@ -85,26 +84,17 @@ export function CreateBorrowerPage() {
    * Uses allSettled so one failure cannot abandon the others.
    */
   async function uploadPendingFiles(borrowerId: string): Promise<string[]> {
-    const entries = Object.entries(pendingFiles) as [BorrowerDocumentType, File][];
+    const entries = Object.entries(pendingFiles) as [IdentityDocumentKind, File][];
     if (entries.length === 0) return [];
 
     const results = await Promise.allSettled(
-      entries.map(([documentType, file]) =>
-        uploadDocument({
-          entityType: "BORROWER",
-          entityId: borrowerId,
-          documentType,
-          source: "IDENTITY",
-          name: BORROWER_DOCUMENT_LABELS[documentType],
-          file,
-        }),
-      ),
+      entries.map(([kind, file]) => uploadIdentityDocument(borrowerId, kind, file)),
     );
 
     const failed: string[] = [];
-    entries.forEach(([documentType], i) => {
-      if (results[i].status === "fulfilled") setPendingFile(documentType, null);
-      else failed.push(BORROWER_DOCUMENT_LABELS[documentType]);
+    entries.forEach(([kind], i) => {
+      if (results[i].status === "fulfilled") setPendingFile(kind, null);
+      else failed.push(IDENTITY_DOCUMENT_LABELS[kind]);
     });
 
     return failed;
@@ -158,7 +148,7 @@ export function CreateBorrowerPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <BorrowerDocumentsProvider
           borrowerId={createdBorrowerId ?? undefined}
-          documents={createdDocuments}
+          borrower={createdBorrower}
           pendingFiles={pendingFiles}
           setPendingFile={setPendingFile}
         >

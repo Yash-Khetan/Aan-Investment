@@ -435,27 +435,6 @@ export const documentTypeEnum = pgEnum("document_type", [
    DOCUMENT OWNER
 ============================================================ */
 
-/* ============================================================
-   DOCUMENT SOURCE
-============================================================ */
-
-/**
- * Which part of the app produced a document row.
- *
- * IDENTITY - uploaded from a dedicated identity field on an entity's own form
- * (e.g. the borrower's PAN / Aadhaar / CKYC boxes). GENERAL - uploaded through
- * the generic Documents page.
- *
- * Both live in the same table and use the same storage pipeline; this column is
- * what keeps them distinguishable, since document_type alone cannot separate a
- * PAN uploaded from the identity field from one uploaded through the Documents
- * page.
- */
-export const documentSourceEnum = pgEnum("document_source", [
-    "IDENTITY",
-    "GENERAL",
-]);
-
 export const documentOwnerEnum = pgEnum("document_owner", [
     "BORROWER",
     "LOAN",

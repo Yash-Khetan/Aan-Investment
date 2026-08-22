@@ -10,13 +10,12 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
             throw new MissingFileError("No file was provided in the request.");
         }
 
-        const { entityType, entityId, documentType, source, name, remarks, uploadedBy } = req.body;
+        const { entityType, entityId, documentType, name, remarks, uploadedBy } = req.body;
 
         const metadata = await DocumentService.upload({
             entityType,
             entityId,
             documentType,
-            source,
             name,
             remarks,
             uploadedBy,
@@ -58,9 +57,7 @@ export async function deleteDocument(req: Request, res: Response): Promise<void>
 export async function listDocuments(req: Request, res: Response): Promise<void> {
     try {
         const { entityType, entityId } = req.params;
-        // ?source=IDENTITY|GENERAL narrows the list to one surface; omitted returns everything.
-        const source = req.query.source ? String(req.query.source) : undefined;
-        const metadata = await DocumentService.list(String(entityType), String(entityId), source);
+        const metadata = await DocumentService.list(String(entityType), String(entityId));
         res.status(200).json(metadata);
     } catch (error) {
         mapErrorToHttpResponse(res, error);

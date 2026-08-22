@@ -1,34 +1,32 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import type { DocumentMetadata } from "../documents/types";
+import type { IdentityDocumentKind } from "./identityDocumentApi";
+import type { Borrower } from "./types";
 
-/**
- * The identity documents a borrower form can attach, keyed by the backend's
- * `document_type` enum values.
- *
- * CKYC intentionally maps to `KYC`: the enum has no `CKYC` value, and nothing
- * else on a borrower uses `KYC`, so there is no ambiguity in practice.
- */
-export type BorrowerDocumentType = "PAN_CARD" | "AADHAAR" | "KYC";
-
-/** Display names, used as the document's `name` when uploading and in error messages. */
-export const BORROWER_DOCUMENT_LABELS: Record<BorrowerDocumentType, string> = {
-  PAN_CARD: "PAN",
-  AADHAAR: "Aadhaar",
-  KYC: "CKYC",
+/** Display names, used in error messages and as the heading fallback. */
+export const IDENTITY_DOCUMENT_LABELS: Record<IdentityDocumentKind, string> = {
+  pan: "PAN",
+  aadhaar: "Aadhaar",
+  ckyc: "CKYC",
 };
 
 /**
  * Files picked before the borrower exists, held in memory until there is an id
  * to attach them to. Never persisted — see the note in CreateBorrowerPage.
  */
-export type PendingBorrowerFiles = Partial<Record<BorrowerDocumentType, File>>;
+export type PendingBorrowerFiles = Partial<Record<IdentityDocumentKind, File>>;
+
+/** The stored scan for one kind, read off the borrower record itself. */
+export interface StoredIdentityDocument {
+  path: string;
+  name: string | null;
+}
 
 interface BorrowerDocumentsValue {
   /** Absent on a borrower that has not been created yet. */
   borrowerId?: string;
-  documents?: DocumentMetadata[];
+  borrower?: Borrower;
   pendingFiles: PendingBorrowerFiles;
-  setPendingFile: (documentType: BorrowerDocumentType, file: File | null) => void;
+  setPendingFile: (kind: IdentityDocumentKind, file: File | null) => void;
 }
 
 /**
@@ -45,33 +43,44 @@ const BorrowerDocumentsContext = createContext<BorrowerDocumentsValue>(DEFAULT_V
 
 export function BorrowerDocumentsProvider({
   borrowerId,
-  documents,
+  borrower,
   pendingFiles,
   setPendingFile,
   children,
 }: {
   borrowerId?: string;
-  documents?: DocumentMetadata[];
+  borrower?: Borrower;
   pendingFiles: PendingBorrowerFiles;
-  setPendingFile: (documentType: BorrowerDocumentType, file: File | null) => void;
+  setPendingFile: (kind: IdentityDocumentKind, file: File | null) => void;
   children: ReactNode;
 }) {
   const value = useMemo(
-    () => ({ borrowerId, documents, pendingFiles, setPendingFile }),
-    [borrowerId, documents, pendingFiles, setPendingFile],
+    () => ({ borrowerId, borrower, pendingFiles, setPendingFile }),
+    [borrowerId, borrower, pendingFiles, setPendingFile],
   );
 
   return <BorrowerDocumentsContext.Provider value={value}>{children}</BorrowerDocumentsContext.Provider>;
 }
 
-/** Everything one identity field needs, narrowed to its own document type. */
-export function useBorrowerDocument(documentType: BorrowerDocumentType) {
-  const { borrowerId, documents, pendingFiles, setPendingFile } = useContext(BorrowerDocumentsContext);
+/** Which pair of borrower fields backs each kind. */
+function storedFor(borrower: Borrower | undefined, kind: IdentityDocumentKind): StoredIdentityDocument | undefined {
+  if (!borrower) return undefined;
+
+  const path = kind === "pan" ? borrower.panDocPath : kind === "aadhaar" ? borrower.aadhaarDocPath : borrower.ckycDocPath;
+  if (!path) return undefined;
+
+  const name = kind === "pan" ? borrower.panDocName : kind === "aadhaar" ? borrower.aadhaarDocName : borrower.ckycDocName;
+  return { path, name };
+}
+
+/** Everything one identity field needs, narrowed to its own document kind. */
+export function useBorrowerDocument(kind: IdentityDocumentKind) {
+  const { borrowerId, borrower, pendingFiles, setPendingFile } = useContext(BorrowerDocumentsContext);
 
   return {
     borrowerId,
-    existingDoc: documents?.find((d) => d.documentType === documentType),
-    pendingFile: pendingFiles[documentType] ?? null,
-    setPendingFile: (file: File | null) => setPendingFile(documentType, file),
+    storedDoc: storedFor(borrower, kind),
+    pendingFile: pendingFiles[kind] ?? null,
+    setPendingFile: (file: File | null) => setPendingFile(kind, file),
   };
 }

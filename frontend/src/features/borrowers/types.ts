@@ -180,6 +180,14 @@ export interface Borrower {
   gst: string | null;
   cin: string | null;
   aadhaar: string | null;
+  /* Identity document scans. Only pointers: *DocPath is the Supabase Storage
+     object key, *DocName the filename the user picked. Null when none attached. */
+  panDocPath: string | null;
+  panDocName: string | null;
+  aadhaarDocPath: string | null;
+  aadhaarDocName: string | null;
+  ckycDocPath: string | null;
+  ckycDocName: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   /* CIBIL consumer */

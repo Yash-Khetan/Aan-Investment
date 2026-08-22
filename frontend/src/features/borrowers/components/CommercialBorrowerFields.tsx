@@ -132,7 +132,7 @@ export function CommercialBorrowerFields({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <IdentityFieldGroup
             heading="PAN"
-            documentType="PAN_CARD"
+            kind="pan"
             required
             value={form.pan}
             onValueChange={(v) => onChange({ pan: v.toUpperCase() })}

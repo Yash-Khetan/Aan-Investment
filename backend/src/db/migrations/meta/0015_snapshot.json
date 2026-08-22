@@ -1,5 +1,5 @@
 {
-  "id": "f09d806d-db06-4b7a-ba05-253e566aa6f2",
+  "id": "6ba8d3a6-2fd3-43cf-85f7-7b13089b8e0f",
   "prevId": "86799a1d-ec65-4939-a808-59bd9d08d1e4",
   "version": "7",
   "dialect": "postgresql",
@@ -727,6 +727,42 @@
         "aadhaar": {
           "name": "aadhaar",
           "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pan_doc_path": {
+          "name": "pan_doc_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pan_doc_name": {
+          "name": "pan_doc_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aadhaar_doc_path": {
+          "name": "aadhaar_doc_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aadhaar_doc_name": {
+          "name": "aadhaar_doc_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ckyc_doc_path": {
+          "name": "ckyc_doc_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ckyc_doc_name": {
+          "name": "ckyc_doc_name",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3340,14 +3376,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "source": {
-          "name": "source",
-          "type": "document_source",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'GENERAL'"
-        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
@@ -3464,33 +3492,6 @@
           "columns": [
             {
               "expression": "document_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "doc_source_idx": {
-          "name": "doc_source_idx",
-          "columns": [
-            {
-              "expression": "owner_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "owner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5776,14 +5777,6 @@
         "PROPERTY",
         "PROMOTER",
         "GUARANTOR"
-      ]
-    },
-    "public.document_source": {
-      "name": "document_source",
-      "schema": "public",
-      "values": [
-        "IDENTITY",
-        "GENERAL"
       ]
     },
     "public.document_type": {

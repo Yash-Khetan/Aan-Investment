@@ -117,6 +117,32 @@ export const borrowers = pgTable("borrowers", {
         length: 12,
     }),
 
+    /* ── Identity document scans ──
+
+       Each identity number can carry one scanned document. Only a pointer is
+       stored here: `*DocPath` is the object key inside the Supabase Storage
+       bucket, `*DocName` the filename the user picked, kept for display and
+       downloads. The bytes never touch Postgres.
+
+       Deliberately columns on this table rather than rows in `documents` -
+       that table belongs to the document-vault module, and these scans are
+       part of the borrower master record. */
+
+    panDocPath: text("pan_doc_path"),
+    panDocName: varchar("pan_doc_name", {
+        length: 500,
+    }),
+
+    aadhaarDocPath: text("aadhaar_doc_path"),
+    aadhaarDocName: varchar("aadhaar_doc_name", {
+        length: 500,
+    }),
+
+    ckycDocPath: text("ckyc_doc_path"),
+    ckycDocName: varchar("ckyc_doc_name", {
+        length: 500,
+    }),
+
     /* ── Business Details ── */
 
     dateOfIncorporation: date("date_of_incorporation"),
