@@ -7,11 +7,11 @@ import { updateSettings } from "../api";
 import type { LedgerSettings } from "../types";
 
 export function RateSettingsPanel({
-  borrowerId,
+  loanId,
   settings,
   onSaved,
 }: {
-  borrowerId: string;
+  loanId: string;
   settings: LedgerSettings;
   onSaved: () => void;
 }) {
@@ -35,7 +35,7 @@ export function RateSettingsPanel({
     setIsSaving(true);
     setError(null);
     try {
-      await updateSettings(borrowerId, { defaultInterestRatePercent: interest, defaultTdsRatePercent: tds });
+      await updateSettings(loanId, { defaultInterestRatePercent: interest, defaultTdsRatePercent: tds });
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update the default rates.");
@@ -47,29 +47,30 @@ export function RateSettingsPanel({
   return (
     <Card className="p-4">
       <div className="mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Default Rates</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Loan Rates</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Used automatically when next month's Interest/TDS entries are generated. Editing this does not change
-          already-posted entries — edit those individually in the table below.
+          These are the loan's own rates — saving here updates the loan record itself. Used automatically when
+          next month's Interest/TDS entries are generated. Editing them does not change already-posted entries —
+          edit those individually in the table below.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
         <TextField
-          label="Default Interest Rate (%)"
+          label="Interest Rate (%)"
           type="number"
           step="0.01"
           value={interestRate}
           onChange={(e) => setInterestRate(e.target.value)}
         />
         <TextField
-          label="Default TDS Rate (%)"
+          label="TDS Rate (%)"
           type="number"
           step="0.01"
           value={tdsRate}
           onChange={(e) => setTdsRate(e.target.value)}
         />
         <Button type="button" onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
-          {isSaving ? "Saving…" : "Save Defaults"}
+          {isSaving ? "Saving…" : "Save Rates"}
         </Button>
       </div>
       {error && (

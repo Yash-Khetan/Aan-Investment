@@ -5,24 +5,24 @@ import { StatCard } from "../../components/ui/Card";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { formatCurrency } from "../../lib/format";
 import { ApiError } from "../../lib/api";
-import { BorrowerSelect } from "../lookup/BorrowerSelect";
+import { LoanSelect } from "../lookup/LoanSelect";
 import { getLedger } from "./api";
 import { AddEntryForm } from "./components/AddEntryForm";
 import { RateSettingsPanel } from "./components/RateSettingsPanel";
 import { LedgerTable } from "./components/LedgerTable";
 
-export function BorrowerLedgerPage() {
-  const [borrowerId, setBorrowerId] = useState("");
+export function LedgerPage() {
+  const [loanId, setLoanId] = useState("");
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["borrower-ledger", borrowerId],
-    queryFn: () => getLedger(borrowerId),
-    enabled: !!borrowerId,
+    queryKey: ["ledger", loanId],
+    queryFn: () => getLedger(loanId),
+    enabled: !!loanId,
   });
 
   function refetch() {
-    queryClient.invalidateQueries({ queryKey: ["borrower-ledger", borrowerId] });
+    queryClient.invalidateQueries({ queryKey: ["ledger", loanId] });
   }
 
   const stats = data
@@ -37,27 +37,27 @@ export function BorrowerLedgerPage() {
   return (
     <div>
       <PageHeader
-        title="Borrower Ledger"
-        description="A running account per borrower — record Payments and Receipts, and month-end Interest/TDS entries are calculated automatically."
+        title="Ledger"
+        description="A running account per loan account — record Payments and Receipts, and month-end Interest/TDS entries are calculated automatically."
       />
 
       <div className="flex flex-col gap-6">
         <div className="max-w-sm">
-          <BorrowerSelect value={borrowerId} onChange={setBorrowerId} />
+          <LoanSelect value={loanId} onChange={setLoanId} />
         </div>
 
-        {!borrowerId && <EmptyState message="Select a borrower to view or add records." />}
+        {!loanId && <EmptyState message="Select a loan to view or add records." />}
 
-        {borrowerId && isLoading && <LoadingState label="Loading ledger..." />}
+        {loanId && isLoading && <LoadingState label="Loading ledger..." />}
 
-        {borrowerId && isError && (
+        {loanId && isError && (
           <ErrorState message={error instanceof ApiError ? error.message : "Failed to load the ledger."} />
         )}
 
-        {borrowerId && data && (
+        {loanId && data && (
           <>
-            <AddEntryForm borrowerId={borrowerId} onAdded={refetch} />
-            <RateSettingsPanel borrowerId={borrowerId} settings={data.settings} onSaved={refetch} />
+            <AddEntryForm loanId={loanId} onAdded={refetch} />
+            <RateSettingsPanel loanId={loanId} settings={data.settings} onSaved={refetch} />
 
             {stats && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -70,7 +70,7 @@ export function BorrowerLedgerPage() {
               </div>
             )}
 
-            <LedgerTable entries={data.entries} borrowerId={borrowerId} onRateSaved={refetch} />
+            <LedgerTable entries={data.entries} loanId={loanId} onRateSaved={refetch} />
           </>
         )}
       </div>

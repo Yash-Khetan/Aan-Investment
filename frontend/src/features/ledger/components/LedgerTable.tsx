@@ -29,17 +29,17 @@ function VchTypeBadge({ vchType }: { vchType: string }) {
 
 export function LedgerTable({
   entries,
-  borrowerId,
+  loanId,
   onRateSaved,
 }: {
   entries: LedgerEntry[];
-  borrowerId: string;
+  loanId: string;
   onRateSaved: () => void;
 }) {
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   if (entries.length === 0) {
-    return <EmptyState message="No records yet for this borrower. Add one using the form above." />;
+    return <EmptyState message="No records yet for this loan. Add one using the form above." />;
   }
 
   return (
@@ -90,7 +90,7 @@ export function LedgerTable({
                     <td colSpan={7} className="p-0">
                       <JournalRateEditor
                         entry={row}
-                        borrowerId={borrowerId}
+                        loanId={loanId}
                         onSaved={() => {
                           onRateSaved();
                           setExpandedRowId(null);

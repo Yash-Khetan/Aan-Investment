@@ -21,7 +21,7 @@ stays byte-for-byte identical.
 - No change to the interest/TDS math, the running-balance walk, the month-end
   auto-generation, or the backdated-entry cascade.
 - No retro-recompute of posted months when a loan's rate changes.
-- No renaming of files, tables, or route paths.
+- No change to what the module does, only to what it is keyed on and named.
 - No migration of existing ledger rows (test data only — dropped).
 
 ## Decisions
@@ -32,7 +32,7 @@ stays byte-for-byte identical.
 | Sync mechanism | Loan row is the single source of truth; the settings table is deleted |
 | Per-row rate edit | Stays local to that Journal row; never writes to the loan |
 | Existing ledger data | Dropped, start fresh |
-| Naming | Files, tables, and routes keep their `borrower` names; only the FK column changes |
+| Naming | Full rename: the module drops the `borrower` prefix and becomes simply "Ledger" |
 | Accrual start month | Unchanged — the month of the earliest ledger entry |
 
 Rejected: a two-way sync helper between `borrower_ledger_settings` and `loans`
@@ -43,7 +43,7 @@ rate mirror in the ledger (would remove the working rate panel).
 
 ### Schema
 
-`borrower_ledger_entries` — one column swap:
+`borrower_ledger_entries` is renamed `ledger_entries`, with one column swap:
 
 - `borrower_id uuid → borrowers.id` becomes `loan_id uuid → loans.id`, `ON DELETE CASCADE`.
 - All four indexes re-point to `loan_id`. The unique constraints on `vch_no` and
@@ -59,7 +59,7 @@ rate mirror in the ledger (would remove the working rate panel).
   ledger's previous default, so existing loans behave as before.
 - The existing `interest_rate numeric(8,4)` becomes the ledger's interest source.
 
-### Repository (`borrowerLedger.repository.ts`)
+### Repository (`ledger.repository.ts`)
 
 Mechanical `borrowerId → loanId` rename across every query. Two functions are
 replaced rather than renamed:
@@ -74,13 +74,13 @@ replaced rather than renamed:
 `getNextVchNo` now counts per loan, so each loan account numbers 1, 2, 3…
 independently.
 
-### Service (`borrowerLedger.service.ts`)
+### Service (`ledger.service.ts`)
 
 No calculation changes. `assembleMonthBalanceEvents`,
 `computeMonthInterestAndTds`, `generateMonthEndJournalPair`,
 `syncMissingMonthEndJournals`, `recomputeMonthsFrom`, `editJournalEntryRate`, and
-the running-balance walk in `getBorrowerLedger` keep their current logic; only the
-identifier parameter is renamed and the rate lookup is re-pointed at the loan.
+the running-balance walk (renamed `getLoanLedger`) keep their current logic; only
+the identifier parameter is renamed and the rate lookup is re-pointed at the loan.
 
 `getSettings()` still returns `{ defaultInterestRatePercent, defaultTdsRatePercent }`,
 now mapped from the loan row. Holding that shape keeps the frontend rate panel and
@@ -88,19 +88,21 @@ its API client unchanged.
 
 ### Routes and controller
 
-Path stays `/borrower-ledger`. The route parameter becomes `:loanId` and the two
-param validators change their key accordingly. The rate validator widens to four
-decimal places to match `numeric(8,4)`.
+The mount point becomes `/ledger` and the route parameter becomes `:loanId`; the
+two param validators change their key accordingly. The rate validator widens to
+four decimal places to match `numeric(8,4)`.
 
 ### Frontend
 
-- `BorrowerLedgerPage.tsx` — swap `BorrowerSelect` for the existing `LoanSelect`,
-  rename the state variable, retitle the page "Loan Ledger", and reword the empty
-  state to "Select a loan to view or add records."
-- `api.ts` — parameter rename only; the URLs do not change.
-- `AddEntryForm`, `RateSettingsPanel`, `LedgerTable` — prop rename only. No
-  behavior change.
-- `Layout.tsx` — nav label becomes "Loan Ledger"; the path stays `/borrower-ledger`.
+The `features/borrower-ledger/` directory becomes `features/ledger/`.
+
+- `BorrowerLedgerPage.tsx` becomes `LedgerPage.tsx` — swap `BorrowerSelect` for the
+  existing `LoanSelect`, rename the state variable, retitle the page "Ledger", and
+  reword the empty state to "Select a loan to view or add records."
+- `api.ts` — parameter rename and the `/ledger` base path.
+- `AddEntryForm`, `RateSettingsPanel`, `LedgerTable`, `JournalRateEditor` — prop
+  rename only. No behavior change.
+- `App.tsx` / `Layout.tsx` — route and nav entry become `/ledger`, labelled "Ledger".
 
 ### Write-back
 
@@ -144,8 +146,9 @@ retains the rate it accrued at.
 One generated Drizzle migration in `backend/src/db/migrations/`:
 
 1. `DROP TABLE borrower_ledger_settings`
-2. Truncate `borrower_ledger_entries`, drop `borrower_id` and its indexes, add
-   `loan_id` with the FK and the four re-pointed indexes
+2. `DROP TABLE borrower_ledger_entries` and create `ledger_entries` keyed on
+   `loan_id`, with the four re-pointed indexes. Dropping rather than altering is
+   safe because the existing rows are test data being discarded.
 3. `ALTER TABLE loans ADD COLUMN tds_rate_percent numeric(5,2) NOT NULL DEFAULT '10'`
 
 Produced by `npm run db:generate`, applied with `npm run db:migrate`.

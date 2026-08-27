@@ -1,39 +1,40 @@
 import { eq, and, asc, lte, gte, isNotNull } from "drizzle-orm";
-import { db, borrowerLedgerEntries, borrowerLedgerSettings } from "../../db";
+import { db, ledgerEntries, loans } from "../../db";
+import { NotFoundError } from "../../common/errors";
 
-export type LedgerEntryRow = typeof borrowerLedgerEntries.$inferSelect;
+export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 
 /** Either the top-level `db` or a transaction handle from `db.transaction(...)` — both support the same query builder surface used here. */
 type DbOrTx = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
 
-/** All entries for a borrower, oldest first — entryDate then sequenceNo as the stable same-day tiebreak. */
-export async function getEntriesForBorrower(borrowerId: string): Promise<LedgerEntryRow[]> {
+/** All entries for a loan, oldest first — entryDate then sequenceNo as the stable same-day tiebreak. */
+export async function getEntriesForLoan(loanId: string): Promise<LedgerEntryRow[]> {
   return db
     .select()
-    .from(borrowerLedgerEntries)
-    .where(eq(borrowerLedgerEntries.borrowerId, borrowerId))
-    .orderBy(asc(borrowerLedgerEntries.entryDate), asc(borrowerLedgerEntries.sequenceNo));
+    .from(ledgerEntries)
+    .where(eq(ledgerEntries.loanId, loanId))
+    .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.sequenceNo));
 }
 
 /** Every entry dated on or before `monthEnd`, oldest first — the raw material for a month's balance walk. */
-export async function getEntriesUpTo(borrowerId: string, monthEnd: string): Promise<LedgerEntryRow[]> {
+export async function getEntriesUpTo(loanId: string, monthEnd: string): Promise<LedgerEntryRow[]> {
   return db
     .select()
-    .from(borrowerLedgerEntries)
-    .where(and(eq(borrowerLedgerEntries.borrowerId, borrowerId), lte(borrowerLedgerEntries.entryDate, monthEnd)))
-    .orderBy(asc(borrowerLedgerEntries.entryDate), asc(borrowerLedgerEntries.sequenceNo));
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.loanId, loanId), lte(ledgerEntries.entryDate, monthEnd)))
+    .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.sequenceNo));
 }
 
 /** Distinct accrual months that already have a Journal pair, for gap detection. */
-export async function getExistingAccrualMonths(borrowerId: string): Promise<string[]> {
+export async function getExistingAccrualMonths(loanId: string): Promise<string[]> {
   const rows = await db
-    .select({ accrualMonth: borrowerLedgerEntries.accrualMonth })
-    .from(borrowerLedgerEntries)
+    .select({ accrualMonth: ledgerEntries.accrualMonth })
+    .from(ledgerEntries)
     .where(
       and(
-        eq(borrowerLedgerEntries.borrowerId, borrowerId),
-        eq(borrowerLedgerEntries.vchType, "JOURNAL_INTEREST"),
-        isNotNull(borrowerLedgerEntries.accrualMonth)
+        eq(ledgerEntries.loanId, loanId),
+        eq(ledgerEntries.vchType, "JOURNAL_INTEREST"),
+        isNotNull(ledgerEntries.accrualMonth)
       )
     );
 
@@ -45,61 +46,61 @@ export async function getExistingAccrualMonths(borrowerId: string): Promise<stri
  * after `fromMonth`, oldest first — used to cascade-recompute months whose
  * balance changed because a backdated Payment/Receipt landed before them.
  */
-export async function getJournalInterestEntriesFromMonth(borrowerId: string, fromMonth: string): Promise<LedgerEntryRow[]> {
+export async function getJournalInterestEntriesFromMonth(loanId: string, fromMonth: string): Promise<LedgerEntryRow[]> {
   return db
     .select()
-    .from(borrowerLedgerEntries)
+    .from(ledgerEntries)
     .where(
       and(
-        eq(borrowerLedgerEntries.borrowerId, borrowerId),
-        eq(borrowerLedgerEntries.vchType, "JOURNAL_INTEREST"),
-        isNotNull(borrowerLedgerEntries.accrualMonth),
-        gte(borrowerLedgerEntries.accrualMonth, fromMonth)
+        eq(ledgerEntries.loanId, loanId),
+        eq(ledgerEntries.vchType, "JOURNAL_INTEREST"),
+        isNotNull(ledgerEntries.accrualMonth),
+        gte(ledgerEntries.accrualMonth, fromMonth)
       )
     )
-    .orderBy(asc(borrowerLedgerEntries.accrualMonth));
+    .orderBy(asc(ledgerEntries.accrualMonth));
 }
 
-export async function getEarliestEntryDate(borrowerId: string): Promise<string | null> {
+export async function getEarliestEntryDate(loanId: string): Promise<string | null> {
   const rows = await db
-    .select({ entryDate: borrowerLedgerEntries.entryDate })
-    .from(borrowerLedgerEntries)
-    .where(eq(borrowerLedgerEntries.borrowerId, borrowerId))
-    .orderBy(asc(borrowerLedgerEntries.entryDate))
+    .select({ entryDate: ledgerEntries.entryDate })
+    .from(ledgerEntries)
+    .where(eq(ledgerEntries.loanId, loanId))
+    .orderBy(asc(ledgerEntries.entryDate))
     .limit(1);
 
   return rows[0]?.entryDate ?? null;
 }
 
 /**
- * Next Vch No. for a borrower — one shared counter across all entry types,
- * a plain incrementing integer. Runs inside the caller's transaction so a
- * concurrent insert can't race to the same number.
+ * Next Vch No. for a loan — one shared counter across all entry types, a plain
+ * incrementing integer, restarting at 1 for every loan account. Runs inside the
+ * caller's transaction so a concurrent insert can't race to the same number.
  */
-async function getNextVchNo(borrowerId: string, tx: DbOrTx): Promise<string> {
+async function getNextVchNo(loanId: string, tx: DbOrTx): Promise<string> {
   const rows = await tx
-    .select({ vchNo: borrowerLedgerEntries.vchNo })
-    .from(borrowerLedgerEntries)
-    .where(eq(borrowerLedgerEntries.borrowerId, borrowerId));
+    .select({ vchNo: ledgerEntries.vchNo })
+    .from(ledgerEntries)
+    .where(eq(ledgerEntries.loanId, loanId));
 
   const maxNo = rows.reduce((max, r) => Math.max(max, Number(r.vchNo) || 0), 0);
   return String(maxNo + 1);
 }
 
 export async function insertPaymentOrReceipt(input: {
-  borrowerId: string;
+  loanId: string;
   entryDate: string;
   vchType: "PAYMENT" | "RECEIPT";
   amount: number;
   narration?: string;
 }): Promise<LedgerEntryRow> {
   return db.transaction(async (tx) => {
-    const vchNo = await getNextVchNo(input.borrowerId, tx);
+    const vchNo = await getNextVchNo(input.loanId, tx);
 
     const [created] = await tx
-      .insert(borrowerLedgerEntries)
+      .insert(ledgerEntries)
       .values({
-        borrowerId: input.borrowerId,
+        loanId: input.loanId,
         entryDate: input.entryDate,
         vchType: input.vchType,
         vchNo,
@@ -124,7 +125,7 @@ export async function insertPaymentOrReceipt(input: {
  * self-reference a row not yet committed within a single INSERT).
  */
 export async function insertJournalPair(input: {
-  borrowerId: string;
+  loanId: string;
   entryDate: string;
   accrualMonth: string;
   interestAmount: number;
@@ -133,12 +134,12 @@ export async function insertJournalPair(input: {
   tdsRatePercent: number;
 }): Promise<{ interestEntry: LedgerEntryRow; tdsEntry: LedgerEntryRow }> {
   return db.transaction(async (tx) => {
-    const interestVchNo = await getNextVchNo(input.borrowerId, tx);
+    const interestVchNo = await getNextVchNo(input.loanId, tx);
 
     const [interestEntry] = await tx
-      .insert(borrowerLedgerEntries)
+      .insert(ledgerEntries)
       .values({
-        borrowerId: input.borrowerId,
+        loanId: input.loanId,
         entryDate: input.entryDate,
         vchType: "JOURNAL_INTEREST",
         vchNo: interestVchNo,
@@ -154,12 +155,12 @@ export async function insertJournalPair(input: {
       throw new Error("Failed to create Journal Interest entry.");
     }
 
-    const tdsVchNo = await getNextVchNo(input.borrowerId, tx);
+    const tdsVchNo = await getNextVchNo(input.loanId, tx);
 
     const [tdsEntry] = await tx
-      .insert(borrowerLedgerEntries)
+      .insert(ledgerEntries)
       .values({
-        borrowerId: input.borrowerId,
+        loanId: input.loanId,
         entryDate: input.entryDate,
         vchType: "JOURNAL_TDS",
         vchNo: tdsVchNo,
@@ -177,16 +178,16 @@ export async function insertJournalPair(input: {
     }
 
     await tx
-      .update(borrowerLedgerEntries)
+      .update(ledgerEntries)
       .set({ pairedEntryId: tdsEntry.id })
-      .where(eq(borrowerLedgerEntries.id, interestEntry.id));
+      .where(eq(ledgerEntries.id, interestEntry.id));
 
     return { interestEntry: { ...interestEntry, pairedEntryId: tdsEntry.id }, tdsEntry };
   });
 }
 
 export async function getEntryById(entryId: string): Promise<LedgerEntryRow | null> {
-  const rows = await db.select().from(borrowerLedgerEntries).where(eq(borrowerLedgerEntries.id, entryId)).limit(1);
+  const rows = await db.select().from(ledgerEntries).where(eq(ledgerEntries.id, entryId)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -197,7 +198,7 @@ export async function updateEntryAmountAndRate(
 ): Promise<LedgerEntryRow> {
   const executor = tx ?? db;
   const [updated] = await executor
-    .update(borrowerLedgerEntries)
+    .update(ledgerEntries)
     .set({
       ratePercent: String(patch.ratePercent),
       ...(patch.debit !== undefined ? { debit: patch.debit === null ? null : String(patch.debit) } : {}),
@@ -207,7 +208,7 @@ export async function updateEntryAmountAndRate(
           ? `Being Interest @ ${patch.ratePercent}%`
           : `Being Tds @ ${patch.ratePercent}%`,
     })
-    .where(eq(borrowerLedgerEntries.id, entryId))
+    .where(eq(ledgerEntries.id, entryId))
     .returning();
 
   if (!updated) {
@@ -217,55 +218,68 @@ export async function updateEntryAmountAndRate(
   return updated;
 }
 
-export async function getOrCreateSettings(borrowerId: string) {
-  const rows = await db
-    .select()
-    .from(borrowerLedgerSettings)
-    .where(eq(borrowerLedgerSettings.borrowerId, borrowerId))
-    .limit(1);
+/* ============================================================
+   DEFAULT RATES — read from, and written to, the LOAN row
 
-  if (rows[0]) return rows[0];
+   There is no ledger settings table. The loan row is the single
+   source of truth for both rates, so a rate edited on the Ledger
+   page is immediately what the Loans module shows, and vice
+   versa, with no sync step that could drift.
+============================================================ */
 
-  const [created] = await db
-    .insert(borrowerLedgerSettings)
-    .values({ borrowerId })
-    .onConflictDoNothing()
-    .returning();
-
-  if (created) return created;
-
-  // Lost the race to a concurrent insert — read back what's there now.
-  const retry = await db
-    .select()
-    .from(borrowerLedgerSettings)
-    .where(eq(borrowerLedgerSettings.borrowerId, borrowerId))
-    .limit(1);
-
-  if (!retry[0]) {
-    throw new Error(`Failed to create ledger settings for borrower ${borrowerId}.`);
-  }
-
-  return retry[0];
+export interface LoanLedgerRates {
+  loanId: string;
+  defaultInterestRatePercent: string;
+  defaultTdsRatePercent: string;
 }
 
-export async function updateSettings(
-  borrowerId: string,
-  input: { defaultInterestRatePercent: number; defaultTdsRatePercent: number }
-) {
-  await getOrCreateSettings(borrowerId);
-
-  const [updated] = await db
-    .update(borrowerLedgerSettings)
-    .set({
-      defaultInterestRatePercent: String(input.defaultInterestRatePercent),
-      defaultTdsRatePercent: String(input.defaultTdsRatePercent),
+export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
+  const rows = await db
+    .select({
+      id: loans.id,
+      interestRate: loans.interestRate,
+      tdsRatePercent: loans.tdsRatePercent,
     })
-    .where(eq(borrowerLedgerSettings.borrowerId, borrowerId))
-    .returning();
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
 
-  if (!updated) {
-    throw new Error(`Failed to update ledger settings for borrower ${borrowerId}.`);
+  const row = rows[0];
+  if (!row) {
+    throw new NotFoundError(`Loan ${loanId} not found.`);
   }
 
-  return updated;
+  return {
+    loanId: row.id,
+    defaultInterestRatePercent: row.interestRate,
+    defaultTdsRatePercent: row.tdsRatePercent,
+  };
+}
+
+export async function updateLoanRates(
+  loanId: string,
+  input: { defaultInterestRatePercent: number; defaultTdsRatePercent: number }
+): Promise<LoanLedgerRates> {
+  const [updated] = await db
+    .update(loans)
+    .set({
+      interestRate: String(input.defaultInterestRatePercent),
+      tdsRatePercent: String(input.defaultTdsRatePercent),
+    })
+    .where(eq(loans.id, loanId))
+    .returning({
+      id: loans.id,
+      interestRate: loans.interestRate,
+      tdsRatePercent: loans.tdsRatePercent,
+    });
+
+  if (!updated) {
+    throw new NotFoundError(`Loan ${loanId} not found.`);
+  }
+
+  return {
+    loanId: updated.id,
+    defaultInterestRatePercent: updated.interestRate,
+    defaultTdsRatePercent: updated.tdsRatePercent,
+  };
 }

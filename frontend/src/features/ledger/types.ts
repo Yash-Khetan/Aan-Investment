@@ -2,7 +2,7 @@ export type LedgerVchType = "PAYMENT" | "RECEIPT" | "JOURNAL_INTEREST" | "JOURNA
 
 export interface LedgerEntry {
   id: string;
-  borrowerId: string;
+  loanId: string;
   entryDate: string;
   narration: string | null;
   vchType: LedgerVchType;
@@ -17,13 +17,14 @@ export interface LedgerEntry {
   balance: number;
 }
 
+/** The loan's own Interest/TDS rates. Saving these writes straight to the loan record. */
 export interface LedgerSettings {
-  borrowerId: string;
+  loanId: string;
   defaultInterestRatePercent: string;
   defaultTdsRatePercent: string;
 }
 
-export interface BorrowerLedger {
+export interface LoanLedger {
   entries: LedgerEntry[];
   settings: LedgerSettings;
 }

@@ -120,6 +120,13 @@
       "when": 1787413411984,
       "tag": "0016_exotic_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787413411985,
+      "tag": "0017_loan_keyed_ledger",
+      "breakpoints": true
     }
   ]
 }
