@@ -1,6 +1,7 @@
 import { db } from "../../db";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
+import { getCurrentInterestConfig, createInterestConfigRevision } from "../interest/interest.repository";
 import {
   getEntriesForLoan,
   getEntriesUpTo,
@@ -288,11 +289,49 @@ export async function getSettings(loanId: string) {
 
 /**
  * Writes both rates straight onto the loan row, so the change is what the
- * Loans module shows too. Already-posted Journal entries keep the rate they
- * accrued at — only months generated from here on use the new value.
+ * Loans module shows too, AND revises the loan's interest config so the
+ * Repayment Engine calculates at the new rate as well.
+ *
+ * Those are two separate rates in this system: `loans.interestRate` is loan
+ * master data (Loans list, reports, this ledger), while
+ * `interestConfigs.annualRate` is what the Repayment Engine and the interest
+ * strategies actually compute from. Writing only the first would leave
+ * schedules quietly accruing at the old rate.
+ *
+ * The revision carries over the outgoing config's basis, calculation method
+ * and day-count flag untouched — only the rate changes. A loan with no config
+ * yet gets its first one, seeded with the same ACTUAL_365 basis this ledger
+ * itself accrues at so the two agree from the start.
+ *
+ * Already-posted Journal entries keep the rate they accrued at; only months
+ * generated from here on use the new value.
  */
 export async function updateLedgerSettings(loanId: string, input: UpdateLedgerSettingsInput) {
-  return updateLoanRates(loanId, input);
+  return db.transaction(async (tx) => {
+    const rates = await updateLoanRates(loanId, input, tx);
+
+    const current = await getCurrentInterestConfig(loanId, tx);
+    const annualRate = String(input.defaultInterestRatePercent);
+
+    if (!current || Number(current.annualRate) !== input.defaultInterestRatePercent) {
+      await createInterestConfigRevision(
+        {
+          loanId,
+          annualRate,
+          interestBasis: current?.interestBasis ?? INTEREST_BASIS,
+          ruleType: current?.ruleType ?? "NORMAL",
+          effectiveFrom: toIsoDate(new Date()),
+          remarks: "Rate updated from the Ledger page.",
+          ...(current?.customFormula ? { customFormula: current.customFormula } : {}),
+          includeOpeningClosingDays: current?.includeOpeningClosingDays ?? false,
+          calculationMethod: current?.calculationMethod ?? "SIMPLE_INTEREST",
+        },
+        tx
+      );
+    }
+
+    return rates;
+  });
 }
 
 /** Full ledger for a loan: self-heals missing month-end journals, then returns entries with a computed running balance. */

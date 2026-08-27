@@ -15,6 +15,9 @@ import type { CodedOption, LoanFormState } from "../types";
 const MORATORIUM_TOOLTIP =
   "Moratorium Period means the period during which no payments are collected from the borrower. However, interest continues to accrue during this period.";
 
+const TDS_RATE_TOOLTIP =
+  "Tax deducted at source, as a percentage of the interest accrued. The Ledger uses this rate when it generates each month's TDS entry.";
+
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
 }
@@ -174,6 +177,16 @@ export function LoanMasterFields({
             value={form.interestRate}
             onChange={(e) => onChange({ interestRate: e.target.value })}
             required
+          />
+          <TextField
+            label="TDS Rate (%)"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={form.tdsRatePercent}
+            onChange={(e) => onChange({ tdsRatePercent: e.target.value })}
+            tooltip={TDS_RATE_TOOLTIP}
           />
           <TextField
             label="Moratorium (months)"

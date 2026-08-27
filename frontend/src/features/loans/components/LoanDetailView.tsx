@@ -56,6 +56,7 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
         <DetailField label="Security Type" value={loan.securityType} />
         <DetailField label="Repayment Type" value={loan.repaymentType?.replace(/_/g, " ")} />
         <DetailField label="Interest Rate" value={`${Number(loan.interestRate).toFixed(2)}%`} />
+        <DetailField label="TDS Rate" value={`${Number(loan.tdsRatePercent ?? 0).toFixed(2)}%`} />
       </DetailSection>
 
       <DetailSection title="Amounts">

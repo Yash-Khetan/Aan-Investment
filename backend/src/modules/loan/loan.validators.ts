@@ -48,6 +48,16 @@ const interestRate = z.coerce
     .number({ error: "must be a number" })
     .nonnegative("must be zero or positive");
 
+/**
+ * TDS withheld as a percentage of accrued interest. Loan master data, same as
+ * the interest rate above — the Ledger reads it from here when it generates a
+ * month's TDS entry.
+ */
+const tdsRatePercent = z.coerce
+    .number({ error: "must be a number" })
+    .min(0, "must be zero or positive")
+    .max(100, "cannot exceed 100");
+
 /** Calendar date string in YYYY-MM-DD form. */
 const dateString = z
     .string()
@@ -234,6 +244,7 @@ export const createLoanSchema = z
         outstandingPrincipal: money({ allowZero: true }).optional(),
 
         interestRate,
+        tdsRatePercent: tdsRatePercent.optional(),
         tenureMonths: z.coerce
             .number()
             .int("must be an integer")
@@ -295,6 +306,7 @@ export const updateLoanSchema = z
         disbursedAmount: money({ allowZero: true }),
         outstandingPrincipal: money({ allowZero: true }),
         interestRate,
+        tdsRatePercent: tdsRatePercent.optional(),
         tenureMonths: z.coerce.number().int().positive(),
         moratoriumMonths: z.coerce.number().int().nonnegative(),
         sanctionDate: dateString.nullable(),
