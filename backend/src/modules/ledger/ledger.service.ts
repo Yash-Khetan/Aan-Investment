@@ -2,6 +2,7 @@ import { db } from "../../db";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import { getCurrentInterestConfig, createInterestConfigRevision } from "../interest/interest.repository";
+import { syncRepaymentSchedule } from "../repayment/repayment.service";
 import {
   getEntriesForLoan,
   getEntriesUpTo,
@@ -307,31 +308,45 @@ export async function getSettings(loanId: string) {
  * generated from here on use the new value.
  */
 export async function updateLedgerSettings(loanId: string, input: UpdateLedgerSettingsInput) {
-  return db.transaction(async (tx) => {
-    const rates = await updateLoanRates(loanId, input, tx);
+  const { rates, rateChanged } = await db.transaction(async (tx) => {
+    const updated = await updateLoanRates(loanId, input, tx);
 
     const current = await getCurrentInterestConfig(loanId, tx);
     const annualRate = String(input.defaultInterestRatePercent);
 
-    if (!current || Number(current.annualRate) !== input.defaultInterestRatePercent) {
-      await createInterestConfigRevision(
-        {
-          loanId,
-          annualRate,
-          interestBasis: current?.interestBasis ?? INTEREST_BASIS,
-          ruleType: current?.ruleType ?? "NORMAL",
-          effectiveFrom: toIsoDate(new Date()),
-          remarks: "Rate updated from the Ledger page.",
-          ...(current?.customFormula ? { customFormula: current.customFormula } : {}),
-          includeOpeningClosingDays: current?.includeOpeningClosingDays ?? false,
-          calculationMethod: current?.calculationMethod ?? "SIMPLE_INTEREST",
-        },
-        tx
-      );
+    if (current && Number(current.annualRate) === input.defaultInterestRatePercent) {
+      return { rates: updated, rateChanged: false };
     }
 
-    return rates;
+    await createInterestConfigRevision(
+      {
+        loanId,
+        annualRate,
+        interestBasis: current?.interestBasis ?? INTEREST_BASIS,
+        ruleType: current?.ruleType ?? "NORMAL",
+        effectiveFrom: toIsoDate(new Date()),
+        remarks: "Rate updated from the Ledger page.",
+        ...(current?.customFormula ? { customFormula: current.customFormula } : {}),
+        includeOpeningClosingDays: current?.includeOpeningClosingDays ?? false,
+        calculationMethod: current?.calculationMethod ?? "SIMPLE_INTEREST",
+      },
+      tx
+    );
+
+    return { rates: updated, rateChanged: true };
   });
+
+  // A new rate makes any existing repayment schedule stale. Re-sync it the way
+  // every other rate-change path does, so the Repayment Engine reflects the new
+  // rate instead of showing a "details have changed" banner. Runs after the
+  // commit so the sync reads the revision that was just written, and is silent
+  // by design: it leaves the schedule alone when payments already exist against
+  // it, or when the loan lacks the dates a schedule needs.
+  if (rateChanged) {
+    await syncRepaymentSchedule(loanId);
+  }
+
+  return rates;
 }
 
 /** Full ledger for a loan: self-heals missing month-end journals, then returns entries with a computed running balance. */
