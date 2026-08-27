@@ -258,11 +258,9 @@ export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
 
 export async function updateLoanRates(
   loanId: string,
-  input: { defaultInterestRatePercent: number; defaultTdsRatePercent: number },
-  tx?: DbOrTx
+  input: { defaultInterestRatePercent: number; defaultTdsRatePercent: number }
 ): Promise<LoanLedgerRates> {
-  const executor = tx ?? db;
-  const [updated] = await executor
+  const [updated] = await db
     .update(loans)
     .set({
       interestRate: String(input.defaultInterestRatePercent),

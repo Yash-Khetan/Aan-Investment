@@ -11,20 +11,13 @@ import {
 } from "../../db";
 import type { PrincipalLedgerEvent } from "./interest.types";
 
-/** Either the top-level `db` or a transaction handle — both expose the query builder surface used here. */
-type DbOrTx = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
-
 /**
  * Fetches the currently active interest configuration for a loan.
  * Assumes exactly one row has isCurrent = true per loan at any time —
  * this invariant must be maintained by whichever service creates/revises configs.
- *
- * Pass `tx` to read inside a caller's transaction — the Ledger's rate save
- * reads the outgoing config and writes its replacement atomically.
  */
-export async function getCurrentInterestConfig(loanId: string, tx?: DbOrTx) {
-  const executor = tx ?? db;
-  const rows = await executor
+export async function getCurrentInterestConfig(loanId: string) {
+  const rows = await db
     .select()
     .from(interestConfigs)
     .where(and(eq(interestConfigs.loanId, loanId), eq(interestConfigs.isCurrent, true)))
@@ -66,35 +59,32 @@ export async function getCurrentPenalRule(loanId: string) {
  * precede the loan's existing config history in a way that breaks
  * chronological ordering.
  */
-export async function createInterestConfigRevision(
-  input: {
-    loanId: string;
-    annualRate: string;
-    interestBasis: string;
-    ruleType?: string;
-    effectiveFrom: string;
-    remarks?: string;
-    customFormula?: string;
-    includeOpeningClosingDays?: boolean;
-    calculationMethod?: string;
-  },
-  tx?: DbOrTx
-) {
-  const run = async (executor: DbOrTx) => {
-    const previous = await executor
+export async function createInterestConfigRevision(input: {
+  loanId: string;
+  annualRate: string;
+  interestBasis: string;
+  ruleType?: string;
+  effectiveFrom: string;
+  remarks?: string;
+  customFormula?: string;
+  includeOpeningClosingDays?: boolean;
+  calculationMethod?: string;
+}) {
+  return db.transaction(async (tx) => {
+    const previous = await tx
       .select()
       .from(interestConfigs)
       .where(and(eq(interestConfigs.loanId, input.loanId), eq(interestConfigs.isCurrent, true)))
       .limit(1);
 
     if (previous[0]) {
-      await executor
+      await tx
         .update(interestConfigs)
         .set({ isCurrent: false, effectiveTo: input.effectiveFrom })
         .where(eq(interestConfigs.id, previous[0].id));
     }
 
-    const [created] = await executor
+    const [created] = await tx
       .insert(interestConfigs)
       .values({
         loanId: input.loanId,
@@ -111,11 +101,7 @@ export async function createInterestConfigRevision(
       .returning();
 
     return created;
-  };
-
-  // Joins the caller's transaction when given one, so the revision commits
-  // together with whatever prompted it; otherwise opens its own.
-  return tx ? run(tx) : db.transaction(run);
+  });
 }
 
 
