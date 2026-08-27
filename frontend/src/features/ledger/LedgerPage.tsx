@@ -25,6 +25,17 @@ export function LedgerPage() {
     queryClient.invalidateQueries({ queryKey: ["ledger", loanId] });
   }
 
+  /**
+   * Saving the rates writes to the loan record itself, so the Loans list and
+   * detail view are stale the moment it lands. Without dropping their cached
+   * copies too, the new rate only appears there after a manual page reload.
+   */
+  function refetchAfterRateSave() {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["loans"] });
+    queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
+  }
+
   const stats = data
     ? (() => {
         const totalDebit = data.entries.reduce((sum, r) => sum + (r.debit ? Number(r.debit) : 0), 0);
@@ -57,7 +68,7 @@ export function LedgerPage() {
         {loanId && data && (
           <>
             <AddEntryForm loanId={loanId} onAdded={refetch} />
-            <RateSettingsPanel loanId={loanId} settings={data.settings} onSaved={refetch} />
+            <RateSettingsPanel loanId={loanId} settings={data.settings} onSaved={refetchAfterRateSave} />
 
             {stats && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
