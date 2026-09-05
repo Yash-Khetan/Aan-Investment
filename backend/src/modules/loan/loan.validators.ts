@@ -2,9 +2,11 @@ import { z } from "zod";
 
 import {
     assetClassificationEnum,
+    calculationMethodEnum,
     cibilAccountStatusEnum,
     cibilCollateralTypeEnum,
     cibilCreditTypeEnum,
+    interestBasisEnum,
     loanTypeEnum,
     paymentFrequencyEnum,
     securityTypeEnum,
@@ -39,10 +41,13 @@ const money = (opts: { allowZero: boolean }) => {
 };
 
 /**
- * Interest rate is stored as loan master data only. The Loan module records and
- * exposes it but performs NO interest logic (accrual, penal, step rules, EMI) —
- * all interest behaviour is owned by the Interest Engine (Developer B). Hence
- * only a basic non-negative storage/integrity check here, no rate policy/caps.
+ * Interest rate is stored as loan master data. The Loan module records and
+ * exposes it, and is where an operator edits it, but performs NO interest
+ * logic (accrual, penal, step rules, EMI) — all interest behaviour is owned by
+ * the Interest Engine. Saving here writes an effective-dated revision into the
+ * Interest module's own interest_configs table; the calculation itself stays
+ * entirely over there. Hence only a basic non-negative storage/integrity check
+ * here, no rate policy/caps.
  */
 const interestRate = z.coerce
     .number({ error: "must be a number" })
@@ -65,6 +70,19 @@ const dateString = z
     .refine((v) => !Number.isNaN(Date.parse(v)), "must be a valid calendar date");
 
 const uuid = z.string().uuid("must be a valid UUID");
+
+/* ------------------------------------------------------------------ */
+/* Interest configuration                                              */
+/*                                                                     */
+/* These are the Interest module's own values, editable from the Loan  */
+/* module because the loan is the source of the current configuration. */
+/* They are NOT columns on the loans table: saving a loan writes them  */
+/* as an effective-dated interest_configs revision. Every option here  */
+/* comes from the existing enums the calculation engine already reads. */
+/* ------------------------------------------------------------------ */
+
+const interestBasisSchema = z.enum(interestBasisEnum.enumValues);
+const calculationMethodSchema = z.enum(calculationMethodEnum.enumValues);
 
 const loanTypeSchema = z.enum(loanTypeEnum.enumValues);
 const securityTypeSchema = z.enum(securityTypeEnum.enumValues);
@@ -245,6 +263,15 @@ export const createLoanSchema = z
 
         interestRate,
         tdsRatePercent: tdsRatePercent.optional(),
+
+        /* Interest configuration — persisted as an interest_configs revision. */
+        interestBasis: interestBasisSchema.optional(),
+        calculationMethod: calculationMethodSchema.optional(),
+        includeOpeningClosingDays: z.boolean().optional(),
+        customFormula: z.string().trim().optional(),
+        /** The date the configuration takes effect from. Defaults to the loan's first disbursement date. */
+        interestEffectiveFrom: dateString.optional(),
+
         tenureMonths: z.coerce
             .number()
             .int("must be an integer")
@@ -307,6 +334,14 @@ export const updateLoanSchema = z
         outstandingPrincipal: money({ allowZero: true }),
         interestRate,
         tdsRatePercent: tdsRatePercent.optional(),
+
+        /* Interest configuration — persisted as an interest_configs revision. */
+        interestBasis: interestBasisSchema,
+        calculationMethod: calculationMethodSchema,
+        includeOpeningClosingDays: z.boolean(),
+        customFormula: z.string().trim().nullable(),
+        interestEffectiveFrom: dateString,
+
         tenureMonths: z.coerce.number().int().positive(),
         moratoriumMonths: z.coerce.number().int().nonnegative(),
         sanctionDate: dateString.nullable(),

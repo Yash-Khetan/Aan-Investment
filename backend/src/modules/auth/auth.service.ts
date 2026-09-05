@@ -307,17 +307,28 @@ export class AuthService {
 
         if (!user.isActive) throw new ForbiddenError("Account is disabled");
 
-        const roles = await this.roles.findRoleNamesForUser(user.id);
         const session = generateRefreshToken();
 
-        await this.sessions.create({
-            userId: user.id,
-            tokenHash: session.tokenHash,
-            expiresAt: session.expiresAt,
-            ipAddress: ctx.ipAddress,
-            userAgent: ctx.userAgent,
-        });
-        await this.users.updateLastLoginAt(user.id);
+        // Independent of each other — both only need user.id — so run them
+        // concurrently instead of paying two sequential round trips.
+        const [roles] = await Promise.all([
+            this.roles.findRoleNamesForUser(user.id),
+            this.sessions.create({
+                userId: user.id,
+                tokenHash: session.tokenHash,
+                expiresAt: session.expiresAt,
+                ipAddress: ctx.ipAddress,
+                userAgent: ctx.userAgent,
+            }),
+        ]);
+
+        // Audit timestamp only — nothing in the response depends on it, so it
+        // must not hold the request open. Errors are logged, never thrown: an
+        // uncaught rejection here would trip the process-wide unhandledRejection
+        // handler and take the whole server down (see src/index.ts).
+        this.users
+            .updateLastLoginAt(user.id)
+            .catch((error) => logger.error("Failed to update lastLoginAt", { err: error, userId: user.id }));
 
         return { user: toPublicUser(user, roles), token: session.token };
     }
@@ -331,6 +342,11 @@ export class AuthService {
      *
      * Roles are read fresh from the database (not baked into the token), so a
      * role change takes effect on the very next request.
+     *
+     * Returns the FULL sanitized profile (not just id/roles): every protected
+     * route already pays for this user+roles lookup, so handlers downstream
+     * (e.g. GET /users/me) can read req.user directly instead of re-querying
+     * the same rows a second time.
      * Errors: 401 (unknown/expired session, or user gone/disabled).
      */
     async authenticateByToken(rawToken: string): Promise<AuthenticatedUser> {
@@ -344,14 +360,21 @@ export class AuthService {
             throw new UnauthorizedError("Session expired");
         }
 
-        const user = await this.users.findById(session.userId);
+        // Both only depend on session.userId (already known), not on each
+        // other's result — fetch concurrently instead of two round trips.
+        // Occasionally fetches roles for a user who turns out to be inactive;
+        // that's cheap and rare compared to the round trip saved on every
+        // normal request.
+        const [user, roles] = await Promise.all([
+            this.users.findById(session.userId),
+            this.roles.findRoleNamesForUser(session.userId),
+        ]);
         if (!user || !user.isActive) {
             await this.sessions.deleteByTokenHash(tokenHash);
             throw new UnauthorizedError("Invalid or expired session");
         }
 
-        const roles = await this.roles.findRoleNamesForUser(user.id);
-        return { id: user.id, roles };
+        return toPublicUser(user, roles);
     }
 
     /**
@@ -385,9 +408,13 @@ export class AuthService {
         });
 
         // Deliver the reset link via the notifications module's email API.
-        // Non-blocking: a delivery failure (e.g. SMTP not configured) must not
-        // break the enumeration-safe flow, so we log and still succeed.
-        await this.sendResetEmail(user, rawToken);
+        // Deliberately NOT awaited: the SMTP round trip (connect + TLS + send)
+        // is the slowest step in this whole flow, and the response body is
+        // identical either way (enumeration-safe), so nothing the client sees
+        // depends on it finishing first. sendResetEmail already catches and
+        // logs internally rather than throwing, so this can't surface as an
+        // unhandled rejection.
+        void this.sendResetEmail(user, rawToken);
     }
 
     /** Build and dispatch the password-reset email through the notifications module. */
@@ -472,17 +499,6 @@ export class AuthService {
         );
     }
 
-    /**
-     * getCurrentUser — load the sanitized profile behind an authenticated id.
-     * Powers GET /users/me; the id comes from the verified session.
-     * Errors: 404 (user not found / soft-deleted since the session was issued).
-     */
-    async getCurrentUser(userId: string): Promise<PublicUser> {
-        const user = await this.users.findById(userId);
-        if (!user) throw new NotFoundError("User not found");
-        const roles = await this.roles.findRoleNamesForUser(userId);
-        return toPublicUser(user, roles);
-    }
 }
 
 export const authService = new AuthService();

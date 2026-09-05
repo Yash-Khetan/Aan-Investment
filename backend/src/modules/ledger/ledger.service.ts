@@ -1,6 +1,7 @@
-import { db } from "../../db";
-import { getDailyRateFraction } from "../interest/dailyRate";
+import { getDailyRateFraction, supportsDailyRate } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
+import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
+import type { InterestBasis } from "../interest/interest.types";
 import {
   getEntriesForLoan,
   getEntriesUpTo,
@@ -12,12 +13,21 @@ import {
   getEntryById,
   updateEntryAmountAndRate,
   getLoanRates,
-  updateLoanRates,
   type LedgerEntryRow,
 } from "./ledger.repository";
-import { CreateLedgerEntryInput, LedgerBalanceEvent, UpdateLedgerSettingsInput } from "./ledger.types";
+import { CreateLedgerEntryInput, LedgerBalanceEvent, MonthAccrualConfig } from "./ledger.types";
 
-const INTEREST_BASIS = "ACTUAL_365";
+/**
+ * The day-count this ledger has always accrued at, and still does whenever a
+ * loan has no interest configuration to read one from — or has one whose basis
+ * has no daily-rate concept at all (FULL_MONTH, CUSTOM), which the month-end
+ * daily walk below cannot express. Journal rows posted before the basis was
+ * snapshotted per row also read back as this, so their amounts reproduce
+ * unchanged.
+ */
+const LEDGER_FALLBACK_BASIS: InterestBasis = "ACTUAL_365";
+
+const LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS = false;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -79,15 +89,61 @@ export async function assembleMonthBalanceEvents(
   return toBalanceEvents(filtered);
 }
 
+/* ============================================================
+   CONFIGURATION — READ, NEVER OWNED
+
+   This ledger holds no rates or day-count settings of its own.
+   Every figure it accrues comes from the Loan module and the
+   Interest module's effective-dated configuration, resolved for
+   the month being accrued. See resolveAccrualConfig below.
+============================================================ */
+
+/**
+ * The interest configuration a given month must accrue under: the
+ * interest_configs revision in effect on that month's end date, falling back
+ * to the loan's own rates when the loan has no configuration at all.
+ *
+ * Resolving per month — rather than always reading the loan's current values —
+ * is what gives a configuration change its effective point. A month that
+ * elapsed before the change resolves the revision that governed it, so a rate
+ * saved today cannot reach back into an earlier month's accrual.
+ */
+export async function resolveAccrualConfig(loanId: string, monthEnd: Date): Promise<MonthAccrualConfig> {
+  const config = await getInterestConfigEffectiveOn(loanId, toIsoDate(monthEnd));
+
+  if (!config) {
+    const rates = await getLoanRates(loanId);
+    return {
+      interestRatePercent: Number(rates.defaultInterestRatePercent),
+      tdsRatePercent: Number(rates.defaultTdsRatePercent),
+      interestBasis: LEDGER_FALLBACK_BASIS,
+      includeOpeningClosingDays: LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
+    };
+  }
+
+  return {
+    interestRatePercent: Number(config.annualRate),
+    tdsRatePercent: Number(config.tdsRatePercent),
+    interestBasis: supportsDailyRate(config.interestBasis) ? config.interestBasis : LEDGER_FALLBACK_BASIS,
+    includeOpeningClosingDays: config.includeOpeningClosingDays ?? LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
+  };
+}
+
+/**
+ * One month's Interest and TDS at a given configuration. The calculation
+ * itself is the Interest module's, unchanged — the running-balance daily walk
+ * over the ledger's own balance events, at the day-count fraction the basis
+ * defines.
+ */
 async function computeMonthInterestAndTds(
   loanId: string,
   monthStart: Date,
   monthEnd: Date,
-  interestRatePercent: number,
-  tdsRatePercent: number
+  config: MonthAccrualConfig,
+  excludeAccrualMonth?: string
 ): Promise<{ interestAmount: number; tdsAmount: number }> {
-  const events = await assembleMonthBalanceEvents(loanId, toIsoDate(monthEnd));
-  const dailyRate = getDailyRateFraction(INTEREST_BASIS, interestRatePercent);
+  const events = await assembleMonthBalanceEvents(loanId, toIsoDate(monthEnd), excludeAccrualMonth);
+  const dailyRate = getDailyRateFraction(config.interestBasis, config.interestRatePercent);
 
   const interestAmount = round2(
     calculateRunningBalanceInterest({
@@ -95,38 +151,36 @@ async function computeMonthInterestAndTds(
       periodStart: monthStart,
       periodEnd: monthEnd,
       dailyRate,
-      includeOpeningClosingDays: false,
+      includeOpeningClosingDays: config.includeOpeningClosingDays,
     })
   );
 
-  const tdsAmount = round2((interestAmount * tdsRatePercent) / 100);
+  const tdsAmount = round2((interestAmount * config.tdsRatePercent) / 100);
 
   return { interestAmount, tdsAmount };
 }
 
-export async function generateMonthEndJournalPair(
-  loanId: string,
-  monthStart: Date,
-  interestRatePercent: number,
-  tdsRatePercent: number
-) {
+/**
+ * Posts a month's Journal Interest/TDS pair at the configuration in effect for
+ * that month, and snapshots that configuration onto the rows — so the month
+ * keeps what it was calculated under no matter what the loan's configuration
+ * becomes later.
+ */
+export async function generateMonthEndJournalPair(loanId: string, monthStart: Date) {
   const monthEnd = lastDayOfMonth(monthStart);
-  const { interestAmount, tdsAmount } = await computeMonthInterestAndTds(
-    loanId,
-    monthStart,
-    monthEnd,
-    interestRatePercent,
-    tdsRatePercent
-  );
+  const config = await resolveAccrualConfig(loanId, monthEnd);
+  const { interestAmount, tdsAmount } = await computeMonthInterestAndTds(loanId, monthStart, monthEnd, config);
 
   return insertJournalPair({
     loanId,
     entryDate: toIsoDate(monthEnd),
     accrualMonth: toIsoDate(new Date(monthStart.getFullYear(), monthStart.getMonth(), 1)),
     interestAmount,
-    interestRatePercent,
+    interestRatePercent: config.interestRatePercent,
     tdsAmount,
-    tdsRatePercent,
+    tdsRatePercent: config.tdsRatePercent,
+    interestBasis: config.interestBasis,
+    includeOpeningClosingDays: config.includeOpeningClosingDays,
   });
 }
 
@@ -137,15 +191,15 @@ export async function generateMonthEndJournalPair(
  * depends on prior months' posted entries, so they can't be generated out
  * of order or in parallel). Silent — a failure here must never block a
  * ledger read.
+ *
+ * Each generated month resolves its own configuration, so back-filling a
+ * stretch that spans a configuration change gives every month the values
+ * that were in effect for it rather than today's.
  */
 export async function syncMissingMonthEndJournals(loanId: string): Promise<void> {
   try {
     const earliest = await getEarliestEntryDate(loanId);
     if (!earliest) return;
-
-    const rates = await getLoanRates(loanId);
-    const interestRate = Number(rates.defaultInterestRatePercent);
-    const tdsRate = Number(rates.defaultTdsRatePercent);
 
     const existingMonths = new Set(await getExistingAccrualMonths(loanId));
 
@@ -157,7 +211,7 @@ export async function syncMissingMonthEndJournals(loanId: string): Promise<void>
     while (cursor.getTime() <= lastElapsedMonthStart.getTime()) {
       const monthKey = toIsoDate(cursor);
       if (!existingMonths.has(monthKey)) {
-        await generateMonthEndJournalPair(loanId, cursor, interestRate, tdsRate);
+        await generateMonthEndJournalPair(loanId, cursor);
       }
       cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
     }
@@ -167,13 +221,33 @@ export async function syncMissingMonthEndJournals(loanId: string): Promise<void>
 }
 
 /**
+ * The configuration an already-posted Journal Interest row was calculated
+ * under, read back off the row itself. Rows posted before the basis was
+ * snapshotted carry null and read back as the ledger's historical defaults,
+ * so their amounts reproduce exactly.
+ */
+function configOfPostedEntry(interestEntry: LedgerEntryRow, tdsRatePercent: number): MonthAccrualConfig {
+  return {
+    interestRatePercent: Number(interestEntry.ratePercent ?? 21),
+    tdsRatePercent,
+    interestBasis: (interestEntry.interestBasis as InterestBasis | null) ?? LEDGER_FALLBACK_BASIS,
+    includeOpeningClosingDays:
+      interestEntry.includeOpeningClosingDays ?? LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
+  };
+}
+
+/**
  * Recomputes every already-posted Journal Interest/TDS pair whose accrual
  * month is on or after `fromDate`'s month, oldest first — cascading forward
  * since each month's balance (and therefore interest) depends on the ones
- * before it. Each month keeps its own previously-set rate rather than
- * resetting to the loan's current rate. Called after a backdated
- * Payment/Receipt lands before Journal entries that already exist, so the
- * ledger stays internally consistent without a manual step.
+ * before it. Called after a backdated Payment/Receipt lands before Journal
+ * entries that already exist, so the ledger stays internally consistent
+ * without a manual step.
+ *
+ * Only the BALANCE moves here. Each month is recomputed at its own
+ * snapshotted configuration — rate, TDS rate, basis and day-count
+ * inclusivity all read back off the row — never at the loan's current one.
+ * A configuration change alone therefore never reaches a posted month.
  */
 export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promise<void> {
   const fromMonthKey = toIsoDate(new Date(fromDate.getFullYear(), fromDate.getMonth(), 1));
@@ -183,30 +257,26 @@ export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promi
     const accrualMonth = interestEntry.accrualMonth as string;
     const monthStart = parseIsoDate(accrualMonth);
     const monthEnd = lastDayOfMonth(monthStart);
-    const interestRate = Number(interestEntry.ratePercent ?? 21);
 
-    const events = await assembleMonthBalanceEvents(loanId, toIsoDate(monthEnd), accrualMonth);
-    const dailyRate = getDailyRateFraction(INTEREST_BASIS, interestRate);
+    const tdsEntry = interestEntry.pairedEntryId ? await getEntryById(interestEntry.pairedEntryId) : null;
+    const tdsRate = Number(tdsEntry?.ratePercent ?? 10);
+    const config = configOfPostedEntry(interestEntry, tdsRate);
 
-    const interestAmount = round2(
-      calculateRunningBalanceInterest({
-        events,
-        periodStart: monthStart,
-        periodEnd: monthEnd,
-        dailyRate,
-        includeOpeningClosingDays: false,
-      })
+    const { interestAmount, tdsAmount } = await computeMonthInterestAndTds(
+      loanId,
+      monthStart,
+      monthEnd,
+      config,
+      accrualMonth
     );
 
-    await updateEntryAmountAndRate(interestEntry.id, { ratePercent: interestRate, debit: interestAmount });
+    await updateEntryAmountAndRate(interestEntry.id, {
+      ratePercent: config.interestRatePercent,
+      debit: interestAmount,
+    });
 
-    if (interestEntry.pairedEntryId) {
-      const tdsEntry = await getEntryById(interestEntry.pairedEntryId);
-      if (tdsEntry) {
-        const tdsRate = Number(tdsEntry.ratePercent ?? 10);
-        const tdsAmount = round2((interestAmount * tdsRate) / 100);
-        await updateEntryAmountAndRate(tdsEntry.id, { ratePercent: tdsRate, credit: tdsAmount });
-      }
+    if (tdsEntry) {
+      await updateEntryAmountAndRate(tdsEntry.id, { ratePercent: tdsRate, credit: tdsAmount });
     }
   }
 }
@@ -226,79 +296,22 @@ export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Pro
 }
 
 /**
- * Edits a Journal row's rate and recomputes its amount. Interest-row edits
- * recompute that month's interest AND its paired TDS row (using the TDS
- * row's own, independently editable rate). TDS-row edits only touch that
- * row. Never cascades into other months, and never writes back to the loan
- * — a standalone correction, not a change of the loan's rate.
+ * The configuration this ledger is currently accruing at, for display only.
+ * Read-only by design: rates and day-count are edited in the Loan module,
+ * which is the source of the current configuration, and this ledger has no
+ * write path back to them.
  */
-export async function editJournalEntryRate(entryId: string, newRatePercent: number): Promise<void> {
-  const entry = await getEntryById(entryId);
-  if (!entry) {
-    throw new Error(`Ledger entry ${entryId} not found.`);
-  }
-  if (entry.vchType !== "JOURNAL_INTEREST" && entry.vchType !== "JOURNAL_TDS") {
-    throw new Error("Only Journal Interest/TDS entries have an editable rate.");
-  }
-  if (!entry.accrualMonth) {
-    throw new Error(`Ledger entry ${entryId} has no accrual month.`);
-  }
-
-  await db.transaction(async (tx) => {
-    if (entry.vchType === "JOURNAL_INTEREST") {
-      const monthStart = parseIsoDate(entry.accrualMonth as string);
-      const monthEnd = lastDayOfMonth(monthStart);
-      const events = await assembleMonthBalanceEvents(entry.loanId, toIsoDate(monthEnd), entry.accrualMonth as string);
-      const dailyRate = getDailyRateFraction(INTEREST_BASIS, newRatePercent);
-
-      const interestAmount = round2(
-        calculateRunningBalanceInterest({
-          events,
-          periodStart: monthStart,
-          periodEnd: monthEnd,
-          dailyRate,
-          includeOpeningClosingDays: false,
-        })
-      );
-
-      await updateEntryAmountAndRate(entry.id, { ratePercent: newRatePercent, debit: interestAmount }, tx);
-
-      if (entry.pairedEntryId) {
-        const tdsEntry = await getEntryById(entry.pairedEntryId);
-        if (tdsEntry) {
-          const tdsRate = Number(tdsEntry.ratePercent ?? 10);
-          const tdsAmount = round2((interestAmount * tdsRate) / 100);
-          await updateEntryAmountAndRate(tdsEntry.id, { ratePercent: tdsRate, credit: tdsAmount }, tx);
-        }
-      }
-    } else {
-      // JOURNAL_TDS: recompute off the paired interest row's current amount.
-      const interestEntry = entry.pairedEntryId ? await getEntryById(entry.pairedEntryId) : null;
-      const interestAmount = interestEntry?.debit ? Number(interestEntry.debit) : 0;
-      const tdsAmount = round2((interestAmount * newRatePercent) / 100);
-      await updateEntryAmountAndRate(entry.id, { ratePercent: newRatePercent, credit: tdsAmount }, tx);
-    }
-  });
-}
-
-/** The loan's own Interest/TDS rates, which are what this ledger accrues at. */
 export async function getSettings(loanId: string) {
-  return getLoanRates(loanId);
-}
+  const rates = await getLoanRates(loanId);
+  const config = await resolveAccrualConfig(loanId, new Date());
 
-/**
- * Writes both rates straight onto the loan row, so the change is what the
- * Loans module shows too. Already-posted Journal entries keep the rate they
- * accrued at — only months generated from here on use the new value.
- *
- * Deliberately stops at the loan row. `interestConfigs.annualRate` — what the
- * Repayment Engine and the interest strategies calculate from — is a separate
- * rate, owned by the Interest module, and is not touched from here. Changing
- * a rate on this page therefore does NOT change what the Repayment Engine
- * produces; the two are reconciled only through the Interest module.
- */
-export async function updateLedgerSettings(loanId: string, input: UpdateLedgerSettingsInput) {
-  return updateLoanRates(loanId, input);
+  return {
+    ...rates,
+    currentInterestRatePercent: String(config.interestRatePercent),
+    currentTdsRatePercent: String(config.tdsRatePercent),
+    interestBasis: config.interestBasis,
+    includeOpeningClosingDays: config.includeOpeningClosingDays,
+  };
 }
 
 /** Full ledger for a loan: self-heals missing month-end journals, then returns entries with a computed running balance. */
@@ -314,7 +327,7 @@ export async function getLoanLedger(loanId: string) {
     return { ...row, balance };
   });
 
-  const settings = await getLoanRates(loanId);
+  const settings = await getSettings(loanId);
 
   return { entries, settings };
 }

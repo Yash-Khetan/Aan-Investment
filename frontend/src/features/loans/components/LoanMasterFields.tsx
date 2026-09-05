@@ -2,6 +2,13 @@ import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
 import {
+  CALCULATION_METHOD_OPTIONS,
+  INCLUDE_OPENING_CLOSING_DAYS_OPTIONS,
+  INTEREST_BASIS_OPTIONS,
+  RUNNING_BALANCE_UNSUPPORTED_BASES,
+} from "../../interest/types";
+import type { InterestBasis } from "../../interest/types";
+import {
   CIBIL_COLLATERAL_TYPES,
   CREDIT_TYPES,
   LOAN_TYPES,
@@ -17,6 +24,23 @@ const MORATORIUM_TOOLTIP =
 
 const TDS_RATE_TOOLTIP =
   "Tax deducted at source, as a percentage of the interest accrued. The Ledger uses this rate when it generates each month's TDS entry.";
+
+const EFFECTIVE_FROM_TOOLTIP =
+  "The date this interest configuration takes effect. Periods already calculated under an earlier configuration keep it — set a later date here to change the rates from that point on without disturbing what came before.";
+
+/** Switching to Running Balance drops a basis it can't express back to the default. */
+function methodChange(method: string, currentBasis: string): Partial<LoanFormState> {
+  const invalid =
+    method === "RUNNING_BALANCE" && RUNNING_BALANCE_UNSUPPORTED_BASES.includes(currentBasis as InterestBasis);
+  return invalid
+    ? { calculationMethod: method, interestBasis: "ACTUAL_365", customFormula: "" }
+    : { calculationMethod: method };
+}
+
+/** A formula belongs only to the CUSTOM basis; leaving it behind would be saved and never used. */
+function clearedFormula(basis: string): Partial<LoanFormState> {
+  return basis === "CUSTOM" ? {} : { customFormula: "" };
+}
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
@@ -60,6 +84,12 @@ export function LoanMasterFields({
   lockedBorrowerLabel?: string;
 }) {
   const tenureMonths = calcTenureMonths(form.firstDisbursementDate, form.maturityDate);
+  // Running Balance Method has no daily-rate concept for FULL_MONTH/CUSTOM, so
+  // those aren't offered alongside it — same rule the Interest module applies.
+  const basisOptions =
+    form.calculationMethod === "RUNNING_BALANCE"
+      ? INTEREST_BASIS_OPTIONS.filter((o) => !RUNNING_BALANCE_UNSUPPORTED_BASES.includes(o.value))
+      : INTEREST_BASIS_OPTIONS;
   /** Drives both the disabled state and the required flag on Value of Collateral. */
   const noCollateral = form.collateralType === "NO_COLLATERAL";
 
@@ -197,7 +227,64 @@ export function LoanMasterFields({
             onChange={(e) => onChange({ moratoriumMonths: e.target.value })}
             tooltip={MORATORIUM_TOOLTIP}
           />
+          <SelectField
+            label="Interest Calculation Method"
+            value={form.calculationMethod}
+            onChange={(e) => onChange(methodChange(e.target.value, form.interestBasis))}
+          >
+            {CALCULATION_METHOD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Interest Basis (Day Count)"
+            value={form.interestBasis}
+            onChange={(e) => onChange({ interestBasis: e.target.value, ...clearedFormula(e.target.value) })}
+            required
+          >
+            {basisOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Include Opening & Closing Days"
+            value={form.includeOpeningClosingDays}
+            onChange={(e) => onChange({ includeOpeningClosingDays: e.target.value })}
+          >
+            {INCLUDE_OPENING_CLOSING_DAYS_OPTIONS.map((o) => (
+              <option key={String(o.value)} value={o.value ? "yes" : "no"}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            label="Interest Effective From"
+            type="date"
+            value={form.interestEffectiveFrom}
+            onChange={(e) => onChange({ interestEffectiveFrom: e.target.value })}
+            tooltip={EFFECTIVE_FROM_TOOLTIP}
+          />
+          {form.interestBasis === "CUSTOM" && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <TextAreaField
+                label="Custom Formula"
+                value={form.customFormula}
+                onChange={(e) => onChange({ customFormula: e.target.value })}
+                placeholder="e.g. principal * rate * days / 365"
+                required
+              />
+            </div>
+          )}
         </div>
+        <p className="mt-2 text-xs text-slate-400">
+          These are the loan&apos;s interest settings. Saving them makes them the current configuration for this loan
+          &mdash; the Interest engine, Repayment schedule and Ledger all calculate from them. Already-posted Ledger
+          entries keep the configuration they were calculated under.
+        </p>
       </Card>
 
       <Card className="p-4">

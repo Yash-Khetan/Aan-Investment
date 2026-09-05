@@ -1,8 +1,6 @@
-import { Fragment, useState } from "react";
 import { formatCurrency, formatDate } from "../../../lib/format";
 import { EmptyState } from "../../../components/ui/States";
 import type { LedgerEntry } from "../types";
-import { JournalRateEditor } from "./JournalRateEditor";
 
 const VCH_TYPE_CLASSES: Record<string, string> = {
   PAYMENT: "bg-red-100 text-red-800",
@@ -27,17 +25,12 @@ function VchTypeBadge({ vchType }: { vchType: string }) {
   );
 }
 
-export function LedgerTable({
-  entries,
-  loanId,
-  onRateSaved,
-}: {
-  entries: LedgerEntry[];
-  loanId: string;
-  onRateSaved: () => void;
-}) {
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-
+/**
+ * The ledger as posted. Rows are not editable here: the rates and day-count a
+ * month accrues at come from the Loan module's interest configuration, and
+ * each posted row keeps the configuration it was calculated under.
+ */
+export function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   if (entries.length === 0) {
     return <EmptyState message="No records yet for this loan. Add one using the form above." />;
   }
@@ -58,50 +51,27 @@ export function LedgerTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {entries.map((row) => {
-            const isExpanded = expandedRowId === row.id;
-            const canEditRate = row.isSystemGenerated;
-            return (
-              <Fragment key={row.id}>
-                <tr
-                  className={canEditRate ? "cursor-pointer hover:bg-slate-50" : ""}
-                  onClick={() => canEditRate && setExpandedRowId(isExpanded ? null : row.id)}
-                >
-                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{formatDate(row.entryDate)}</td>
-                  <td className="max-w-xs truncate px-4 py-2.5 text-slate-700" title={row.narration ?? ""}>
-                    {row.narration || "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
-                    <VchTypeBadge vchType={row.vchType} />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{row.vchNo}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-red-700">
-                    {row.debit != null ? formatCurrency(row.debit, 2) : "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-emerald-700">
-                    {row.credit != null ? formatCurrency(row.credit, 2) : "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900">
-                    {formatCurrency(Math.abs(row.balance), 2)} {row.balance >= 0 ? "Dr" : "Cr"}
-                  </td>
-                </tr>
-                {isExpanded && canEditRate && (
-                  <tr>
-                    <td colSpan={7} className="p-0">
-                      <JournalRateEditor
-                        entry={row}
-                        loanId={loanId}
-                        onSaved={() => {
-                          onRateSaved();
-                          setExpandedRowId(null);
-                        }}
-                      />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+          {entries.map((row) => (
+            <tr key={row.id}>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{formatDate(row.entryDate)}</td>
+              <td className="max-w-xs truncate px-4 py-2.5 text-slate-700" title={row.narration ?? ""}>
+                {row.narration || "—"}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5">
+                <VchTypeBadge vchType={row.vchType} />
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{row.vchNo}</td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-red-700">
+                {row.debit != null ? formatCurrency(row.debit, 2) : "—"}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-emerald-700">
+                {row.credit != null ? formatCurrency(row.credit, 2) : "—"}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900">
+                {formatCurrency(Math.abs(row.balance), 2)} {row.balance >= 0 ? "Dr" : "Cr"}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

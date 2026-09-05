@@ -29,3 +29,13 @@ export function getDailyRateFraction(basis: InterestBasis, annualRate: number): 
       throw new Error(`Unknown interest basis: ${basis}`);
   }
 }
+
+/**
+ * Whether a basis has a daily-rate concept at all — i.e. whether
+ * getDailyRateFraction can produce a number for it rather than throwing.
+ * Callers that must not fail on an unsupported basis (the Ledger's month-end
+ * accrual) check this first and fall back to their own default.
+ */
+export function supportsDailyRate(basis: string): basis is InterestBasis {
+  return basis !== "FULL_MONTH" && basis !== "CUSTOM";
+}

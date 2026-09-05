@@ -132,6 +132,9 @@ export async function insertJournalPair(input: {
   interestRatePercent: number;
   tdsAmount: number;
   tdsRatePercent: number;
+  /** Snapshotted with the rates, so a later configuration change can't move this month. */
+  interestBasis: string;
+  includeOpeningClosingDays: boolean;
 }): Promise<{ interestEntry: LedgerEntryRow; tdsEntry: LedgerEntryRow }> {
   return db.transaction(async (tx) => {
     const interestVchNo = await getNextVchNo(input.loanId, tx);
@@ -147,6 +150,8 @@ export async function insertJournalPair(input: {
         narration: `Being Interest @ ${input.interestRatePercent}%`,
         accrualMonth: input.accrualMonth,
         ratePercent: String(input.interestRatePercent),
+        interestBasis: input.interestBasis as any,
+        includeOpeningClosingDays: input.includeOpeningClosingDays,
         isSystemGenerated: true,
       })
       .returning();
@@ -168,6 +173,8 @@ export async function insertJournalPair(input: {
         narration: `Being Tds @ ${input.tdsRatePercent}%`,
         accrualMonth: input.accrualMonth,
         ratePercent: String(input.tdsRatePercent),
+        interestBasis: input.interestBasis as any,
+        includeOpeningClosingDays: input.includeOpeningClosingDays,
         pairedEntryId: interestEntry.id,
         isSystemGenerated: true,
       })
@@ -219,12 +226,14 @@ export async function updateEntryAmountAndRate(
 }
 
 /* ============================================================
-   DEFAULT RATES — read from, and written to, the LOAN row
+   RATES — READ ONLY, FROM THE LOAN ROW
 
-   There is no ledger settings table. The loan row is the single
-   source of truth for both rates, so a rate edited on the Ledger
-   page is immediately what the Loans module shows, and vice
-   versa, with no sync step that could drift.
+   There is no ledger settings table, and no write path from here
+   back onto the loan. The Loan module owns the configuration; the
+   ledger only reads it. These loan-row rates are the fallback for
+   a loan that has no interest configuration yet — otherwise the
+   effective-dated revision is what a month accrues at. See
+   ledger.service.ts's resolveAccrualConfig.
 ============================================================ */
 
 export interface LoanLedgerRates {
@@ -253,33 +262,5 @@ export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
     loanId: row.id,
     defaultInterestRatePercent: row.interestRate,
     defaultTdsRatePercent: row.tdsRatePercent,
-  };
-}
-
-export async function updateLoanRates(
-  loanId: string,
-  input: { defaultInterestRatePercent: number; defaultTdsRatePercent: number }
-): Promise<LoanLedgerRates> {
-  const [updated] = await db
-    .update(loans)
-    .set({
-      interestRate: String(input.defaultInterestRatePercent),
-      tdsRatePercent: String(input.defaultTdsRatePercent),
-    })
-    .where(eq(loans.id, loanId))
-    .returning({
-      id: loans.id,
-      interestRate: loans.interestRate,
-      tdsRatePercent: loans.tdsRatePercent,
-    });
-
-  if (!updated) {
-    throw new NotFoundError(`Loan ${loanId} not found.`);
-  }
-
-  return {
-    loanId: updated.id,
-    defaultInterestRatePercent: updated.interestRate,
-    defaultTdsRatePercent: updated.tdsRatePercent,
   };
 }

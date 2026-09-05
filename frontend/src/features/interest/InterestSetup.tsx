@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { formatDate } from "../../lib/format";
 import { ApiError } from "../../lib/api";
@@ -16,10 +14,14 @@ import { PenalRulesPanel } from "./components/PenalRulesPanel";
  * The complete interest engine for one loan — base config, step-up/step-down
  * rules, penal rule, and a calculation preview. Embedded in the loan creation
  * flow; the loan must already exist because every mutation keys off loanId.
+ *
+ * The base configuration is shown read-only: the Loan module is where it is
+ * edited, and saving it there writes a new effective-dated revision. Only a
+ * legacy loan that has never had a configuration still gets the create form
+ * below. The rules and penal panels remain editable here — they are the
+ * Interest module's own, layered on top of the base configuration.
  */
 export function InterestSetup({ loanId }: { loanId: string }) {
-  const [showReplaceForm, setShowReplaceForm] = useState(false);
-
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["interest-config", loanId],
     queryFn: () => getInterestConfig(loanId),
@@ -58,24 +60,22 @@ export function InterestSetup({ loanId }: { loanId: string }) {
 
       {data && (
         <>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-baseline justify-between gap-4">
             <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Interest Configuration
             </div>
-            <Button variant="secondary" onClick={() => setShowReplaceForm((s) => !s)}>
-              {showReplaceForm ? "Cancel" : "Replace Config"}
-            </Button>
+            <div className="text-xs text-slate-400">Edited in the Loan module — saved there, read here.</div>
           </div>
-
-          {showReplaceForm && (
-            <CreateInterestConfigForm loanId={loanId} onDone={() => setShowReplaceForm(false)} />
-          )}
 
           <Card className="mb-6 p-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs font-medium text-slate-500">Annual Rate</div>
                 <div className="mt-1 text-sm text-slate-900">{Number(data.annualRate)}%</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">TDS Rate</div>
+                <div className="mt-1 text-sm text-slate-900">{Number(data.tdsRatePercent)}%</div>
               </div>
               <div>
                 <div className="text-xs font-medium text-slate-500">Interest Basis</div>

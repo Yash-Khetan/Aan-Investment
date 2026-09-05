@@ -11,7 +11,7 @@ import {
     uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { ledgerVchTypeEnum, money, timestamps } from "./shared";
+import { interestBasisEnum, ledgerVchTypeEnum, money, timestamps } from "./shared";
 import { loans } from "./loan";
 
 /* ============================================================
@@ -23,11 +23,17 @@ import { loans } from "./loan";
    a cumulative (debit - credit) walk, ordered by entryDate then
    sequenceNo. See modules/ledger/ledger.service.ts.
 
-   The Interest/TDS rates this ledger accrues at are NOT stored
-   here: they live on the loan row (loans.interestRate and
-   loans.tdsRatePercent), which is their single source of truth.
-   Each posted Journal row still keeps the rate it accrued at in
-   `ratePercent`, so changing the loan's rate never rewrites history.
+   This ledger owns NO configuration. The Interest/TDS rates and
+   the day-count basis it accrues at are read from the Loan module
+   and its interest configuration (loans.interestRate /
+   loans.tdsRatePercent, and the interest_configs revision in
+   effect for the month being accrued).
+
+   What each posted Journal row DOES keep is a snapshot of the
+   configuration it was actually calculated under — `ratePercent`,
+   `interestBasis` and `includeOpeningClosingDays`. Recomputes read
+   those back off the row, so changing the loan's configuration
+   never rewrites an already-posted month.
 ============================================================ */
 
 export const ledgerEntries = pgTable("ledger_entries", {
@@ -80,6 +86,22 @@ export const ledgerEntries = pgTable("ledger_entries", {
      * PAYMENT/RECEIPT.
      */
     ratePercent: numeric("rate_percent", { precision: 5, scale: 2 }),
+
+    /**
+     * Day-count basis this entry was accrued under, snapshotted from the
+     * interest configuration in effect for its accrual month. Null for
+     * PAYMENT/RECEIPT, and for Journal rows posted before this column
+     * existed — those fall back to the ledger's historical default,
+     * ACTUAL_365, so their amounts are reproduced unchanged.
+     */
+    interestBasis: interestBasisEnum("interest_basis"),
+
+    /**
+     * Day-count inclusivity this entry was accrued under, snapshotted with
+     * `interestBasis` above. Null carries the same meaning: the historical
+     * default, false.
+     */
+    includeOpeningClosingDays: boolean("include_opening_closing_days"),
 
     /** True only for the two auto-generated Journal rows. */
     isSystemGenerated: boolean("is_system_generated")

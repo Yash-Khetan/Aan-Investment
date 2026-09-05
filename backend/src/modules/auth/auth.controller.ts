@@ -104,6 +104,7 @@ export const deactivateUser = setActive(false);
 
 export const getCurrentUser: RequestHandler = async (req, res) => {
     if (!req.user) throw new UnauthorizedError("Not authenticated");
-    const user = await authService.getCurrentUser(req.user.id);
-    res.status(200).json({ success: true, data: { user } });
+    // authenticate already fetched the full profile + roles for this request
+    // (auth.service#authenticateByToken) — no need to query them again.
+    res.status(200).json({ success: true, data: { user: req.user } });
 };

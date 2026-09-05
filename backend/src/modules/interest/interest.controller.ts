@@ -3,13 +3,14 @@ import { NotFoundError } from "../../common/errors";
 import { calculateInterestForLoan } from "./interest.service";
 import { syncRepaymentSchedule } from "../repayment/repayment.service";
 
-import { createInterestConfigRevision, getCurrentInterestConfig, createInterestRule, deleteInterestRule, createPenalRule, getPenalRulesForLoan, getInterestRulesForConfig } from "./interest.repository";
+import { createInterestConfigRevision, getCurrentInterestConfig, createInterestRule, deleteInterestRule, createPenalRule, getPenalRulesForLoan, getInterestRulesForConfig, getLoanRates } from "./interest.repository";
 
 export const createInterestConfig: RequestHandler = async (req, res, next) => {
   try {
     const body = req.valid!.body as {
       loanId: string;
       annualRate: number;
+      tdsRatePercent?: number;
       interestBasis: string;
       ruleType?: string;
       effectiveFrom: string;
@@ -19,9 +20,16 @@ export const createInterestConfig: RequestHandler = async (req, res, next) => {
       calculationMethod?: string;
     };
 
+    // A revision snapshots both rates. When the caller doesn't send a TDS rate,
+    // carry the loan's current one forward rather than silently defaulting.
+    const loanRates = await getLoanRates(body.loanId);
+    const tdsRatePercent =
+      body.tdsRatePercent !== undefined ? String(body.tdsRatePercent) : (loanRates?.tdsRatePercent ?? "10");
+
     const created = await createInterestConfigRevision({
       loanId: body.loanId,
       annualRate: String(body.annualRate),
+      tdsRatePercent,
       interestBasis: body.interestBasis,
       ruleType: body.ruleType,
       effectiveFrom: body.effectiveFrom,

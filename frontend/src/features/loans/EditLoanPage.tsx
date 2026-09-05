@@ -33,7 +33,12 @@ export function EditLoanPage() {
     if (data && !loaded) {
       // A locally autosaved draft reflects unsaved edits in progress — it takes
       // precedence over the persisted record until the user explicitly saves.
-      setForm(loadDraft<LoanFormState>(draftKey) ?? loanToFormState(data));
+      // Laid OVER the persisted record rather than replacing it, so a draft
+      // saved before a field existed doesn't submit that field as undefined
+      // and quietly overwrite what's stored.
+      const draft = loadDraft<LoanFormState>(draftKey);
+      const persisted = loanToFormState(data);
+      setForm(draft ? { ...persisted, ...draft } : persisted);
       setLoaded(true);
     }
   }, [data, loaded, draftKey]);
@@ -46,6 +51,13 @@ export function EditLoanPage() {
       clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["loans"] });
       queryClient.invalidateQueries({ queryKey: ["loan", id] });
+      // Saving here writes this loan's current interest configuration, which
+      // the Ledger and the Interest module both read. Their cached copies are
+      // stale the moment it lands — drop them, or those pages would keep
+      // serving the pre-edit values for the rest of their stale window.
+      queryClient.invalidateQueries({ queryKey: ["ledger", id] });
+      queryClient.invalidateQueries({ queryKey: ["interest-config", id] });
+      queryClient.invalidateQueries({ queryKey: ["loan-interest-rate", id] });
       navigate("/loans");
     },
   });

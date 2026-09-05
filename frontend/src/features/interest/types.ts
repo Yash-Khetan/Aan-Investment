@@ -34,6 +34,8 @@ export interface InterestConfig {
   id: string;
   loanId: string;
   annualRate: string;
+  /** Snapshotted with the rate, so a revision fully describes what a period was calculated under. */
+  tdsRatePercent: string;
   interestBasis: InterestBasis;
   ruleType: InterestRuleType;
   effectiveFrom: string;
@@ -50,6 +52,8 @@ export interface InterestConfig {
 export interface CreateInterestConfigInput {
   loanId: string;
   annualRate: number;
+  /** Omitted, the revision carries the loan's current TDS rate forward. */
+  tdsRatePercent?: number;
   interestBasis: InterestBasis;
   ruleType?: InterestRuleType;
   effectiveFrom: string;

@@ -21,6 +21,8 @@ const calculationMethodValues = ["RUNNING_BALANCE", "SIMPLE_INTEREST"] as const;
 export const createInterestConfigSchema = z.object({
   loanId: z.string().uuid(),
   annualRate: z.coerce.number().positive(),
+  /* Optional: omitted, the revision snapshots the loan's current TDS rate. */
+  tdsRatePercent: z.coerce.number().min(0).max(100).optional(),
   interestBasis: z.enum(interestBasisValues),
   ruleType: z.enum(ruleTypeValues).optional(),
   effectiveFrom: z.string().date(),
