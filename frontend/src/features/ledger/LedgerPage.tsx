@@ -102,7 +102,7 @@ export function LedgerPage() {
               </div>
             )}
 
-            <LedgerTable entries={data.entries} loanId={loanId} onRateSaved={refetch} />
+            <LedgerTable entries={data.entries} />
           </>
         )}
       </div>

@@ -13,15 +13,27 @@ export interface LedgerEntry {
   accrualMonth: string | null;
   ratePercent: string | null;
   isSystemGenerated: boolean;
+  /** Day-count basis this entry was accrued under. Null on rows posted before it was snapshotted. */
+  interestBasis: string | null;
+  includeOpeningClosingDays: boolean | null;
   /** Computed cumulative running balance, attached server-side — never independently stored. */
   balance: number;
 }
 
-/** The loan's own Interest/TDS rates. Saving these writes straight to the loan record. */
+/**
+ * The interest configuration this ledger is accruing at, read from the Loan
+ * module. Display only — there is no write path back from the Ledger.
+ */
 export interface LedgerSettings {
   loanId: string;
+  /** The loan row's own rates. */
   defaultInterestRatePercent: string;
   defaultTdsRatePercent: string;
+  /** The rates and day-count actually in effect today, from the current interest configuration. */
+  currentInterestRatePercent: string;
+  currentTdsRatePercent: string;
+  interestBasis: string;
+  includeOpeningClosingDays: boolean;
 }
 
 export interface LoanLedger {
@@ -34,9 +46,4 @@ export interface CreateEntryInput {
   vchType: "PAYMENT" | "RECEIPT";
   amount: number;
   narration?: string;
-}
-
-export interface UpdateSettingsInput {
-  defaultInterestRatePercent: number;
-  defaultTdsRatePercent: number;
 }

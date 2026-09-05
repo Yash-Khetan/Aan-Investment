@@ -9,15 +9,24 @@ import {
   PAYMENT_FREQUENCIES,
 } from "../../loans/types";
 import type { Loan } from "../../loans/types";
+import { CALCULATION_METHOD_OPTIONS, INTEREST_BASIS_OPTIONS } from "../../interest/types";
 import { labelOf } from "./codedLabel";
 import { SummaryCard, SummaryGroup } from "./summaryShared";
 
+/** Falls back to the raw enum value for a basis retired from the picker but still configured. */
+function optionLabel(options: readonly { value: string; label: string }[], value: string | null | undefined) {
+  if (!value) return null;
+  return options.find((o) => o.value === value)?.label ?? value;
+}
+
 /**
- * The selected loan, read straight from the Loan module — the source of truth
- * for the Interest and TDS rates this ledger accrues at. Read-only: the rates
- * are changed in the Loan module, not here.
+ * The selected loan, read straight from the Loan module — the source of the
+ * interest configuration this ledger accrues at. Read-only: rates and
+ * day-count are changed in the Loan module, not here.
  */
 export function LoanSummaryCard({ loan }: { loan: Loan }) {
+  const config = loan.interestConfig ?? null;
+
   return (
     <SummaryCard
       title="Loan Details"
@@ -35,6 +44,16 @@ export function LoanSummaryCard({ loan }: { loan: Loan }) {
         <DetailField label="Repayment Type" value={loan.repaymentType?.replace(/_/g, " ")} />
         <DetailField label="Interest Rate" value={`${Number(loan.interestRate).toFixed(2)}%`} />
         <DetailField label="TDS Rate" value={`${Number(loan.tdsRatePercent ?? 0).toFixed(2)}%`} />
+      </SummaryGroup>
+
+      <SummaryGroup title="Interest Configuration (in effect)">
+        <DetailField label="Interest Basis" value={optionLabel(INTEREST_BASIS_OPTIONS, config?.interestBasis)} />
+        <DetailField label="Method" value={optionLabel(CALCULATION_METHOD_OPTIONS, config?.calculationMethod)} />
+        <DetailField
+          label="Include Opening & Closing Days"
+          value={config ? (config.includeOpeningClosingDays ? "Yes" : "No") : null}
+        />
+        <DetailField label="Effective From" value={formatDate(config?.effectiveFrom)} />
       </SummaryGroup>
 
       <SummaryGroup title="Amounts">

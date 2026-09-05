@@ -127,6 +127,13 @@
       "when": 1787413411985,
       "tag": "0017_loan_keyed_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788618903319,
+      "tag": "0018_loan_owned_interest_config",
+      "breakpoints": true
     }
   ]
 }

@@ -54,7 +54,12 @@ function StepIndicator({ current }: { current: number }) {
 export function CreateLoanPage() {
   const navigate = useNavigate();
   const { status } = useAuth();
-  const [form, setForm] = useState<LoanFormState>(() => loadDraft<LoanFormState>(DRAFT_KEY) ?? EMPTY_LOAN_FORM);
+  // Draft laid over the defaults, so one saved before a field existed still
+  // yields a complete form rather than undefined values.
+  const [form, setForm] = useState<LoanFormState>(() => ({
+    ...EMPTY_LOAN_FORM,
+    ...loadDraft<LoanFormState>(DRAFT_KEY),
+  }));
   const [createdLoan, setCreatedLoan] = useState<Loan | null>(null);
 
   useAutosaveDraft(DRAFT_KEY, form, status === "authenticated" && !createdLoan);

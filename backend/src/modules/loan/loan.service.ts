@@ -17,6 +17,12 @@ import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators
 import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
 import { syncRepaymentSchedule } from "../repayment/repayment.service";
+import {
+    createInterestConfigRevision,
+    createInterestRule,
+    getCurrentInterestConfig,
+    getInterestRulesForConfig,
+} from "../interest/interest.repository";
 import type {
     CreateLoanInput,
     ListLoansQuery,
@@ -40,6 +46,165 @@ const toMoney = (value: number | undefined): string | undefined =>
 
 const num = (value: string | null): number | undefined =>
     value === null ? undefined : Number(value);
+
+/* ────────────────────────────────────────────────────────
+   INTEREST CONFIGURATION
+
+   The loan is the source of the CURRENT interest configuration,
+   but it does not store it: the values an operator edits here are
+   persisted into the Interest module's own effective-dated
+   interest_configs table, as a new revision. One store, so the
+   Interest engine, the Repayment engine and the Ledger all read
+   the same configuration the Loan module saved.
+
+   A revision is never edited in place. Each one records what the
+   period it governs was calculated under — the Ledger resolves a
+   month's configuration by date — so rewriting one would silently
+   change an already-calculated period. A change produces a new
+   revision with its own effective-from date instead.
+
+   No calculation happens here. The formulas, day-count logic and
+   rounding all stay in the Interest module, which reads these
+   values exactly as it always has.
+──────────────────────────────────────────────────────── */
+
+/** Applied only when neither the incoming save nor an existing revision says otherwise. */
+const DEFAULT_INTEREST_BASIS = "ACTUAL_365";
+const DEFAULT_CALCULATION_METHOD = "SIMPLE_INTEREST";
+
+interface DesiredInterestConfig {
+    annualRate: string;
+    tdsRatePercent: string;
+    interestBasis: string;
+    calculationMethod: string;
+    includeOpeningClosingDays: boolean;
+    customFormula: string | null;
+    effectiveFrom: string;
+}
+
+/**
+ * The two combination rules the Interest module already enforces on a config
+ * (see modules/interest/interest.validators.ts). Re-checked here because a
+ * configuration can now also arrive through a loan save, and an invalid
+ * combination must be rejected at the door rather than saved and thrown on
+ * later at calculation time.
+ */
+const assertInterestConfigCoherent = (config: DesiredInterestConfig): void => {
+    if (config.interestBasis === "CUSTOM" && !config.customFormula) {
+        throw new BadRequestError(
+            "customFormula is required when interestBasis is CUSTOM",
+            { field: "customFormula" },
+        );
+    }
+
+    if (
+        config.calculationMethod === "RUNNING_BALANCE" &&
+        (config.interestBasis === "FULL_MONTH" || config.interestBasis === "CUSTOM")
+    ) {
+        throw new BadRequestError(
+            "Running Balance Method isn't supported for FULL_MONTH or CUSTOM interest basis",
+            { field: "calculationMethod" },
+        );
+    }
+};
+
+/** The interest_configs revision currently in effect for a loan, or null when it has none. */
+type CurrentInterestConfig = Awaited<ReturnType<typeof getCurrentInterestConfig>>;
+
+/** Interest values the loan save carries, separate from the loan's own columns. */
+type InterestConfigInput = {
+    interestBasis?: string;
+    calculationMethod?: string;
+    includeOpeningClosingDays?: boolean;
+    customFormula?: string | null;
+    interestEffectiveFrom?: string;
+};
+
+/** Whether a save actually moves the configuration, numerically rather than textually ("20" vs "20.0000"). */
+const interestConfigChanged = (
+    desired: DesiredInterestConfig,
+    current: NonNullable<Awaited<ReturnType<typeof getCurrentInterestConfig>>>,
+): boolean =>
+    Number(desired.annualRate) !== Number(current.annualRate) ||
+    Number(desired.tdsRatePercent) !== Number(current.tdsRatePercent) ||
+    desired.interestBasis !== current.interestBasis ||
+    desired.calculationMethod !== current.calculationMethod ||
+    desired.includeOpeningClosingDays !== (current.includeOpeningClosingDays ?? false) ||
+    desired.customFormula !== (current.customFormula ?? null) ||
+    desired.effectiveFrom !== current.effectiveFrom;
+
+/**
+ * Writes the loan's interest values as its current configuration — as a new
+ * effective-dated revision, and only when they actually differ from the
+ * revision already in effect, so an ordinary loan save doesn't pile up
+ * identical revisions.
+ *
+ * Step-up/step-down/event rules are carried onto the new revision: they hang
+ * off a config id, and changing a rate shouldn't quietly drop the slabs an
+ * operator configured against the old one.
+ */
+const syncInterestConfig = async (
+    loan: LoanWithBorrower,
+    input: InterestConfigInput,
+): Promise<void> => {
+    const current = await getCurrentInterestConfig(loan.id);
+
+    const desired: DesiredInterestConfig = {
+        annualRate: loan.interestRate,
+        tdsRatePercent: loan.tdsRatePercent,
+        interestBasis:
+            input.interestBasis ?? current?.interestBasis ?? DEFAULT_INTEREST_BASIS,
+        calculationMethod:
+            input.calculationMethod ??
+            current?.calculationMethod ??
+            DEFAULT_CALCULATION_METHOD,
+        includeOpeningClosingDays:
+            input.includeOpeningClosingDays ??
+            current?.includeOpeningClosingDays ??
+            false,
+        // `null` here means "clear it", which `??` would misread as "not sent".
+        customFormula:
+            "customFormula" in input
+                ? (input.customFormula ?? null)
+                : (current?.customFormula ?? null),
+        effectiveFrom:
+            input.interestEffectiveFrom ??
+            current?.effectiveFrom ??
+            loan.firstDisbursementDate ??
+            loan.sanctionDate ??
+            today(),
+    };
+
+    if (current && !interestConfigChanged(desired, current)) return;
+
+    assertInterestConfigCoherent(desired);
+
+    const created = await createInterestConfigRevision({
+        loanId: loan.id,
+        annualRate: desired.annualRate,
+        tdsRatePercent: desired.tdsRatePercent,
+        interestBasis: desired.interestBasis,
+        ruleType: current?.ruleType ?? undefined,
+        effectiveFrom: desired.effectiveFrom,
+        remarks: current ? "Revised from the Loan module" : "Created with the loan",
+        customFormula: desired.customFormula ?? undefined,
+        includeOpeningClosingDays: desired.includeOpeningClosingDays,
+        calculationMethod: desired.calculationMethod,
+    });
+
+    if (!current || !created) return;
+
+    for (const rule of await getInterestRulesForConfig(current.id)) {
+        await createInterestRule({
+            interestConfigId: created.id,
+            fromMonth: rule.fromMonth ?? undefined,
+            toMonth: rule.toMonth ?? undefined,
+            rate: rule.rate,
+            triggerEvent: rule.triggerEvent ?? undefined,
+            remarks: rule.remarks ?? undefined,
+        });
+    }
+};
 
 /** Ensure the referenced borrower exists (required on create). */
 const assertBorrowerExists = async (borrowerId: string): Promise<void> => {
@@ -141,24 +306,31 @@ export const createLoan = async (
     // A loan created with an initial disbursed amount gets tranche #1 recorded
     // in the same transaction, so accounting-export's disbursement report (and
     // any other reader of loan_tranches) sees it immediately and consistently.
-    if (input.disbursedAmount !== undefined && input.disbursedAmount > 0) {
-        return db.transaction(async (tx) => {
-            const loan = await loanRepository.create(values, tx);
-            await loanRepository.createTranche(
-                {
-                    loanId: loan.id,
-                    trancheNumber: 1,
-                    amount: toMoney(input.disbursedAmount)!,
-                    disbursementDate: input.firstDisbursementDate ?? today(),
-                    remarks: "Initial disbursement",
-                },
-                tx,
-            );
-            return loan;
-        });
-    }
+    const loan =
+        input.disbursedAmount !== undefined && input.disbursedAmount > 0
+            ? await db.transaction(async (tx) => {
+                  const created = await loanRepository.create(values, tx);
+                  await loanRepository.createTranche(
+                      {
+                          loanId: created.id,
+                          trancheNumber: 1,
+                          amount: toMoney(input.disbursedAmount)!,
+                          disbursementDate: input.firstDisbursementDate ?? today(),
+                          remarks: "Initial disbursement",
+                      },
+                      tx,
+                  );
+                  return created;
+              })
+            : await loanRepository.create(values);
 
-    return loanRepository.create(values);
+    // The loan's interest values become its interest configuration straight
+    // away, so the Interest engine, the Repayment engine and the Ledger all
+    // have something to read from the moment the loan exists.
+    await syncInterestConfig(loan, input);
+    await syncRepaymentSchedule(loan.id);
+
+    return loan;
 };
 
 /**
@@ -183,12 +355,16 @@ const enrichWithMetrics = async (
 
 export const getLoanById = async (
     id: string,
-): Promise<LoanWithMetrics & { irr: number | null }> => {
+): Promise<LoanWithMetrics & { irr: number | null; interestConfig: CurrentInterestConfig }> => {
     const loan = await loanRepository.findById(id);
     if (!loan) throw new NotFoundError(`Loan '${id}' not found`);
     const [enriched] = await enrichWithMetrics([loan]);
     const irrs = await getLoanIrrs([id]);
-    return { ...enriched!, irr: irrs.get(id) ?? null };
+    // The configuration in effect, so reopening the loan shows what was saved
+    // rather than falling back to defaults. Null only for a loan that predates
+    // having one at all.
+    const interestConfig = await getCurrentInterestConfig(id);
+    return { ...enriched!, irr: irrs.get(id) ?? null, interestConfig };
 };
 
 export const listLoans = async (
@@ -368,6 +544,11 @@ export const updateLoan = async (
         if (!result) throw new NotFoundError(`Loan '${id}' not found`);
         updated = result;
     }
+
+    // The saved interest values become this loan's current configuration.
+    // Ordered before the schedule re-sync below, which reads that
+    // configuration to regenerate from.
+    await syncInterestConfig(updated, input);
 
     // Keep the repayment schedule in sync with whatever just changed —
     // regenerates automatically if nothing's been paid yet, otherwise leaves

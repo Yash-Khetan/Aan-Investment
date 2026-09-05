@@ -43,6 +43,16 @@ export const interestConfigs = pgTable("interest_configs", {
         scale: 4,
     }).notNull(),
 
+    /* TDS withheld as a percentage of accrued interest, snapshotted onto the
+       revision alongside the rate it accompanies. The loan row still carries
+       the loan's *current* TDS rate (loans.tdsRatePercent, edited in the Loan
+       module); this column is what makes a revision a complete, effective-dated
+       record of the configuration a period was calculated under. */
+    tdsRatePercent: numeric("tds_rate_percent", {
+        precision: 5,
+        scale: 2,
+    }).notNull().default("10"),
+
     interestBasis: interestBasisEnum("interest_basis")
         .notNull(),
 

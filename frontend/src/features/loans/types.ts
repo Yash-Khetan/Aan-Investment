@@ -1,3 +1,5 @@
+import type { CalculationMethod, InterestBasis, InterestConfig } from "../interest/types";
+
 export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
 
 export const SECURITY_TYPES = [
@@ -195,6 +197,14 @@ export interface Loan {
   collateralValue: string | null;
   relationshipManagerId: string | null;
   createdAt: string | null;
+  /**
+   * The interest configuration currently in effect for this loan — the
+   * interest_configs revision the Loan module last saved, and what the
+   * Interest engine, Repayment engine and Ledger all calculate from. Only
+   * present on the single-loan detail response, not the list. Null for a
+   * legacy loan that has never had one.
+   */
+  interestConfig?: InterestConfig | null;
   /** Sum of (expected - paid) across unpaid installments past due, on the current repayment schedule. */
   amountOverdue: number;
   /** Days since the oldest unpaid overdue installment's due date; 0 when nothing is overdue. */
@@ -224,6 +234,12 @@ export interface CreateLoanInput {
   outstandingPrincipal?: number;
   interestRate: number;
   tdsRatePercent?: number;
+  /* Interest configuration — saved as an effective-dated interest_configs revision. */
+  interestBasis?: InterestBasis;
+  calculationMethod?: CalculationMethod;
+  includeOpeningClosingDays?: boolean;
+  customFormula?: string;
+  interestEffectiveFrom?: string;
   tenureMonths: number;
   moratoriumMonths?: number;
   sanctionDate?: string;
@@ -256,6 +272,13 @@ export interface UpdateLoanInput {
   outstandingPrincipal: number;
   interestRate: number;
   tdsRatePercent: number;
+  /* Interest configuration — saved as an effective-dated interest_configs revision. */
+  interestBasis: InterestBasis;
+  calculationMethod: CalculationMethod;
+  includeOpeningClosingDays: boolean;
+  customFormula: string | null;
+  /** Omitted rather than blank when there is no date to send — the API rejects an empty string. */
+  interestEffectiveFrom?: string;
   tenureMonths: number;
   moratoriumMonths: number;
   sanctionDate: string | null;
@@ -288,6 +311,12 @@ export interface LoanFormState {
   disbursedAmount: string;
   interestRate: string;
   tdsRatePercent: string;
+  /* Interest configuration. Booleans are carried as "yes"/"no" like every other field here. */
+  interestBasis: string;
+  calculationMethod: string;
+  includeOpeningClosingDays: string;
+  customFormula: string;
+  interestEffectiveFrom: string;
   moratoriumMonths: string;
   sanctionDate: string;
   firstDisbursementDate: string;
@@ -317,6 +346,11 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
   disbursedAmount: "",
   interestRate: "",
   tdsRatePercent: "10",
+  interestBasis: "ACTUAL_365",
+  calculationMethod: "SIMPLE_INTEREST",
+  includeOpeningClosingDays: "no",
+  customFormula: "",
+  interestEffectiveFrom: "",
   moratoriumMonths: "",
   sanctionDate: "",
   firstDisbursementDate: "",
@@ -334,6 +368,10 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
 };
 
 export function loanToFormState(l: Loan): LoanFormState {
+  // Interest values come from the configuration in effect, so reopening the
+  // loan shows what was saved rather than the form's defaults. The rates
+  // themselves stay on the loan row, which is what the operator edits here.
+  const config = l.interestConfig ?? null;
   return {
     loanAccountNumber: l.loanAccountNumber,
     borrowerId: l.borrowerId,
@@ -346,6 +384,11 @@ export function loanToFormState(l: Loan): LoanFormState {
     disbursedAmount: l.disbursedAmount ?? "",
     interestRate: l.interestRate ?? "",
     tdsRatePercent: l.tdsRatePercent ?? "10",
+    interestBasis: config?.interestBasis ?? "ACTUAL_365",
+    calculationMethod: config?.calculationMethod ?? "SIMPLE_INTEREST",
+    includeOpeningClosingDays: config?.includeOpeningClosingDays ? "yes" : "no",
+    customFormula: config?.customFormula ?? "",
+    interestEffectiveFrom: config?.effectiveFrom ?? l.firstDisbursementDate ?? "",
     moratoriumMonths: String(l.moratoriumMonths ?? 0),
     sanctionDate: l.sanctionDate ?? "",
     firstDisbursementDate: l.firstDisbursementDate ?? "",
@@ -375,6 +418,11 @@ export function formStateToCreateInput(f: LoanFormState): CreateLoanInput {
     disbursedAmount: f.disbursedAmount ? Number(f.disbursedAmount) : undefined,
     interestRate: Number(f.interestRate),
     tdsRatePercent: f.tdsRatePercent ? Number(f.tdsRatePercent) : undefined,
+    interestBasis: f.interestBasis as InterestBasis,
+    calculationMethod: f.calculationMethod as CalculationMethod,
+    includeOpeningClosingDays: f.includeOpeningClosingDays === "yes",
+    customFormula: f.interestBasis === "CUSTOM" ? f.customFormula || undefined : undefined,
+    interestEffectiveFrom: f.interestEffectiveFrom || f.firstDisbursementDate || undefined,
     tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: f.moratoriumMonths ? Number(f.moratoriumMonths) : undefined,
     sanctionDate: f.sanctionDate || undefined,
@@ -407,6 +455,11 @@ export function formStateToUpdateInput(f: LoanFormState): UpdateLoanInput {
     outstandingPrincipal: 0,
     interestRate: Number(f.interestRate),
     tdsRatePercent: Number(f.tdsRatePercent || 10),
+    interestBasis: f.interestBasis as InterestBasis,
+    calculationMethod: f.calculationMethod as CalculationMethod,
+    includeOpeningClosingDays: f.includeOpeningClosingDays === "yes",
+    customFormula: f.interestBasis === "CUSTOM" ? f.customFormula || null : null,
+    interestEffectiveFrom: f.interestEffectiveFrom || f.firstDisbursementDate || undefined,
     tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: Number(f.moratoriumMonths || 0),
     sanctionDate: f.sanctionDate || null,

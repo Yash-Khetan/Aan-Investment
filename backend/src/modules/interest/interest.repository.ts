@@ -1,4 +1,4 @@
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, lte, desc, asc } from "drizzle-orm";
 import {
   db,
   interestConfigs,
@@ -24,6 +24,40 @@ export async function getCurrentInterestConfig(loanId: string) {
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+/**
+ * The interest configuration that was in effect on a given date — the
+ * revision with the latest effectiveFrom on or before it, most recently
+ * created first when two revisions share a date.
+ *
+ * This is what gives a configuration change its effective point: a period
+ * being calculated resolves the revision that governed it, so a change saved
+ * today cannot retroactively alter how an earlier period is calculated.
+ *
+ * Falls back to the loan's earliest revision for a date preceding all of
+ * them (a period that predates the loan's first configuration is calculated
+ * under that first configuration, not under none), and returns null only
+ * when the loan has no interest configuration at all.
+ */
+export async function getInterestConfigEffectiveOn(loanId: string, isoDate: string) {
+  const rows = await db
+    .select()
+    .from(interestConfigs)
+    .where(and(eq(interestConfigs.loanId, loanId), lte(interestConfigs.effectiveFrom, isoDate)))
+    .orderBy(desc(interestConfigs.effectiveFrom), desc(interestConfigs.createdAt))
+    .limit(1);
+
+  if (rows[0]) return rows[0];
+
+  const earliest = await db
+    .select()
+    .from(interestConfigs)
+    .where(eq(interestConfigs.loanId, loanId))
+    .orderBy(asc(interestConfigs.effectiveFrom), asc(interestConfigs.createdAt))
+    .limit(1);
+
+  return earliest[0] ?? null;
 }
 
 /**
@@ -62,6 +96,7 @@ export async function getCurrentPenalRule(loanId: string) {
 export async function createInterestConfigRevision(input: {
   loanId: string;
   annualRate: string;
+  tdsRatePercent: string;
   interestBasis: string;
   ruleType?: string;
   effectiveFrom: string;
@@ -89,6 +124,7 @@ export async function createInterestConfigRevision(input: {
       .values({
         loanId: input.loanId,
         annualRate: input.annualRate,
+        tdsRatePercent: input.tdsRatePercent,
         interestBasis: input.interestBasis as any,
         ruleType: (input.ruleType ?? "NORMAL") as any,
         effectiveFrom: input.effectiveFrom,
@@ -186,6 +222,23 @@ export async function getPenalRulesForLoan(loanId: string) {
     .select()
     .from(penalInterestRules)
     .where(eq(penalInterestRules.loanId, loanId));
+}
+
+/**
+ * The loan's own Interest and TDS rates, as the Loan module holds them. The
+ * Loan module is where an operator edits these; a configuration revision
+ * snapshots them so each period keeps what it was calculated under.
+ */
+export async function getLoanRates(
+  loanId: string
+): Promise<{ interestRate: string; tdsRatePercent: string } | null> {
+  const rows = await db
+    .select({ interestRate: loans.interestRate, tdsRatePercent: loans.tdsRatePercent })
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 /**
