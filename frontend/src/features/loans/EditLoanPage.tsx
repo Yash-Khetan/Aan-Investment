@@ -46,6 +46,11 @@ export function EditLoanPage() {
       clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["loans"] });
       queryClient.invalidateQueries({ queryKey: ["loan", id] });
+      // The loan row is the single source of truth for the Interest and TDS
+      // rates the Ledger accrues at, so a saved rate change makes this loan's
+      // cached ledger stale — drop it, or the Ledger page would keep serving
+      // the pre-edit copy for the rest of its stale window.
+      queryClient.invalidateQueries({ queryKey: ["ledger", id] });
       navigate("/loans");
     },
   });
