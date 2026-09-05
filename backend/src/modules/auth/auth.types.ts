@@ -5,11 +5,15 @@
  * them, controllers/middleware consume them.
  */
 
-/** Identity the authenticate middleware attaches to req.user. */
-export interface AuthenticatedUser {
-    id: string;
-    roles: string[];
-}
+/**
+ * Identity the authenticate middleware attaches to req.user.
+ *
+ * Carries the FULL sanitized profile (not just id/roles) so that handlers
+ * downstream of `authenticate` — e.g. GET /users/me — can serve straight from
+ * req.user instead of re-querying the user + roles that the middleware just
+ * fetched. Shape matches PublicUser exactly for that reason.
+ */
+export type AuthenticatedUser = PublicUser;
 
 /** A freshly generated opaque session token and the data we persist for it. */
 export interface GeneratedRefreshToken {
