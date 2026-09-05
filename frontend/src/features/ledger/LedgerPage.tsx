@@ -6,14 +6,32 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States
 import { formatCurrency } from "../../lib/format";
 import { ApiError } from "../../lib/api";
 import { LoanSelect } from "../lookup/LoanSelect";
+import { getLoan } from "../loans/api";
 import { getLedger } from "./api";
 import { AddEntryForm } from "./components/AddEntryForm";
-import { RateSettingsPanel } from "./components/RateSettingsPanel";
+import { BorrowerSummaryCard } from "./components/BorrowerSummaryCard";
+import { LoanSummaryCard } from "./components/LoanSummaryCard";
 import { LedgerTable } from "./components/LedgerTable";
 
 export function LedgerPage() {
   const [loanId, setLoanId] = useState("");
   const queryClient = useQueryClient();
+
+  /**
+   * The selected loan drives the two read-only panels above the ledger: the
+   * loan itself, and — via its borrowerId — the borrower behind it. Same query
+   * key as the Loans module's detail view, so they share one cached record.
+   */
+  const {
+    data: loan,
+    isLoading: isLoanLoading,
+    isError: isLoanError,
+    error: loanError,
+  } = useQuery({
+    queryKey: ["loan", loanId],
+    queryFn: () => getLoan(loanId),
+    enabled: !!loanId,
+  });
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["ledger", loanId],
@@ -23,17 +41,6 @@ export function LedgerPage() {
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["ledger", loanId] });
-  }
-
-  /**
-   * Saving the rates writes to the loan record itself, so the Loans list and
-   * detail view are stale the moment it lands. Without dropping their cached
-   * copies too, the new rate only appears there after a manual page reload.
-   */
-  function refetchAfterRateSave() {
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ["loans"] });
-    queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
   }
 
   const stats = data
@@ -59,6 +66,21 @@ export function LedgerPage() {
 
         {!loanId && <EmptyState message="Select a loan to view or add records." />}
 
+        {loanId && isLoanLoading && <LoadingState label="Loading loan details..." />}
+
+        {loanId && isLoanError && (
+          <ErrorState
+            message={loanError instanceof ApiError ? loanError.message : "Failed to load the loan details."}
+          />
+        )}
+
+        {loanId && loan && (
+          <>
+            <BorrowerSummaryCard borrowerId={loan.borrowerId} />
+            <LoanSummaryCard loan={loan} />
+          </>
+        )}
+
         {loanId && isLoading && <LoadingState label="Loading ledger..." />}
 
         {loanId && isError && (
@@ -68,7 +90,6 @@ export function LedgerPage() {
         {loanId && data && (
           <>
             <AddEntryForm loanId={loanId} onAdded={refetch} />
-            <RateSettingsPanel loanId={loanId} settings={data.settings} onSaved={refetchAfterRateSave} />
 
             {stats && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
