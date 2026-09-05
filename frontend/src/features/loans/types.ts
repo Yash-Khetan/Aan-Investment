@@ -175,6 +175,7 @@ export interface Loan {
   disbursedAmount: string | null;
   outstandingPrincipal: string | null;
   interestRate: string;
+  tdsRatePercent: string;
   tenureMonths: number;
   moratoriumMonths: number | null;
   sanctionDate: string | null;
@@ -222,6 +223,7 @@ export interface CreateLoanInput {
   disbursedAmount?: number;
   outstandingPrincipal?: number;
   interestRate: number;
+  tdsRatePercent?: number;
   tenureMonths: number;
   moratoriumMonths?: number;
   sanctionDate?: string;
@@ -253,6 +255,7 @@ export interface UpdateLoanInput {
   disbursedAmount: number;
   outstandingPrincipal: number;
   interestRate: number;
+  tdsRatePercent: number;
   tenureMonths: number;
   moratoriumMonths: number;
   sanctionDate: string | null;
@@ -284,6 +287,7 @@ export interface LoanFormState {
   sanctionedAmount: string;
   disbursedAmount: string;
   interestRate: string;
+  tdsRatePercent: string;
   moratoriumMonths: string;
   sanctionDate: string;
   firstDisbursementDate: string;
@@ -312,6 +316,7 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
   sanctionedAmount: "",
   disbursedAmount: "",
   interestRate: "",
+  tdsRatePercent: "10",
   moratoriumMonths: "",
   sanctionDate: "",
   firstDisbursementDate: "",
@@ -340,6 +345,7 @@ export function loanToFormState(l: Loan): LoanFormState {
     sanctionedAmount: l.sanctionedAmount ?? "",
     disbursedAmount: l.disbursedAmount ?? "",
     interestRate: l.interestRate ?? "",
+    tdsRatePercent: l.tdsRatePercent ?? "10",
     moratoriumMonths: String(l.moratoriumMonths ?? 0),
     sanctionDate: l.sanctionDate ?? "",
     firstDisbursementDate: l.firstDisbursementDate ?? "",
@@ -368,6 +374,7 @@ export function formStateToCreateInput(f: LoanFormState): CreateLoanInput {
     sanctionedAmount: Number(f.sanctionedAmount),
     disbursedAmount: f.disbursedAmount ? Number(f.disbursedAmount) : undefined,
     interestRate: Number(f.interestRate),
+    tdsRatePercent: f.tdsRatePercent ? Number(f.tdsRatePercent) : undefined,
     tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: f.moratoriumMonths ? Number(f.moratoriumMonths) : undefined,
     sanctionDate: f.sanctionDate || undefined,
@@ -399,6 +406,7 @@ export function formStateToUpdateInput(f: LoanFormState): UpdateLoanInput {
     disbursedAmount: Number(f.disbursedAmount || 0),
     outstandingPrincipal: 0,
     interestRate: Number(f.interestRate),
+    tdsRatePercent: Number(f.tdsRatePercent || 10),
     tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
     moratoriumMonths: Number(f.moratoriumMonths || 0),
     sanctionDate: f.sanctionDate || null,

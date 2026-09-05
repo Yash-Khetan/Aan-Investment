@@ -9,7 +9,7 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function AddEntryForm({ borrowerId, onAdded }: { borrowerId: string; onAdded: () => void }) {
+export function AddEntryForm({ loanId, onAdded }: { loanId: string; onAdded: () => void }) {
   const [entryDate, setEntryDate] = useState(todayIso());
   const [vchType, setVchType] = useState<"PAYMENT" | "RECEIPT">("PAYMENT");
   const [amount, setAmount] = useState("");
@@ -27,7 +27,7 @@ export function AddEntryForm({ borrowerId, onAdded }: { borrowerId: string; onAd
     setIsSaving(true);
     setError(null);
     try {
-      await createEntry(borrowerId, { entryDate, vchType, amount: parsedAmount, narration: narration || undefined });
+      await createEntry(loanId, { entryDate, vchType, amount: parsedAmount, narration: narration || undefined });
       setAmount("");
       setNarration("");
       onAdded();

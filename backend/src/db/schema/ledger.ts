@@ -12,26 +12,32 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { ledgerVchTypeEnum, money, timestamps } from "./shared";
-import { borrowers } from "./borrower";
+import { loans } from "./loan";
 
 /* ============================================================
-   BORROWER LEDGER ENTRIES
+   LEDGER ENTRIES
 
    One row per Payment, Receipt, or (auto-generated) Journal
-   Interest/TDS entry on a borrower's running account. The running
-   Balance is never stored here — it's computed on read as a
-   cumulative (debit - credit) walk, ordered by entryDate then
-   sequenceNo. See modules/borrower-ledger/borrowerLedger.service.ts.
+   Interest/TDS entry on a LOAN ACCOUNT's running account. The
+   running Balance is never stored here — it's computed on read as
+   a cumulative (debit - credit) walk, ordered by entryDate then
+   sequenceNo. See modules/ledger/ledger.service.ts.
+
+   The Interest/TDS rates this ledger accrues at are NOT stored
+   here: they live on the loan row (loans.interestRate and
+   loans.tdsRatePercent), which is their single source of truth.
+   Each posted Journal row still keeps the rate it accrued at in
+   `ratePercent`, so changing the loan's rate never rewrites history.
 ============================================================ */
 
-export const borrowerLedgerEntries = pgTable("borrower_ledger_entries", {
+export const ledgerEntries = pgTable("ledger_entries", {
 
     id: uuid("id")
         .defaultRandom()
         .primaryKey(),
 
-    borrowerId: uuid("borrower_id")
-        .references(() => borrowers.id, {
+    loanId: uuid("loan_id")
+        .references(() => loans.id, {
             onDelete: "cascade",
         })
         .notNull(),
@@ -44,7 +50,7 @@ export const borrowerLedgerEntries = pgTable("borrower_ledger_entries", {
     vchType: ledgerVchTypeEnum("vch_type")
         .notNull(),
 
-    /** System-assigned, plain incrementing integer shared across all vch types per borrower. */
+    /** System-assigned, plain incrementing integer shared across all vch types per loan. */
     vchNo: varchar("vch_no", { length: 30 })
         .notNull(),
 
@@ -63,7 +69,7 @@ export const borrowerLedgerEntries = pgTable("borrower_ledger_entries", {
 
     /**
      * First-of-month date this Journal pair accrues for. Null for
-     * PAYMENT/RECEIPT. Unique per (borrower, month, vchType) — this is what
+     * PAYMENT/RECEIPT. Unique per (loan, month, vchType) — this is what
      * makes the month-end auto-generator idempotent.
      */
     accrualMonth: date("accrual_month"),
@@ -88,46 +94,16 @@ export const borrowerLedgerEntries = pgTable("borrower_ledger_entries", {
 
 }, (table) => ({
 
-    ledgerBorrowerIdx: index("borrower_ledger_borrower_idx")
-        .on(table.borrowerId),
+    ledgerLoanIdx: index("ledger_loan_idx")
+        .on(table.loanId),
 
-    ledgerBorrowerDateIdx: index("borrower_ledger_borrower_date_idx")
-        .on(table.borrowerId, table.entryDate),
+    ledgerLoanDateIdx: index("ledger_loan_date_idx")
+        .on(table.loanId, table.entryDate),
 
-    ledgerVchNoUniqueIdx: uniqueIndex("borrower_ledger_vch_no_idx")
-        .on(table.borrowerId, table.vchNo),
+    ledgerVchNoUniqueIdx: uniqueIndex("ledger_vch_no_idx")
+        .on(table.loanId, table.vchNo),
 
-    ledgerAccrualMonthUniqueIdx: uniqueIndex("borrower_ledger_accrual_month_idx")
-        .on(table.borrowerId, table.accrualMonth, table.vchType),
+    ledgerAccrualMonthUniqueIdx: uniqueIndex("ledger_accrual_month_idx")
+        .on(table.loanId, table.accrualMonth, table.vchType),
 
 }));
-
-/* ============================================================
-   BORROWER LEDGER SETTINGS
-
-   One row per borrower holding the default Interest/TDS rate the
-   silent month-end auto-generator uses. Editable anytime from the
-   Borrower Ledger page; defaults to 21% / 10%.
-============================================================ */
-
-export const borrowerLedgerSettings = pgTable("borrower_ledger_settings", {
-
-    borrowerId: uuid("borrower_id")
-        .references(() => borrowers.id, {
-            onDelete: "cascade",
-        })
-        .primaryKey(),
-
-    defaultInterestRatePercent: numeric("default_interest_rate_percent", {
-        precision: 5,
-        scale: 2,
-    }).notNull().default("21"),
-
-    defaultTdsRatePercent: numeric("default_tds_rate_percent", {
-        precision: 5,
-        scale: 2,
-    }).notNull().default("10"),
-
-    ...timestamps,
-
-});

@@ -72,6 +72,9 @@ temp/
 # Personal punch-list tracker (not product code)
 punchlist/
 
+# Local working notes (design drafts, implementation checklists)
+docs/notes/
+
 # Drizzle
 drizzle/meta/
 

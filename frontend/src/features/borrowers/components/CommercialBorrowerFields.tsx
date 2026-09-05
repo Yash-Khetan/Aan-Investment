@@ -1,4 +1,5 @@
 import { Card } from "../../../components/ui/Card";
+import { IdentityFieldGroup } from "./IdentityFieldGroup";
 import { SelectField, TextField } from "../../../components/ui/Field";
 import {
   APPLICANT_TYPES,
@@ -129,14 +130,13 @@ export function CommercialBorrowerFields({
       <Card className="p-4">
         <SectionTitle>Identity</SectionTitle>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField
-            label="PAN"
-            value={form.pan}
-            onChange={(e) => onChange({ pan: e.target.value.toUpperCase() })}
-            placeholder="AAAAA9999A"
-            pattern={PAN_PATTERN}
-            title={PAN_TITLE}
+          <IdentityFieldGroup
+            heading="PAN"
+            kind="pan"
             required
+            value={form.pan}
+            onValueChange={(v) => onChange({ pan: v.toUpperCase() })}
+            inputProps={{ placeholder: "AAAAA9999A", pattern: PAN_PATTERN, title: PAN_TITLE }}
           />
         </div>
       </Card>

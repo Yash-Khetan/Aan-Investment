@@ -78,6 +78,16 @@ export const loans = pgTable("loans", {
         scale: 4,
     }).notNull(),
 
+    /**
+     * TDS withheld as a percentage of accrued interest. Lives here rather
+     * than on the ledger so the loan row is the single source of truth for
+     * both rates the ledger accrues at — see db/schema/ledger.ts.
+     */
+    tdsRatePercent: numeric("tds_rate_percent", {
+        precision: 5,
+        scale: 2,
+    }).notNull().default("10"),
+
     /* ── Tenure ── */
 
     tenureMonths: integer("tenure_months")

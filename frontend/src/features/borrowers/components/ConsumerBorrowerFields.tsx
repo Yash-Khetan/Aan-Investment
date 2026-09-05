@@ -1,4 +1,5 @@
 import { Card } from "../../../components/ui/Card";
+import { IdentityFieldGroup } from "./IdentityFieldGroup";
 import { SelectField, TextField } from "../../../components/ui/Field";
 import {
   ADDRESS_CATEGORIES,
@@ -78,30 +79,27 @@ export function ConsumerBorrowerFields({
       <Card className="p-4">
         <SectionTitle>Identity</SectionTitle>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField
-            label="Income Tax ID Number (PAN)"
-            value={form.pan}
-            onChange={(e) => onChange({ pan: e.target.value.toUpperCase() })}
-            placeholder="AAAAA9999A"
-            pattern={PAN_PATTERN}
-            title={PAN_TITLE}
+          <IdentityFieldGroup
+            heading="Income Tax ID Number (PAN)"
+            kind="pan"
             required
+            value={form.pan}
+            onValueChange={(v) => onChange({ pan: v.toUpperCase() })}
+            inputProps={{ placeholder: "AAAAA9999A", pattern: PAN_PATTERN, title: PAN_TITLE }}
           />
-          <TextField
-            label="Aadhaar"
+          <IdentityFieldGroup
+            heading="Aadhaar"
+            kind="aadhaar"
             value={form.aadhaar}
-            onChange={(e) => onChange({ aadhaar: e.target.value.replace(/\D/g, "") })}
-            placeholder="123412341234"
-            pattern={AADHAAR_PATTERN}
-            title={AADHAAR_TITLE}
+            onValueChange={(v) => onChange({ aadhaar: v.replace(/\D/g, "") })}
+            inputProps={{ placeholder: "123412341234", pattern: AADHAAR_PATTERN, title: AADHAAR_TITLE }}
           />
-          <TextField
-            label="CKYC Number"
+          <IdentityFieldGroup
+            heading="CKYC Number"
+            kind="ckyc"
             value={form.ckycNumber}
-            onChange={(e) => onChange({ ckycNumber: e.target.value.replace(/\D/g, "") })}
-            placeholder="14-digit CKYC number"
-            pattern={CKYC_PATTERN}
-            title={CKYC_TITLE}
+            onValueChange={(v) => onChange({ ckycNumber: v.replace(/\D/g, "") })}
+            inputProps={{ placeholder: "14-digit CKYC number", pattern: CKYC_PATTERN, title: CKYC_TITLE }}
           />
         </div>
       </Card>

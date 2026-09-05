@@ -100,6 +100,8 @@ export const createLoan = async (
         tenureMonths: input.tenureMonths,
     };
 
+    if (input.tdsRatePercent !== undefined)
+        values.tdsRatePercent = input.tdsRatePercent.toString();
     if (input.securityType !== undefined) values.securityType = input.securityType;
     if (input.otherSecurityType !== undefined) values.otherSecurityType = input.otherSecurityType;
     if (input.disbursedAmount !== undefined)
@@ -292,6 +294,8 @@ export const updateLoan = async (
         patch.outstandingPrincipal = toMoney(input.outstandingPrincipal);
     if (input.interestRate !== undefined)
         patch.interestRate = input.interestRate.toString();
+    if (input.tdsRatePercent !== undefined)
+        patch.tdsRatePercent = input.tdsRatePercent.toString();
     if (input.tenureMonths !== undefined) patch.tenureMonths = input.tenureMonths;
     if (input.moratoriumMonths !== undefined)
         patch.moratoriumMonths = input.moratoriumMonths;

@@ -28,7 +28,7 @@ import apiRouter from "./routes/index";
 
 import { paymentRouter } from "./modules/payment/payment.routes";
 import { accountingRouter } from "./modules/accounting/accounting.routes";
-import { borrowerLedgerRouter } from "./modules/borrower-ledger/borrowerLedger.routes";
+import { ledgerRouter } from "./modules/ledger/ledger.routes";
 
 
 /**
@@ -99,7 +99,7 @@ function createApp(): Application {
 
     app.use("/payments", paymentRouter); //  POST /
     app.use("/accounting-entries", accountingRouter); //  POST /disbursement, POST /write-off, GET /:loanId
-    app.use("/borrower-ledger", borrowerLedgerRouter); //  GET /:borrowerId, POST /:borrowerId/entries, PATCH /:borrowerId/entries/:entryId/rate
+    app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, PATCH /:loanId/entries/:entryId/rate
 
     app.use("/documents", documentRouter);
     app.use("/ocr", ocrRouter); //  POST /extract

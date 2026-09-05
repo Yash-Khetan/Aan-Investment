@@ -7,11 +7,11 @@ import type { LedgerEntry } from "../types";
 
 export function JournalRateEditor({
   entry,
-  borrowerId,
+  loanId,
   onSaved,
 }: {
   entry: LedgerEntry;
-  borrowerId: string;
+  loanId: string;
   onSaved: () => void;
 }) {
   const [rate, setRate] = useState(entry.ratePercent ?? "");
@@ -27,7 +27,7 @@ export function JournalRateEditor({
     setIsSaving(true);
     setError(null);
     try {
-      await editJournalRate(borrowerId, entry.id, ratePercent);
+      await editJournalRate(loanId, entry.id, ratePercent);
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update the rate.");
@@ -48,7 +48,7 @@ export function JournalRateEditor({
           {isSaving ? "Saving…" : "Recalculate & Save"}
         </Button>
         <p className="text-xs text-slate-400">
-          Recalculates this entry's amount at the new rate. Only affects this entry
+          Recalculates this entry's amount at the new rate. Does not change the loan's rate; only affects this entry
           {entry.vchType === "JOURNAL_INTEREST" ? " and its paired TDS entry" : ""} — other months are left untouched.
         </p>
       </div>

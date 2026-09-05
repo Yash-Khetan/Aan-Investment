@@ -2,7 +2,7 @@ import { db } from "../../db";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import {
-  getEntriesForBorrower,
+  getEntriesForLoan,
   getEntriesUpTo,
   getExistingAccrualMonths,
   getJournalInterestEntriesFromMonth,
@@ -11,11 +11,11 @@ import {
   insertJournalPair,
   getEntryById,
   updateEntryAmountAndRate,
-  getOrCreateSettings,
-  updateSettings as updateSettingsRepo,
+  getLoanRates,
+  updateLoanRates,
   type LedgerEntryRow,
-} from "./borrowerLedger.repository";
-import { CreateLedgerEntryInput, LedgerBalanceEvent, UpdateLedgerSettingsInput } from "./borrowerLedger.types";
+} from "./ledger.repository";
+import { CreateLedgerEntryInput, LedgerBalanceEvent, UpdateLedgerSettingsInput } from "./ledger.types";
 
 const INTEREST_BASIS = "ACTUAL_365";
 
@@ -70,23 +70,23 @@ function toBalanceEvents(rows: LedgerEntryRow[]): LedgerBalanceEvent[] {
  * stale prior amount doesn't feed into the balance being used to replace it.
  */
 export async function assembleMonthBalanceEvents(
-  borrowerId: string,
+  loanId: string,
   monthEnd: string,
   excludeAccrualMonth?: string
 ): Promise<LedgerBalanceEvent[]> {
-  const rows = await getEntriesUpTo(borrowerId, monthEnd);
+  const rows = await getEntriesUpTo(loanId, monthEnd);
   const filtered = excludeAccrualMonth ? rows.filter((r) => r.accrualMonth !== excludeAccrualMonth) : rows;
   return toBalanceEvents(filtered);
 }
 
 async function computeMonthInterestAndTds(
-  borrowerId: string,
+  loanId: string,
   monthStart: Date,
   monthEnd: Date,
   interestRatePercent: number,
   tdsRatePercent: number
 ): Promise<{ interestAmount: number; tdsAmount: number }> {
-  const events = await assembleMonthBalanceEvents(borrowerId, toIsoDate(monthEnd));
+  const events = await assembleMonthBalanceEvents(loanId, toIsoDate(monthEnd));
   const dailyRate = getDailyRateFraction(INTEREST_BASIS, interestRatePercent);
 
   const interestAmount = round2(
@@ -105,14 +105,14 @@ async function computeMonthInterestAndTds(
 }
 
 export async function generateMonthEndJournalPair(
-  borrowerId: string,
+  loanId: string,
   monthStart: Date,
   interestRatePercent: number,
   tdsRatePercent: number
 ) {
   const monthEnd = lastDayOfMonth(monthStart);
   const { interestAmount, tdsAmount } = await computeMonthInterestAndTds(
-    borrowerId,
+    loanId,
     monthStart,
     monthEnd,
     interestRatePercent,
@@ -120,7 +120,7 @@ export async function generateMonthEndJournalPair(
   );
 
   return insertJournalPair({
-    borrowerId,
+    loanId,
     entryDate: toIsoDate(monthEnd),
     accrualMonth: toIsoDate(new Date(monthStart.getFullYear(), monthStart.getMonth(), 1)),
     interestAmount,
@@ -132,22 +132,22 @@ export async function generateMonthEndJournalPair(
 
 /**
  * Self-heal: generates any missing month-end Journal pair for every
- * calendar month between the borrower's first ledger entry and the last
+ * calendar month between the loan's first ledger entry and the last
  * fully-elapsed month, in chronological order (each month's balance
  * depends on prior months' posted entries, so they can't be generated out
  * of order or in parallel). Silent — a failure here must never block a
  * ledger read.
  */
-export async function syncMissingMonthEndJournals(borrowerId: string): Promise<void> {
+export async function syncMissingMonthEndJournals(loanId: string): Promise<void> {
   try {
-    const earliest = await getEarliestEntryDate(borrowerId);
+    const earliest = await getEarliestEntryDate(loanId);
     if (!earliest) return;
 
-    const settings = await getOrCreateSettings(borrowerId);
-    const interestRate = Number(settings.defaultInterestRatePercent);
-    const tdsRate = Number(settings.defaultTdsRatePercent);
+    const rates = await getLoanRates(loanId);
+    const interestRate = Number(rates.defaultInterestRatePercent);
+    const tdsRate = Number(rates.defaultTdsRatePercent);
 
-    const existingMonths = new Set(await getExistingAccrualMonths(borrowerId));
+    const existingMonths = new Set(await getExistingAccrualMonths(loanId));
 
     const today = new Date();
     const earliestDate = parseIsoDate(earliest);
@@ -157,7 +157,7 @@ export async function syncMissingMonthEndJournals(borrowerId: string): Promise<v
     while (cursor.getTime() <= lastElapsedMonthStart.getTime()) {
       const monthKey = toIsoDate(cursor);
       if (!existingMonths.has(monthKey)) {
-        await generateMonthEndJournalPair(borrowerId, cursor, interestRate, tdsRate);
+        await generateMonthEndJournalPair(loanId, cursor, interestRate, tdsRate);
       }
       cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
     }
@@ -171,13 +171,13 @@ export async function syncMissingMonthEndJournals(borrowerId: string): Promise<v
  * month is on or after `fromDate`'s month, oldest first — cascading forward
  * since each month's balance (and therefore interest) depends on the ones
  * before it. Each month keeps its own previously-set rate rather than
- * resetting to the borrower's current default. Called after a backdated
+ * resetting to the loan's current rate. Called after a backdated
  * Payment/Receipt lands before Journal entries that already exist, so the
  * ledger stays internally consistent without a manual step.
  */
-export async function recomputeMonthsFrom(borrowerId: string, fromDate: Date): Promise<void> {
+export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promise<void> {
   const fromMonthKey = toIsoDate(new Date(fromDate.getFullYear(), fromDate.getMonth(), 1));
-  const interestEntries = await getJournalInterestEntriesFromMonth(borrowerId, fromMonthKey);
+  const interestEntries = await getJournalInterestEntriesFromMonth(loanId, fromMonthKey);
 
   for (const interestEntry of interestEntries) {
     const accrualMonth = interestEntry.accrualMonth as string;
@@ -185,7 +185,7 @@ export async function recomputeMonthsFrom(borrowerId: string, fromDate: Date): P
     const monthEnd = lastDayOfMonth(monthStart);
     const interestRate = Number(interestEntry.ratePercent ?? 21);
 
-    const events = await assembleMonthBalanceEvents(borrowerId, toIsoDate(monthEnd), accrualMonth);
+    const events = await assembleMonthBalanceEvents(loanId, toIsoDate(monthEnd), accrualMonth);
     const dailyRate = getDailyRateFraction(INTEREST_BASIS, interestRate);
 
     const interestAmount = round2(
@@ -213,14 +213,14 @@ export async function recomputeMonthsFrom(borrowerId: string, fromDate: Date): P
 
 export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Promise<LedgerEntryRow> {
   const created = await insertPaymentOrReceipt({
-    borrowerId: input.borrowerId,
+    loanId: input.loanId,
     entryDate: input.entryDate,
     vchType: input.vchType,
     amount: input.amount,
     narration: input.narration,
   });
 
-  await recomputeMonthsFrom(input.borrowerId, parseIsoDate(input.entryDate));
+  await recomputeMonthsFrom(input.loanId, parseIsoDate(input.entryDate));
 
   return created;
 }
@@ -229,8 +229,8 @@ export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Pro
  * Edits a Journal row's rate and recomputes its amount. Interest-row edits
  * recompute that month's interest AND its paired TDS row (using the TDS
  * row's own, independently editable rate). TDS-row edits only touch that
- * row. Never cascades into other months — a standalone correction, not a
- * forward recalculation.
+ * row. Never cascades into other months, and never writes back to the loan
+ * — a standalone correction, not a change of the loan's rate.
  */
 export async function editJournalEntryRate(entryId: string, newRatePercent: number): Promise<void> {
   const entry = await getEntryById(entryId);
@@ -248,7 +248,7 @@ export async function editJournalEntryRate(entryId: string, newRatePercent: numb
     if (entry.vchType === "JOURNAL_INTEREST") {
       const monthStart = parseIsoDate(entry.accrualMonth as string);
       const monthEnd = lastDayOfMonth(monthStart);
-      const events = await assembleMonthBalanceEvents(entry.borrowerId, toIsoDate(monthEnd), entry.accrualMonth as string);
+      const events = await assembleMonthBalanceEvents(entry.loanId, toIsoDate(monthEnd), entry.accrualMonth as string);
       const dailyRate = getDailyRateFraction(INTEREST_BASIS, newRatePercent);
 
       const interestAmount = round2(
@@ -281,19 +281,31 @@ export async function editJournalEntryRate(entryId: string, newRatePercent: numb
   });
 }
 
-export async function getSettings(borrowerId: string) {
-  return getOrCreateSettings(borrowerId);
+/** The loan's own Interest/TDS rates, which are what this ledger accrues at. */
+export async function getSettings(loanId: string) {
+  return getLoanRates(loanId);
 }
 
-export async function updateLedgerSettings(borrowerId: string, input: UpdateLedgerSettingsInput) {
-  return updateSettingsRepo(borrowerId, input);
+/**
+ * Writes both rates straight onto the loan row, so the change is what the
+ * Loans module shows too. Already-posted Journal entries keep the rate they
+ * accrued at — only months generated from here on use the new value.
+ *
+ * Deliberately stops at the loan row. `interestConfigs.annualRate` — what the
+ * Repayment Engine and the interest strategies calculate from — is a separate
+ * rate, owned by the Interest module, and is not touched from here. Changing
+ * a rate on this page therefore does NOT change what the Repayment Engine
+ * produces; the two are reconciled only through the Interest module.
+ */
+export async function updateLedgerSettings(loanId: string, input: UpdateLedgerSettingsInput) {
+  return updateLoanRates(loanId, input);
 }
 
-/** Full ledger for a borrower: self-heals missing month-end journals, then returns entries with a computed running balance. */
-export async function getBorrowerLedger(borrowerId: string) {
-  await syncMissingMonthEndJournals(borrowerId);
+/** Full ledger for a loan: self-heals missing month-end journals, then returns entries with a computed running balance. */
+export async function getLoanLedger(loanId: string) {
+  await syncMissingMonthEndJournals(loanId);
 
-  const rows = await getEntriesForBorrower(borrowerId);
+  const rows = await getEntriesForLoan(loanId);
 
   let balance = 0;
   const entries = rows.map((row) => {
@@ -302,7 +314,7 @@ export async function getBorrowerLedger(borrowerId: string) {
     return { ...row, balance };
   });
 
-  const settings = await getOrCreateSettings(borrowerId);
+  const settings = await getLoanRates(loanId);
 
   return { entries, settings };
 }

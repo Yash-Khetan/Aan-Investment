@@ -43,7 +43,7 @@ export const BORROWER_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export const GENDERS: CodedOption[] = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
-  { value: "TRANSGENDER", label: "Transgender" },
+  { value: "OTHERS", label: "Others" },
 ];
 
 export const ADDRESS_CATEGORIES: CodedOption[] = [
@@ -180,6 +180,14 @@ export interface Borrower {
   gst: string | null;
   cin: string | null;
   aadhaar: string | null;
+  /* Identity document scans. Only pointers: *DocPath is the Supabase Storage
+     object key, *DocName the filename the user picked. Null when none attached. */
+  panDocPath: string | null;
+  panDocName: string | null;
+  aadhaarDocPath: string | null;
+  aadhaarDocName: string | null;
+  ckycDocPath: string | null;
+  ckycDocName: string | null;
   dateOfIncorporation: string | null;
   natureOfBusiness: string | null;
   /* CIBIL consumer */

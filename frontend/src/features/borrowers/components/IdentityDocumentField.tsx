@@ -1,96 +1,143 @@
 import { useState, type ChangeEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteDocument, downloadDocument, uploadDocument } from "../../documents/api";
-import { extractDocumentData, type OcrDocumentType } from "../../ocr/api";
-import type { DocumentMetadata } from "../../documents/types";
+import {
+  deleteIdentityDocument,
+  downloadIdentityDocument,
+  uploadIdentityDocument,
+  viewIdentityDocument,
+  type IdentityDocumentKind,
+} from "../identityDocumentApi";
+import { OCR_DOCUMENT_TYPE_FOR_KIND, type StoredIdentityDocument } from "../BorrowerDocumentsContext";
+import { extractDocumentData } from "../../ocr/api";
 
-/** Image types OCR can actually read — Tesseract reads pixels, not a PDF's text layer. */
-const OCR_ELIGIBLE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+/** Photos only. The backend enforces the same allowlist and a 10 MB cap. */
+const ACCEPTED_FILE_TYPES = ".jpg,.jpeg,.png";
+
+/**
+ * Formats OCR can read. Same list as the picker allows - `accept` is only a
+ * hint to the file dialog and can be bypassed, so this still has to be checked.
+ */
+const OCR_READABLE_TYPES = new Set(["image/jpeg", "image/png"]);
 
 /**
  * Compact upload control nested inside an `IdentityFieldGroup` (so it renders
- * no label of its own — the group's heading already says which document this
- * is). Create mode (no borrowerId): file is held in memory and uploaded by the
- * caller once the borrower exists. Edit mode (borrowerId set): file uploads
- * immediately, and any existing doc is shown for download/removal.
- * On file select, best-effort OCR runs in the background and — if it finds a
- * matching value — calls onExtracted so the caller can pre-fill the paired
- * text field. The user can still edit/override whatever gets suggested.
+ * no label of its own - the group's heading already says which document this is).
+ *
+ * Create mode (no `borrowerId`): the file is held in memory and uploaded by the
+ * caller once the borrower exists. Edit mode (`borrowerId` set): the file
+ * uploads immediately, and any stored scan is shown for view, download or removal.
+ *
+ * Picking a photo also sends a copy for OCR, reported upward via
+ * `onOcrSuggestion` so the group can offer it as a suggestion. That runs
+ * alongside the upload and never gates it: OCR failing has no effect on whether
+ * the file is stored, and is not surfaced - the user can always just type the
+ * number.
+ *
+ * Uploading is always optional - this control never renders a required input.
  */
 export function IdentityDocumentField({
-  documentType,
-  label,
+  kind,
   borrowerId,
-  existingDoc,
+  storedDoc,
   pendingFile,
   onPendingFileChange,
-  onExtracted,
-  required,
+  onOcrSuggestion,
 }: {
-  documentType: OcrDocumentType;
-  /** Used only as the display name stored with the uploaded document, never rendered here. */
-  label: string;
+  kind: IdentityDocumentKind;
   borrowerId?: string;
-  existingDoc?: DocumentMetadata;
+  storedDoc?: StoredIdentityDocument;
   pendingFile?: File | null;
   onPendingFileChange?: (file: File | null) => void;
-  onExtracted?: (value: string) => void;
-  required?: boolean;
+  onOcrSuggestion?: (value: string | null) => void;
 }) {
   const queryClient = useQueryClient();
-  const [ocrStatus, setOcrStatus] = useState<"idle" | "reading" | "done" | "failed">("idle");
+  const [viewError, setViewError] = useState<string | null>(null);
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) =>
-      uploadDocument({ entityType: "BORROWER", entityId: borrowerId!, documentType, name: label, file }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId] }),
+    mutationFn: (file: File) => uploadIdentityDocument(borrowerId!, kind, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteDocument(existingDoc!.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "BORROWER", borrowerId] }),
+    mutationFn: () => deleteIdentityDocument(borrowerId!, kind),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
   });
 
+  /**
+   * Best-effort, and deliberately silent on failure: a read that finds nothing,
+   * errors, or gets an unreadable format simply produces no suggestion.
+   */
   function runOcr(file: File) {
-    if (!OCR_ELIGIBLE_TYPES.has(file.type)) return; // PDFs etc. — silently skipped, no auto-fill
-    setOcrStatus("reading");
-    extractDocumentData(file, documentType)
-      .then(({ extractedValue }) => {
-        setOcrStatus("done");
-        if (extractedValue) onExtracted?.(extractedValue);
-      })
-      .catch(() => setOcrStatus("failed"));
+    if (!onOcrSuggestion || !OCR_READABLE_TYPES.has(file.type)) return;
+
+    extractDocumentData(file, OCR_DOCUMENT_TYPE_FOR_KIND[kind])
+      .then(({ extractedValue }) => onOcrSuggestion(extractedValue))
+      .catch(() => onOcrSuggestion(null));
   }
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    // Reset so re-picking the same filename still fires a change event.
     e.target.value = "";
     if (!file) return;
-    if (borrowerId) {
-      uploadMutation.mutate(file);
-    } else {
-      onPendingFileChange?.(file);
-    }
+
+    if (borrowerId) uploadMutation.mutate(file);
+    else onPendingFileChange?.(file);
+
     runOcr(file);
   }
 
-  const uploadedFileName = borrowerId ? existingDoc?.fileName ?? existingDoc?.name : pendingFile?.name;
-  const hasFile = borrowerId ? Boolean(existingDoc) : Boolean(pendingFile);
+  function clearFile() {
+    onOcrSuggestion?.(null);
+    if (borrowerId) deleteMutation.mutate();
+    else onPendingFileChange?.(null);
+  }
+
+  function handleView() {
+    setViewError(null);
+
+    if (borrowerId && storedDoc) {
+      viewIdentityDocument(borrowerId, kind).catch((error) =>
+        setViewError(error instanceof Error ? error.message : "Couldn't open this document."),
+      );
+      return;
+    }
+
+    // Not uploaded yet - preview the file straight out of browser memory. No
+    // await here, so the click's user-gesture context is intact and the popup
+    // blocker stays quiet.
+    if (!pendingFile) return;
+    const objectUrl = URL.createObjectURL(pendingFile);
+    const tab = window.open(objectUrl, "_blank");
+    if (!tab) {
+      URL.revokeObjectURL(objectUrl);
+      setViewError("Allow pop-ups for this site to preview the file.");
+      return;
+    }
+    // Revoking immediately would race the new tab's own load of the blob.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  }
+
+  const displayName = borrowerId ? storedDoc?.name ?? storedDoc?.path : pendingFile?.name;
+  const hasFile = borrowerId ? Boolean(storedDoc) : Boolean(pendingFile);
 
   return (
     <div>
       {hasFile ? (
         <div className="flex items-center justify-between gap-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 text-emerald-600">✓</span>
-            <span className="truncate text-slate-700">{uploadedFileName}</span>
+            <span className="shrink-0 text-emerald-600">&#10003;</span>
+            <span className="truncate text-slate-700">{displayName}</span>
           </span>
           <div className="flex flex-wrap gap-2">
-            {borrowerId && existingDoc && (
+            <button type="button" className="text-xs text-slate-500 underline" onClick={handleView}>
+              View
+            </button>
+            {borrowerId && storedDoc && (
               <button
                 type="button"
                 className="text-xs text-slate-500 underline"
-                onClick={() => downloadDocument(existingDoc.id, existingDoc.fileName ?? existingDoc.name)}
+                onClick={() => downloadIdentityDocument(borrowerId, kind, storedDoc.name ?? `${kind}-document`)}
               >
                 Download
               </button>
@@ -98,7 +145,7 @@ export function IdentityDocumentField({
             <button
               type="button"
               className="text-xs text-red-600 underline"
-              onClick={() => (borrowerId ? deleteMutation.mutate() : onPendingFileChange?.(null))}
+              onClick={clearFile}
               disabled={deleteMutation.isPending}
             >
               Remove
@@ -108,23 +155,25 @@ export function IdentityDocumentField({
       ) : (
         <input
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          accept={ACCEPTED_FILE_TYPES}
           onChange={handleFileChange}
           disabled={uploadMutation.isPending}
-          required={required}
           className="block w-full text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-slate-900 file:px-2.5 file:py-1 file:text-xs file:text-white"
         />
       )}
 
-      {ocrStatus === "reading" && <p className="mt-1 text-xs text-slate-400">Reading document…</p>}
-      {ocrStatus === "failed" && (
-        <p className="mt-1 text-xs text-slate-400">Couldn't auto-read this file — enter the value manually.</p>
-      )}
+      {uploadMutation.isPending && <p className="mt-1 text-xs text-slate-400">Uploading&hellip;</p>}
       {uploadMutation.isError && (
         <p className="mt-1 text-xs text-red-600">
           {uploadMutation.error instanceof Error ? uploadMutation.error.message : "Upload failed."}
         </p>
       )}
+      {deleteMutation.isError && (
+        <p className="mt-1 text-xs text-red-600">
+          {deleteMutation.error instanceof Error ? deleteMutation.error.message : "Couldn't remove this document."}
+        </p>
+      )}
+      {viewError && <p className="mt-1 text-xs text-red-600">{viewError}</p>}
     </div>
   );
 }
