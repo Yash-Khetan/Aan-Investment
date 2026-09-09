@@ -134,6 +134,20 @@
       "when": 1788618903319,
       "tag": "0018_loan_owned_interest_config",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788978633878,
+      "tag": "0019_minor_doctor_octopus",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788980765189,
+      "tag": "0020_heavy_zarek",
+      "breakpoints": true
     }
   ]
 }
