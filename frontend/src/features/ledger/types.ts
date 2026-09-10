@@ -47,3 +47,38 @@ export interface CreateEntryInput {
   amount: number;
   narration?: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* DPD history                                                         */
+/*                                                                     */
+/* Month-by-month Days Past Due for one loan. A null month is "X" -    */
+/* outside the loan's life, which is not the same as a month with      */
+/* nothing overdue (0).                                                */
+/* ------------------------------------------------------------------ */
+
+export interface DpdMonth {
+  dpd: number;
+  /** Whole 30-day periods past due: floor(dpd / 30). */
+  bucket: number;
+  amountOverdue: number;
+  /** The month still in progress - derived, not yet frozen. */
+  isCurrentMonth: boolean;
+}
+
+export interface DpdYearRow {
+  year: number;
+  /** Twelve entries, Jan..Dec. Null renders as "X". */
+  months: Array<DpdMonth | null>;
+}
+
+export interface DpdGrid {
+  loanId: string;
+  years: DpdYearRow[];
+  current: {
+    dpd: number;
+    bucket: number;
+    amountOverdue: number;
+    oldestOverdueDueDate: string | null;
+  } | null;
+  worstDpd: number;
+}

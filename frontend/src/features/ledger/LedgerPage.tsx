@@ -7,11 +7,12 @@ import { formatCurrency } from "../../lib/format";
 import { ApiError } from "../../lib/api";
 import { LoanSelect } from "../lookup/LoanSelect";
 import { getLoan } from "../loans/api";
-import { getLedger } from "./api";
+import { getDpdHistory, getLedger } from "./api";
 import { AddEntryForm } from "./components/AddEntryForm";
 import { BorrowerSummaryCard } from "./components/BorrowerSummaryCard";
 import { LoanSummaryCard } from "./components/LoanSummaryCard";
 import { LedgerTable } from "./components/LedgerTable";
+import { DpdHistoryTable } from "./components/DpdHistoryTable";
 
 export function LedgerPage() {
   const [loanId, setLoanId] = useState("");
@@ -36,6 +37,21 @@ export function LedgerPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["ledger", loanId],
     queryFn: () => getLedger(loanId),
+    enabled: !!loanId,
+  });
+
+  /**
+   * DPD is keyed to the loan's repayment obligations, not to the ledger's own
+   * rows, so it is fetched separately rather than riding along with the
+   * ledger read.
+   */
+  const {
+    data: dpd,
+    isLoading: isDpdLoading,
+    error: dpdError,
+  } = useQuery({
+    queryKey: ["ledger-dpd", loanId],
+    queryFn: () => getDpdHistory(loanId),
     enabled: !!loanId,
   });
 
@@ -103,6 +119,8 @@ export function LedgerPage() {
             )}
 
             <LedgerTable entries={data.entries} />
+
+            <DpdHistoryTable grid={dpd} isLoading={isDpdLoading} error={dpdError} />
           </>
         )}
       </div>
