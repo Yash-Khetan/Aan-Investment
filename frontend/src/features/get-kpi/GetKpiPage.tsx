@@ -1,89 +1,155 @@
 import { useState } from "react";
 import { PageHeader } from "../../components/Layout";
+import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { EmptyState } from "../../components/ui/States";
+import { SelectField } from "../../components/ui/Field";
+import { EmptyState, ErrorState, SuccessState } from "../../components/ui/States";
+import { formatCurrency } from "../../lib/format";
+import { useLoanLookup } from "../lookup/hooks";
 import { ImportPanel } from "./components/ImportPanel";
 import { LedgerTable } from "./components/LedgerTable";
-import { KpiDashboard } from "./components/KpiDashboard";
 import { parseLedgerWorkbook } from "./xlsxParser";
-import { downloadLedgerCsv } from "./csvExport";
-import type { ImportSettings, LedgerRow, RowParameter } from "./types";
+import { attachKpiRows } from "./api";
+import type { KpiLedgerRow, KpiLedgerRowInput } from "./types";
 
 export function GetKpiPage() {
-  const [settings, setSettings] = useState<ImportSettings>({ standardInterestRate: 21, standardTdsRate: 10 });
-  const [rows, setRows] = useState<LedgerRow[]>([]);
+  const loans = useLoanLookup();
+  const [rows, setRows] = useState<KpiLedgerRow[]>([]);
+  const [fileName, setFileName] = useState<string | undefined>();
+  const [meta, setMeta] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [loanId, setLoanId] = useState("");
+  const [attaching, setAttaching] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [attachDone, setAttachDone] = useState<string | null>(null);
+
+  const selectedLoan = loans.data?.find((l) => l.id === loanId);
+
+  function loanLabel(l: NonNullable<typeof loans.data>[number]): string {
+    const outstanding = formatCurrency(l.outstandingPrincipal, 0);
+    return `${l.loanAccountNumber} — ${l.customerName} — ${l.status} — ${outstanding} outstanding`;
+  }
 
   async function handleImport(file: File) {
     setIsImporting(true);
+    setAttachDone(null);
+    setAttachError(null);
     try {
       const parsed = await parseLedgerWorkbook(file);
-      const seeded = parsed.map((row) => ({
-        ...row,
-        parameters: [
-          { id: `${row.id}-interest`, name: "interest", value: settings.standardInterestRate / 100, isPercent: true },
-          { id: `${row.id}-tds`, name: "tds", value: settings.standardTdsRate / 100, isPercent: true },
-        ] satisfies RowParameter[],
-      }));
-      setRows(seeded);
+      setRows(parsed.rows);
+      setMeta(parsed.meta);
+      setFileName(file.name);
     } finally {
       setIsImporting(false);
     }
   }
 
-  function handleUpdateParameters(rowId: string, parameters: RowParameter[]) {
-    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, parameters } : r)));
+  function handleEditRow(id: string, patch: KpiLedgerRowInput) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
-
-  function handleUpdateOutput(rowId: string, output: LedgerRow["output"]) {
-    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, output } : r)));
+  function handleDeleteRow(id: string) {
+    setRows((prev) => prev.filter((r) => r.id !== id));
   }
-
-  function handleReset() {
+  function handleClear() {
     setRows([]);
+    setMeta(null);
+    setFileName(undefined);
+    setLoanId("");
+    setAttachError(null);
+    setAttachDone(null);
   }
 
-  function handleDownload() {
-    downloadLedgerCsv(rows);
+  async function handleAttach() {
+    if (!loanId || rows.length === 0) return;
+    setAttaching(true);
+    setAttachError(null);
+    setAttachDone(null);
+    try {
+      const payload: KpiLedgerRowInput[] = rows.map(({ id: _id, ...rest }) => rest);
+      const result = await attachKpiRows(loanId, payload, fileName, meta);
+      setAttachDone(
+        `Attached ${result.appended} row${result.appended === 1 ? "" : "s"} to ${
+          selectedLoan ? `${selectedLoan.loanAccountNumber} — ${selectedLoan.customerName}` : "the loan"
+        }. It now has ${result.totalRows} in its KPI history.`,
+      );
+      handleClear();
+    } catch (err) {
+      setAttachError(err instanceof Error ? err.message : "Failed to attach rows to the loan.");
+    } finally {
+      setAttaching(false);
+    }
   }
 
   return (
     <div>
       <PageHeader
         title="Get KPI"
-        description="Import a ledger, define custom per-row formulas, and explore an interactive KPI dashboard."
+        description="Upload a client's historical ledger Excel, review the rows, then attach them to a loan as its opening history."
       />
 
       <div className="space-y-6">
-        <ImportPanel
-          settings={settings}
-          onSettingsChange={setSettings}
-          onImport={handleImport}
-          isImporting={isImporting}
-        />
+        <ImportPanel onImport={handleImport} isImporting={isImporting} />
+
+        {attachDone && <SuccessState message={attachDone} />}
 
         {rows.length === 0 ? (
-          <EmptyState message="Import an Excel ledger above to get started." />
+          !attachDone && <EmptyState message="Upload an Excel ledger above to get started." />
         ) : (
           <>
+            {meta && (
+              <Card className="p-4">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">From the uploaded sheet</h2>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{meta}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Check the client name and loan id here match the loan you attach to below.
+                </p>
+              </Card>
+            )}
+
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Ledger Data ({rows.length} rows)</h2>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={handleDownload}>
-                  Download Report (CSV)
-                </Button>
-                <Button variant="ghost" onClick={handleReset}>
-                  Clear &amp; Import Another File
+              <h2 className="text-sm font-semibold text-slate-900">Parsed {rows.length} rows</h2>
+              <Button variant="ghost" onClick={handleClear}>
+                Clear &amp; upload another file
+              </Button>
+            </div>
+
+            <LedgerTable rows={rows} onEditRow={handleEditRow} onDeleteRow={handleDeleteRow} />
+
+            <Card className="p-4">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Attach to a loan</h2>
+              {loans.isError && <ErrorState message="Could not load the list of loans." />}
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-96 flex-1">
+                  <SelectField
+                    label="Loan"
+                    value={loanId}
+                    onChange={(e) => setLoanId(e.target.value)}
+                    disabled={loans.isLoading || attaching}
+                  >
+                    <option value="">Select a loan…</option>
+                    {loans.data?.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {loanLabel(l)}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+                <Button onClick={handleAttach} disabled={!loanId || attaching}>
+                  {attaching ? "Attaching…" : "Attach to loan"}
                 </Button>
               </div>
-            </div>
-
-            <LedgerTable rows={rows} onUpdateParameters={handleUpdateParameters} onUpdateOutput={handleUpdateOutput} />
-
-            <div>
-              <h2 className="mb-3 text-sm font-semibold text-slate-900">KPI Dashboard</h2>
-              <KpiDashboard rows={rows} />
-            </div>
+              {selectedLoan && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Attaching to <span className="font-medium text-slate-700">{loanLabel(selectedLoan)}</span>
+                </p>
+              )}
+              {attachError && (
+                <div className="mt-3">
+                  <ErrorState message={attachError} />
+                </div>
+              )}
+            </Card>
           </>
         )}
       </div>

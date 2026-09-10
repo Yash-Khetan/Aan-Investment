@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import { getLoanLedger, recordPaymentOrReceipt, getSettings } from "./ledger.service";
+import { getDpdGrid } from "./dpd.service";
 
 export const getLedger: RequestHandler = async (req, res, next) => {
   try {
@@ -32,6 +33,16 @@ export const getLedgerSettings: RequestHandler = async (req, res, next) => {
     const { loanId } = req.valid!.params as { loanId: string };
     const settings = await getSettings(loanId);
     res.json({ success: true, data: settings });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getDpdHistory: RequestHandler = async (req, res, next) => {
+  try {
+    const { loanId } = req.valid!.params as { loanId: string };
+    const grid = await getDpdGrid(loanId);
+    res.json({ success: true, data: grid });
   } catch (err) {
     next(err);
   }

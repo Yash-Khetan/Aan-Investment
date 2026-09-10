@@ -9,6 +9,7 @@ import * as controller from "./ledger.controller";
  *  GET   /:loanId            full ledger + computed running balances (self-heals missing month-end journals)
  *  POST  /:loanId/entries    record a manual Payment or Receipt
  *  GET   /:loanId/settings   the interest configuration this ledger is accruing at — read-only
+ *  GET   /:loanId/dpd        month-by-month DPD history for this loan — read-only
  *
  * There is deliberately no rate-writing route here. The Loan module is the
  * source of the current interest configuration; the ledger reads it and
@@ -36,4 +37,11 @@ ledgerRouter.get(
   authenticate,
   validate({ params: loanIdParamSchema }),
   controller.getLedgerSettings
+);
+
+ledgerRouter.get(
+  "/:loanId/dpd",
+  authenticate,
+  validate({ params: loanIdParamSchema }),
+  controller.getDpdHistory
 );

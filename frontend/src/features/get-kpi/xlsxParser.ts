@@ -1,5 +1,5 @@
 import { readSheet } from "read-excel-file/browser";
-import type { LedgerRow } from "./types";
+import type { KpiLedgerRow, ParsedLedger } from "./types";
 
 const HEADER_ALIASES: Record<string, keyof RawRow> = {
   date: "date",
@@ -27,69 +27,78 @@ function newId(): string {
   return `row-${nextId++}`;
 }
 
-function toText(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toISOString();
-  return String(value).trim();
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** The value exactly as the cell shows it, trimmed. Empty cell -> null. */
+function toCellText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = value instanceof Date ? value.toISOString() : String(value).trim();
+  return text === "" ? null : text;
 }
 
-function toAmount(value: unknown): number | null {
-  if (typeof value === "number") return value;
-  const text = toText(value).replace(/,/g, "");
-  if (text === "") return null;
-  const num = Number.parseFloat(text);
-  return Number.isNaN(num) ? null : num;
+/**
+ * Normalizes a date cell to DD-MMM-YYYY (e.g. "05-May-2025") — never an ISO
+ * string with a "T…Z". A real Date cell, a "05-May-25" / "5-May-2025" text
+ * cell, or a "05/05/2025" text cell are all recognized; anything else is left
+ * exactly as written.
+ */
+function formatLedgerDate(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${String(value.getDate()).padStart(2, "0")}-${MONTHS[value.getMonth()]}-${value.getFullYear()}`;
+  }
+
+  const text = toCellText(value);
+  if (text === null) return null;
+
+  // 05-May-25 / 5-May-2025 / 05 May 2025
+  const named = text.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
+  if (named) {
+    const day = named[1].padStart(2, "0");
+    const monIdx = MONTHS.findIndex((m) => m.toLowerCase() === named[2].slice(0, 3).toLowerCase());
+    const year = named[3].length === 2 ? `20${named[3]}` : named[3];
+    if (monIdx !== -1) return `${day}-${MONTHS[monIdx]}-${year}`;
+  }
+
+  // 05/05/2025 or 05-05-2025 (DD/MM/YYYY, the Indian ledger convention)
+  const numeric = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (numeric) {
+    const day = numeric[1].padStart(2, "0");
+    const monIdx = Number(numeric[2]) - 1;
+    const year = numeric[3].length === 2 ? `20${numeric[3]}` : numeric[3];
+    if (monIdx >= 0 && monIdx < 12) return `${day}-${MONTHS[monIdx]}-${year}`;
+  }
+
+  // ISO from a Date that slipped through as text
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const monIdx = Number(iso[2]) - 1;
+    if (monIdx >= 0 && monIdx < 12) return `${iso[3]}-${MONTHS[monIdx]}-${iso[1]}`;
+  }
+
+  return text;
 }
 
-/** Splits a "<amount> Dr" / "<amount> Cr" cell into a signed number (Dr positive, Cr negative). */
-function parseSignedBalance(value: unknown): number | null {
-  if (typeof value === "number") return value;
-  const text = toText(value);
-  if (text === "") return null;
-  const match = text.match(/^([\d,.]+)\s*(Dr|Cr)?$/i);
-  if (!match) return toAmount(text);
-  const amount = Number.parseFloat(match[1].replace(/,/g, ""));
-  if (Number.isNaN(amount)) return null;
-  return match[2]?.toLowerCase() === "cr" ? -amount : amount;
-}
-
-function parseDate(value: unknown): string | null {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  const text = toText(value);
-  if (text === "") return null;
-  // Ledger dates look like "05-May-25" — not natively parseable by Date(), so parse manually.
-  const match = text.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
-  if (!match) return text;
-  const [, day, mon, yearRaw] = match;
-  const months: Record<string, string> = {
-    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
-  };
-  const monthNum = months[mon.toLowerCase()];
-  if (!monthNum) return text;
-  const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
-  return `${year}-${monthNum}-${day.padStart(2, "0")}`;
-}
-
-/** Finds the header row by locating the row that contains a "Date" cell followed by "Particulars". */
+/** Finds the header row by locating the row that contains a "Date" cell and a "Particulars" cell. */
 function findHeaderRowIndex(grid: unknown[][]): number {
   for (let i = 0; i < grid.length; i++) {
-    const row = grid[i].map((c) => toText(c).toLowerCase());
+    const row = grid[i].map((c) => (c == null ? "" : String(c).trim().toLowerCase()));
     if (row.includes("date") && row.includes("particulars")) return i;
   }
   return -1;
 }
 
 /**
- * Parses a ledger workbook shaped like GAF.csv: a few title rows, a header row, then data rows
- * where a "primary" row (has a Date or Vch No.) can be followed by one or more "continuation"
- * rows that only carry extra narration text in the Particulars column — those get appended to
- * the previous row instead of becoming their own row.
+ * Parses a ledger workbook shaped like GAF.xlsx: a few preamble rows (report
+ * title, the account holder's name and loan id, a date range), a header row,
+ * then data rows where a "primary" row (has a Date or Vch No.) can be followed
+ * by "continuation" rows that only carry extra narration in the Particulars
+ * column — those are appended to the previous row.
  *
- * NOTE: this is the piece slated to move server-side (POST to the future Python microservice) —
- * keep its signature (File in, LedgerRow[] out) stable so the caller doesn't need to change.
+ * Nothing is dropped: every non-empty preamble row is captured into `meta`, and
+ * every data row is kept. Only the Date column is reformatted (to DD-MMM-YYYY);
+ * every other value is stored exactly as the cell shows it.
  */
-export async function parseLedgerWorkbook(file: File): Promise<LedgerRow[]> {
+export async function parseLedgerWorkbook(file: File): Promise<ParsedLedger> {
   const grid = (await readSheet(file)) as unknown[][];
 
   const headerIndex = findHeaderRowIndex(grid);
@@ -97,43 +106,50 @@ export async function parseLedgerWorkbook(file: File): Promise<LedgerRow[]> {
     throw new Error("Could not find a header row containing 'Date' and 'Particulars' columns.");
   }
 
-  const headerCells = grid[headerIndex].map((c) => toText(c).toLowerCase());
+  // Everything above the header row — the report title, account name, loan id,
+  // date range. Each row's non-empty cells joined; rows joined with " / ".
+  const meta =
+    grid
+      .slice(0, headerIndex)
+      .map((r) => r.map((c) => toCellText(c)).filter((c): c is string => c !== null).join(" | "))
+      .filter((line) => line !== "")
+      .join("  /  ") || null;
+
+  const headerCells = grid[headerIndex].map((c) => (c == null ? "" : String(c).trim().toLowerCase()));
   const colIndex: Partial<Record<keyof RawRow, number>> = {};
   headerCells.forEach((cell, idx) => {
     const key = HEADER_ALIASES[cell];
     if (key && colIndex[key] === undefined) colIndex[key] = idx;
   });
 
-  const rows: LedgerRow[] = [];
+  const rows: KpiLedgerRow[] = [];
   for (let i = headerIndex + 1; i < grid.length; i++) {
     const raw = grid[i];
-    if (!raw || raw.every((c) => toText(c) === "")) continue;
+    if (!raw || raw.every((c) => toCellText(c) === null)) continue;
 
     const get = (key: keyof RawRow) => (colIndex[key] !== undefined ? raw[colIndex[key]!] : undefined);
-    const date = toText(get("date"));
-    const vchNo = toText(get("vchNo"));
-    const particulars = toText(get("particulars"));
+    const date = formatLedgerDate(get("date"));
+    const vchNo = toCellText(get("vchNo"));
+    const particulars = toCellText(get("particulars"));
 
-    const isPrimaryRow = date !== "" || vchNo !== "";
+    const isPrimaryRow = date !== null || vchNo !== null;
 
     if (isPrimaryRow) {
       rows.push({
         id: newId(),
-        date: parseDate(get("date")),
-        particulars,
-        vchType: toText(get("vchType")) || null,
-        vchNo: vchNo || null,
-        debit: toAmount(get("debit")),
-        credit: toAmount(get("credit")),
-        balance: parseSignedBalance(get("balance")),
-        parameters: [],
-        output: null,
+        date,
+        particulars: particulars ?? "",
+        vchType: toCellText(get("vchType")),
+        vchNo,
+        debit: toCellText(get("debit")),
+        credit: toCellText(get("credit")),
+        balance: toCellText(get("balance")),
       });
-    } else if (rows.length > 0 && particulars !== "") {
+    } else if (rows.length > 0 && particulars !== null) {
       const last = rows[rows.length - 1];
       last.particulars = last.particulars ? `${last.particulars} — ${particulars}` : particulars;
     }
   }
 
-  return rows;
+  return { meta, rows };
 }

@@ -1,5 +1,5 @@
 import { apiRequest } from "../../lib/api";
-import type { CreateEntryInput, LedgerEntry, LoanLedger } from "./types";
+import type { CreateEntryInput, DpdGrid, LedgerEntry, LoanLedger } from "./types";
 
 interface Envelope<T> {
   success: true;
@@ -16,5 +16,10 @@ export async function createEntry(loanId: string, input: CreateEntryInput): Prom
     method: "POST",
     body: JSON.stringify(input),
   });
+  return res.data;
+}
+
+export async function getDpdHistory(loanId: string): Promise<DpdGrid> {
+  const res = await apiRequest<Envelope<DpdGrid>>(`/ledger/${loanId}/dpd`);
   return res.data;
 }

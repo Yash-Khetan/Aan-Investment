@@ -29,6 +29,7 @@ import apiRouter from "./routes/index";
 import { paymentRouter } from "./modules/payment/payment.routes";
 import { accountingRouter } from "./modules/accounting/accounting.routes";
 import { ledgerRouter } from "./modules/ledger/ledger.routes";
+import { kpiLedgerRouter } from "./modules/kpi-ledger/kpi-ledger.routes";
 
 
 /**
@@ -100,6 +101,7 @@ function createApp(): Application {
     app.use("/payments", paymentRouter); //  POST /
     app.use("/accounting-entries", accountingRouter); //  POST /disbursement, POST /write-off, GET /:loanId
     app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, PATCH /:loanId/entries/:entryId/rate
+    app.use("/kpi-ledger", kpiLedgerRouter); //  POST /:loanId/rows, GET /:loanId?page=&limit=, PATCH/DELETE /:loanId/rows/:rowId — "Get KPI" history
 
     app.use("/documents", documentRouter);
     app.use("/ocr", ocrRouter); //  POST /extract

@@ -1,18 +1,12 @@
 import { useRef, useState } from "react";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
-import { TextField } from "../../../components/ui/Field";
 import { ErrorState } from "../../../components/ui/States";
-import type { ImportSettings } from "../types";
 
 export function ImportPanel({
-  settings,
-  onSettingsChange,
   onImport,
   isImporting,
 }: {
-  settings: ImportSettings;
-  onSettingsChange: (settings: ImportSettings) => void;
   onImport: (file: File) => Promise<void>;
   isImporting: boolean;
 }) {
@@ -28,54 +22,34 @@ export function ImportPanel({
     try {
       await onImport(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import the file.");
+      setError(err instanceof Error ? err.message : "Failed to read the file.");
+    } finally {
+      // allow re-selecting the same file
+      e.target.value = "";
     }
   }
 
   return (
     <Card className="p-4">
       <div className="mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Import Ledger</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Upload Ledger Excel</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Upload an Excel ledger with Date, Particulars, Vch Type, Vch No., Debit, Credit and Balance columns.
+          An <span className="font-medium">.xlsx</span> / <span className="font-medium">.xls</span> export with
+          Date, Particulars, Vch Type, Vch No., Debit, Credit and Balance columns. Values are read exactly as they
+          appear in the sheet.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
-        <TextField
-          label="Standard Interest Rate (%)"
-          type="number"
-          step="0.01"
-          value={settings.standardInterestRate}
-          onChange={(e) =>
-            onSettingsChange({ ...settings, standardInterestRate: Number.parseFloat(e.target.value) || 0 })
-          }
-        />
-        <TextField
-          label="Standard TDS Rate (%)"
-          type="number"
-          step="0.01"
-          value={settings.standardTdsRate}
-          onChange={(e) => onSettingsChange({ ...settings, standardTdsRate: Number.parseFloat(e.target.value) || 0 })}
-        />
-        <div className="flex gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className="w-full sm:w-auto"
-          >
-            {isImporting ? "Importing…" : "Choose Excel File"}
-          </Button>
-        </div>
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+        {isImporting ? "Reading…" : "Choose Excel File"}
+      </Button>
 
       {fileName && !error && (
         <p className="mt-2 text-xs text-slate-500">

@@ -7,6 +7,7 @@ import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
 import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
+import { KpiLedgerSection } from "../get-kpi/components/KpiLedgerSection";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { getLoan, updateLoan } from "./api";
@@ -96,8 +97,12 @@ export function EditLoanPage() {
       )}
 
       {data && loaded && (
-        <div className="mt-6">
+        <div className="mt-6 flex flex-col gap-6">
           <GuarantorsSection loanId={data.id} />
+          <KpiLedgerSection
+            loanId={data.id}
+            loanLabel={`${data.loanAccountNumber} — ${data.borrowerName ?? data.borrowerId}`}
+          />
         </div>
       )}
     </div>
