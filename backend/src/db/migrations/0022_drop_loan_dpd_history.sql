@@ -1,0 +1,1 @@
+DROP TABLE "loan_dpd_history" CASCADE;

@@ -1,35 +1,26 @@
-import {
-  getAllocations,
-  getDpdHistory,
-  getLoanStartDate,
-  getObligations,
-  insertDpdMonths,
-  type DpdAllocation,
-  type DpdObligation,
-} from "./dpd.repository";
+import { classifyByDpd } from "../loan/loan.metrics";
+import { getEntriesForLoan, getLoanMaturityDate, type LedgerEntryRow } from "./ledger.repository";
+import { syncMissingMonthEndJournals } from "./ledger.service";
 import type { DpdGrid, DpdMonth, DpdYearRow } from "./ledger.types";
 
 /**
- * Days Past Due for one loan, as a month-by-month history.
+ * Days Past Due for one loan, month by month, measured against the loan's
+ * own ledger.
  *
- * DPD is measured against the loan's payment OBLIGATIONS (its current
- * repayment schedule's installments), not against the ledger's own rows —
- * the ledger records money movements, the schedule records what was owed and
- * when. A receipt existing is never enough to clear DPD on its own: an
- * obligation counts as cleared only once the payments appropriated to it add
- * up to the full amount due, which is why this reads dated
- * `payment_allocations` rather than the installment's mutable paid* columns.
+ * The obligation each month is the Interest journal the ledger posts at
+ * month-end, net of the TDS credit paired with it — the amount the borrower
+ * actually has to remit. Receipts clear those obligations oldest-first. DPD
+ * is the age of the oldest obligation not yet cleared in full, so a
+ * part-payment lowers the amount overdue but does not move the day count.
+ * This is the reckoning the operations ledger has always done by hand:
+ * "interest outstanding — May, June; DPD from 30 May".
  *
- * Nothing here changes any existing calculation. It reads obligations and
- * appropriations that other modules already produce, and derives a day count
- * from them.
+ * Every cell is computed as at its own month-end, from the entries dated on
+ * or before it, so a Receipt posted in June cannot make March look current.
+ * Nothing is stored. The ledger is the record, and it recomputes its own
+ * month-end journals when a backdated entry lands, so any copy of the answer
+ * taken earlier would silently drift from it.
  */
-
-/** A whole 30-day period past due. Bucket 0 is "late, but under a month". */
-const DAYS_PER_BUCKET = 30;
-
-/** Months outside the loan's life — before it started, or not yet elapsed. */
-export const NO_DATA = "X";
 
 function toIsoDate(d: Date): string {
   const y = d.getFullYear();
@@ -43,17 +34,21 @@ function parseIsoDate(dateStr: string): Date {
   return new Date(y!, m! - 1, d!);
 }
 
-function lastDayOfMonth(monthStart: Date): Date {
-  return new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-}
-
 function firstOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+function lastDayOfMonth(monthStart: Date): Date {
+  return new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+}
+
+function nextMonth(monthStart: Date): Date {
+  return new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+}
+
 /**
  * Whole days between two YYYY-MM-DD dates, positive when `to` is later.
- * Parsed as UTC midnight so no local timezone offset can shift a day count -
+ * Parsed as UTC midnight so no local timezone offset can shift a day count —
  * the same approach loan.metrics.ts uses for the loan-level figure.
  */
 function daysBetween(from: string, to: string): number {
@@ -66,186 +61,143 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function bucketOf(dpdDays: number): number {
-  return dpdDays <= 0 ? 0 : Math.floor(dpdDays / DAYS_PER_BUCKET);
+/** One month's interest, net of its TDS, falling due on the day it was posted. */
+interface DpdObligation {
+  dueDate: string;
+  netAmount: number;
+}
+
+/**
+ * The obligations in a ledger, oldest first. Each Interest journal is paired
+ * with its TDS journal by `pairedEntryId`; the TDS is deducted at source and
+ * remitted by the borrower to the government rather than to us, so it is
+ * settled the moment it is posted and only the net remains to be received.
+ */
+function toObligations(entries: LedgerEntryRow[]): DpdObligation[] {
+  const tdsById = new Map<string, number>();
+  for (const e of entries) {
+    if (e.vchType === "JOURNAL_TDS") tdsById.set(e.id, Number(e.credit ?? 0));
+  }
+
+  const obligations: DpdObligation[] = [];
+  for (const e of entries) {
+    if (e.vchType !== "JOURNAL_INTEREST") continue;
+    const tds = e.pairedEntryId ? (tdsById.get(e.pairedEntryId) ?? 0) : 0;
+    const netAmount = round2(Number(e.debit ?? 0) - tds);
+    if (netAmount <= 0) continue;
+    obligations.push({ dueDate: e.entryDate, netAmount });
+  }
+
+  return obligations.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
 }
 
 export interface DpdAsOf {
   dpdDays: number;
-  bucket: number;
+  classification: ReturnType<typeof classifyByDpd>;
   amountOverdue: number;
   oldestOverdueDueDate: string | null;
 }
 
 /**
- * The loan's DPD as at `asOf`, reconstructed rather than read off current
- * state — this is what makes back-filling historical months accurate. An
- * obligation is treated as cleared only by appropriations that had actually
- * arrived by `asOf`, so a payment made in June cannot retroactively make
- * March look current.
+ * The loan's DPD as at `asOf`, from the entries dated on or before it.
  *
- * DPD is the age of the OLDEST obligation still uncleared, matching the
- * basis `loan.metrics.ts` already uses for the loan-level figure. A partly
- * paid obligation is not cleared, so partial payment does not reduce DPD.
+ * Every Receipt received by `asOf` goes into one pool that is applied to the
+ * obligations oldest-first. A borrower who has remitted at least as much as
+ * every month's net interest posted so far is current, whichever months the
+ * individual receipts were labelled for. Disbursements (Payments) create no
+ * obligation: in an interest-serviced loan the principal is not due until
+ * maturity.
  */
-export function computeDpdAsOf(
-  obligations: DpdObligation[],
-  allocations: DpdAllocation[],
-  asOf: string
-): DpdAsOf {
-  const clearedByAsOf = new Map<string, number>();
-  for (const alloc of allocations) {
-    if (alloc.paymentDate > asOf) continue;
-    clearedByAsOf.set(alloc.installmentId, (clearedByAsOf.get(alloc.installmentId) ?? 0) + alloc.amount);
+export function computeDpdAsOf(entries: LedgerEntryRow[], asOf: string): DpdAsOf {
+  let pool = 0;
+  for (const e of entries) {
+    if (e.vchType === "RECEIPT" && e.entryDate <= asOf) pool = round2(pool + Number(e.credit ?? 0));
   }
 
   let oldestOverdueDueDate: string | null = null;
   let amountOverdue = 0;
 
-  for (const obligation of obligations) {
-    if (obligation.dueDate > asOf) continue;
+  for (const obligation of toObligations(entries)) {
+    if (obligation.dueDate > asOf) break;
+
+    const applied = Math.min(pool, obligation.netAmount);
+    pool = round2(pool - applied);
 
     // Round before comparing: money accumulated in floating point can land on
-    // 926.34999999999997 and leave a genuinely settled obligation "unpaid".
-    const cleared = round2(clearedByAsOf.get(obligation.installmentId) ?? 0);
-    const shortfall = round2(obligation.totalAmount - cleared);
-    if (shortfall <= 0) continue;
+    // 124.60999999999 and leave a genuinely settled month "unpaid".
+    const remaining = round2(obligation.netAmount - applied);
+    if (remaining <= 0) continue;
 
-    amountOverdue = round2(amountOverdue + shortfall);
-    if (oldestOverdueDueDate === null || obligation.dueDate < oldestOverdueDueDate) {
-      oldestOverdueDueDate = obligation.dueDate;
-    }
+    amountOverdue = round2(amountOverdue + remaining);
+    if (oldestOverdueDueDate === null) oldestOverdueDueDate = obligation.dueDate;
   }
 
   const dpdDays = oldestOverdueDueDate ? Math.max(daysBetween(oldestOverdueDueDate, asOf), 0) : 0;
 
-  return { dpdDays, bucket: bucketOf(dpdDays), amountOverdue, oldestOverdueDueDate };
+  return { dpdDays, classification: classifyByDpd(dpdDays), amountOverdue, oldestOverdueDueDate };
 }
 
 /**
- * Freezes a DPD row for every fully-elapsed month the loan has lived through
- * that isn't on record yet, oldest first.
+ * The DPD History grid for one loan: one row per year of the loan's life,
+ * one cell per month.
  *
- * Deliberately mirrors `syncMissingMonthEndJournals`: walk from the loan's
- * start to the last fully-elapsed month, skip what already exists, write what
- * doesn't, and never touch a month already written. The current month is
- * never frozen — it isn't over, so its DPD is still moving.
- *
- * Silent on failure. A loan with no schedule yet simply has no obligations,
- * which is a legitimate 0-DPD history, not an error.
- */
-export async function syncDpdHistory(loanId: string): Promise<void> {
-  try {
-    const startDate = await getLoanStartDate(loanId);
-    if (!startDate) return;
-
-    const existing = new Set((await getDpdHistory(loanId)).map((r) => r.monthStart));
-
-    const obligations = await getObligations(loanId);
-    const allocations = await getAllocations(obligations.map((o) => o.installmentId));
-
-    const today = new Date();
-    const lastElapsedMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-
-    const pending: Parameters<typeof insertDpdMonths>[0] = [];
-    let cursor = firstOfMonth(parseIsoDate(startDate));
-
-    while (cursor.getTime() <= lastElapsedMonthStart.getTime()) {
-      const monthStart = toIsoDate(cursor);
-      if (!existing.has(monthStart)) {
-        const asOf = toIsoDate(lastDayOfMonth(cursor));
-        const { dpdDays, bucket, amountOverdue, oldestOverdueDueDate } = computeDpdAsOf(
-          obligations,
-          allocations,
-          asOf
-        );
-        pending.push({ loanId, monthStart, dpdDays, bucket, amountOverdue, oldestOverdueDueDate });
-      }
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-    }
-
-    await insertDpdMonths(pending);
-  } catch {
-    // No loan dates or no schedule yet — nothing to record until there is.
-  }
-}
-
-/**
- * The DPD History grid for one loan: one row per year, one cell per month,
- * plus the live figure for the month in progress.
- *
- * Months before the loan started and months that haven't happened yet render
- * as "X" rather than 0 — no obligation existed, which is different from an
- * obligation met on time.
+ * The grid runs from the month of the loan's first ledger entry to the month
+ * it matures — or to the current month, if it has run past maturity. Months
+ * outside that span are not shown at all; months inside it that have not yet
+ * arrived render as "X", as does any month before the first entry. Every
+ * elapsed month is measured at its own month-end; the month in progress is
+ * measured as at today and marked as such.
  */
 export async function getDpdGrid(loanId: string): Promise<DpdGrid> {
-  await syncDpdHistory(loanId);
+  // Idempotent. The Ledger read does this too, but the two are fetched
+  // side by side, and a month with no Interest journal has no obligation.
+  await syncMissingMonthEndJournals(loanId);
 
-  const startDate = await getLoanStartDate(loanId);
-  const frozen = await getDpdHistory(loanId);
+  const maturityDate = await getLoanMaturityDate(loanId);
+  const entries = await getEntriesForLoan(loanId);
+
+  if (entries.length === 0) {
+    return { loanId, years: [], current: null, worstDpd: 0 };
+  }
+
+  const today = new Date();
+  const todayIso = toIsoDate(today);
+  const currentMonth = firstOfMonth(today);
+  const firstMonth = firstOfMonth(parseIsoDate(entries[0]!.entryDate));
+
+  const maturityMonth = maturityDate ? firstOfMonth(parseIsoDate(maturityDate)) : currentMonth;
+  const lastMonth = maturityMonth.getTime() > currentMonth.getTime() ? maturityMonth : currentMonth;
 
   const byMonth = new Map<string, DpdMonth>();
-  for (const row of frozen) {
-    byMonth.set(row.monthStart, {
-      dpd: row.dpdDays,
-      bucket: row.bucket,
-      amountOverdue: Number(row.amountOverdue ?? 0),
-      isCurrentMonth: false,
+  for (let cursor = firstMonth; cursor.getTime() <= currentMonth.getTime(); cursor = nextMonth(cursor)) {
+    const isCurrentMonth = cursor.getTime() === currentMonth.getTime();
+    const asOf = isCurrentMonth ? todayIso : toIsoDate(lastDayOfMonth(cursor));
+    const { dpdDays, classification, amountOverdue } = computeDpdAsOf(entries, asOf);
+    byMonth.set(toIsoDate(cursor), { dpd: dpdDays, classification, amountOverdue, isCurrentMonth });
+  }
+
+  const years: DpdYearRow[] = [];
+  for (let year = firstMonth.getFullYear(); year <= lastMonth.getFullYear(); year++) {
+    years.push({
+      year,
+      months: Array.from({ length: 12 }, (_, i) => {
+        const key = `${year}-${String(i + 1).padStart(2, "0")}-01`;
+        return byMonth.get(key) ?? null;
+      }),
     });
   }
 
-  // The month in progress is derived, never stored — it is still moving.
-  const today = new Date();
-  const currentMonthStart = toIsoDate(firstOfMonth(today));
-  let current: DpdAsOf | null = null;
-
-  if (startDate) {
-    const obligations = await getObligations(loanId);
-    const allocations = await getAllocations(obligations.map((o) => o.installmentId));
-    current = computeDpdAsOf(obligations, allocations, toIsoDate(today));
-
-    if (firstOfMonth(parseIsoDate(startDate)).getTime() <= firstOfMonth(today).getTime()) {
-      byMonth.set(currentMonthStart, {
-        dpd: current.dpdDays,
-        bucket: current.bucket,
-        amountOverdue: current.amountOverdue,
-        isCurrentMonth: true,
-      });
-    }
-  }
-
-  const months = [...byMonth.keys()].sort();
-  const years: DpdYearRow[] = [];
-
-  if (months.length > 0) {
-    const firstYear = Number(months[0]!.slice(0, 4));
-    const lastYear = Number(months[months.length - 1]!.slice(0, 4));
-
-    for (let year = firstYear; year <= lastYear; year++) {
-      years.push({
-        year,
-        months: Array.from({ length: 12 }, (_, i) => {
-          const key = `${year}-${String(i + 1).padStart(2, "0")}-01`;
-          return byMonth.get(key) ?? null;
-        }),
-      });
-    }
-  }
+  const current = computeDpdAsOf(entries, todayIso);
 
   return {
     loanId,
     years,
-    current: current
-      ? {
-          dpd: current.dpdDays,
-          bucket: current.bucket,
-          amountOverdue: current.amountOverdue,
-          oldestOverdueDueDate: current.oldestOverdueDueDate,
-        }
-      : null,
-    worstDpd: years.reduce(
-      (max, y) => Math.max(max, ...y.months.map((m) => m?.dpd ?? 0)),
-      0
-    ),
+    current: {
+      dpd: current.dpdDays,
+      classification: current.classification,
+      amountOverdue: current.amountOverdue,
+      oldestOverdueDueDate: current.oldestOverdueDueDate,
+    },
+    worstDpd: [...byMonth.values()].reduce((max, m) => Math.max(max, m.dpd), 0),
   };
 }

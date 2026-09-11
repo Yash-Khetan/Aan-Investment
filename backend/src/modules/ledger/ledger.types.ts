@@ -1,3 +1,4 @@
+import type { LoanClassification } from "../loan/loan.metrics";
 import type { InterestBasis } from "../interest/interest.types";
 
 export type LedgerVchType = "PAYMENT" | "RECEIPT" | "JOURNAL_INTEREST" | "JOURNAL_TDS";
@@ -33,18 +34,21 @@ export interface LedgerBalanceEvent {
 /* ============================================================
    DPD HISTORY
 
-   The Ledger's month-by-month Days Past Due grid for one loan.
-   A null month is "X" - outside the loan's life, which is not
-   the same as a month with nothing overdue (0).
+   The Ledger's month-by-month Days Past Due grid for one loan,
+   measured against the ledger's own month-end Interest journals.
+   A null month is "X" - before the loan's first entry, or not
+   yet reached - which is not the same as a month with nothing
+   overdue (0).
 ============================================================ */
 
 export interface DpdMonth {
-  /** Days past due as at this month's end. */
+  /** Days past due as at this month's end (as at today, for the month in progress). */
   dpd: number;
-  /** Whole 30-day periods past due: floor(dpd / 30). */
-  bucket: number;
+  /** RBI asset classification for that DPD: STD, SMA-0, SMA-1, SMA-2 or NPA. */
+  classification: LoanClassification;
+  /** Net interest posted by then and still not received, in rupees. */
   amountOverdue: number;
-  /** True for the month still in progress, whose figure is derived, not frozen. */
+  /** True for the month still in progress, whose figure is still moving. */
   isCurrentMonth: boolean;
 }
 
@@ -56,14 +60,15 @@ export interface DpdYearRow {
 
 export interface DpdGrid {
   loanId: string;
+  /** One row per year from the loan's first ledger entry to its maturity. Empty when the ledger is. */
   years: DpdYearRow[];
-  /** Live figure as of today, for the summary line. Null when the loan has no start date. */
+  /** Live figure as of today. Null when the ledger has no entries yet. */
   current: {
     dpd: number;
-    bucket: number;
+    classification: LoanClassification;
     amountOverdue: number;
     oldestOverdueDueDate: string | null;
   } | null;
-  /** Highest DPD the loan has ever reached. */
+  /** Highest DPD on the grid. */
   worstDpd: number;
 }

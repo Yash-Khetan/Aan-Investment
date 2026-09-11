@@ -1,5 +1,5 @@
 import { eq, and, desc, gt, sql } from "drizzle-orm";
-import { db, repaymentSchedules, installments, paymentAllocations, loans, loanDpdHistory } from "../../db";
+import { db, repaymentSchedules, installments, paymentAllocations, loans } from "../../db";
 import { GeneratedInstallment } from "./repayment.types";
 
 /**
@@ -95,20 +95,6 @@ export async function createScheduleRevision(input: {
         .set({ isCurrent: false })
         .where(eq(repaymentSchedules.id, previous[0].id));
     }
-
-    // A frozen DPD month is only meaningful against the schedule it was
-    // measured from, so superseding that schedule invalidates every frozen row
-    // for this loan: a new revision can move due dates, change the amount owed,
-    // or move the loan's start month entirely. They are cleared here, inside
-    // the same transaction that makes the new revision current, so a read can
-    // never observe the new schedule alongside history frozen against the old
-    // one. `syncDpdHistory` rebuilds them on the next ledger read.
-    //
-    // Without this they would survive forever: `insertDpdMonths` writes with
-    // `onConflictDoNothing`, so a month already on record is never rewritten —
-    // and a loan whose dates were corrected would keep reporting delinquency
-    // for months it was never live in.
-    await tx.delete(loanDpdHistory).where(eq(loanDpdHistory.loanId, input.loanId));
 
     const nextVersion = (previous[0]?.version ?? 0) + 1;
     const snapshot = input.generationSnapshot;
