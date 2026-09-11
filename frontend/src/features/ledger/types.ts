@@ -56,12 +56,16 @@ export interface CreateEntryInput {
 /* nothing overdue (0).                                                */
 /* ------------------------------------------------------------------ */
 
+/** RBI asset classification, derived from DPD: STD 0, SMA-0 1-30, SMA-1 31-60, SMA-2 61-90, NPA 90+. */
+export type DpdClassification = "STD" | "SMA-0" | "SMA-1" | "SMA-2" | "NPA";
+
 export interface DpdMonth {
+  /** Days past due as at this month's end (as at today, for the month in progress). */
   dpd: number;
-  /** Whole 30-day periods past due: floor(dpd / 30). */
-  bucket: number;
+  classification: DpdClassification;
+  /** Net interest posted by then and still not received. */
   amountOverdue: number;
-  /** The month still in progress - derived, not yet frozen. */
+  /** The month still in progress - its figure is still moving. */
   isCurrentMonth: boolean;
 }
 
@@ -73,10 +77,11 @@ export interface DpdYearRow {
 
 export interface DpdGrid {
   loanId: string;
+  /** One row per year from the loan's first ledger entry to its maturity. Empty when the ledger is. */
   years: DpdYearRow[];
   current: {
     dpd: number;
-    bucket: number;
+    classification: DpdClassification;
     amountOverdue: number;
     oldestOverdueDueDate: string | null;
   } | null;

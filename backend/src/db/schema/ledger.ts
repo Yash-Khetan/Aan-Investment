@@ -6,7 +6,6 @@ import {
     date,
     numeric,
     boolean,
-    integer,
     bigserial,
     index,
     uniqueIndex,
@@ -128,72 +127,5 @@ export const ledgerEntries = pgTable("ledger_entries", {
 
     ledgerAccrualMonthUniqueIdx: uniqueIndex("ledger_accrual_month_idx")
         .on(table.loanId, table.accrualMonth, table.vchType),
-
-}));
-
-/* ============================================================
-   LOAN DPD HISTORY
-
-   One frozen row per LOAN per calendar month: the loan's Days
-   Past Due as at that month's end. This is what the Ledger's
-   DPD History grid renders (a year x month pivot of these rows),
-   and it is kept per loan because a borrower's loans each carry
-   their own delinquency history.
-
-   Written by the same month-end walk that posts the Interest/TDS
-   journal pairs, and with the same rule: a month is written once
-   and never rewritten. A month's DPD is the record of what that
-   month's delinquency was, so restating a repayment schedule
-   later must not silently rewrite the months already behind it.
-
-   Only fully-elapsed months are stored. The current, incomplete
-   month is derived on read and never persisted.
-
-   No DPD arithmetic lives here - see modules/ledger/dpd.service.ts.
-============================================================ */
-
-export const loanDpdHistory = pgTable("loan_dpd_history", {
-
-    id: uuid("id")
-        .defaultRandom()
-        .primaryKey(),
-
-    loanId: uuid("loan_id")
-        .references(() => loans.id, {
-            onDelete: "cascade",
-        })
-        .notNull(),
-
-    /** First day of the month this row describes, e.g. 2025-02-01. */
-    monthStart: date("month_start")
-        .notNull(),
-
-    /** Days past due as at this month's end. 0 when nothing was overdue. */
-    dpdDays: integer("dpd_days")
-        .notNull()
-        .default(0),
-
-    /** Whole 30-day periods past due: floor(dpdDays / 30). */
-    bucket: integer("bucket")
-        .notNull()
-        .default(0),
-
-    /** Total still unpaid across every obligation already due at month end. */
-    amountOverdue: money("amount_overdue")
-        .default("0"),
-
-    /** Due date of the oldest obligation still uncleared at month end; null when none. */
-    oldestOverdueDueDate: date("oldest_overdue_due_date"),
-
-    ...timestamps,
-
-}, (table) => ({
-
-    dpdHistoryLoanIdx: index("dpd_history_loan_idx")
-        .on(table.loanId),
-
-    /* One row per loan per month - what makes the month-end walk idempotent. */
-    dpdHistoryMonthUniqueIdx: uniqueIndex("dpd_history_month_idx")
-        .on(table.loanId, table.monthStart),
 
 }));

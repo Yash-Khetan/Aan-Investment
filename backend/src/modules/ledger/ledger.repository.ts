@@ -264,3 +264,19 @@ export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
     defaultTdsRatePercent: row.tdsRatePercent,
   };
 }
+
+/** The loan's maturity date — the far edge of its DPD grid. Null when the loan has none recorded. */
+export async function getLoanMaturityDate(loanId: string): Promise<string | null> {
+  const rows = await db
+    .select({ maturityDate: loans.maturityDate })
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) {
+    throw new NotFoundError(`Loan ${loanId} not found.`);
+  }
+
+  return row.maturityDate ?? null;
+}
