@@ -1,5 +1,5 @@
 import {
-  getCurrentInterestConfig,
+  getInterestConfigEffectiveOn,
   getInterestRulesForConfig,
   getCurrentPenalRule,
   getLoanOriginalPrincipal,
@@ -41,6 +41,18 @@ function diffInMonths(start: Date, end: Date): number {
     (end.getFullYear() - start.getFullYear()) * 12 +
     (end.getMonth() - start.getMonth())
   );
+}
+
+/**
+ * Formats a Date's own calendar day as "YYYY-MM-DD" — deliberately NOT
+ * `toISOString().slice(0, 10)`, which rolls the date back a day in any
+ * positive-UTC-offset timezone for a Date built from local y/m/d components.
+ */
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /**
@@ -88,7 +100,7 @@ export function calculatePeriodInterest(input: {
 
 /**
  * Orchestrates the full interest calculation for a loan as of a given date:
- * 1. Load the current interest config + its slab/event rules.
+ * 1. Load the interest config in effect on that date + its slab/event rules.
  * 2. Detect which events are currently active for the loan.
  * 3. Resolve the effective rate (config base vs slabs vs events, highest wins).
  * 4. Run the appropriate calculation strategy for the configured basis.
@@ -97,10 +109,10 @@ export function calculatePeriodInterest(input: {
 export async function calculateInterestForLoan(
   input: CalculateInterestInput
 ): Promise<CalculateInterestResult> {
-  const config = await getCurrentInterestConfig(input.loanId);
+  const config = await getInterestConfigEffectiveOn(input.loanId, toIsoDate(input.asOfDate));
 
   if (!config) {
-    throw new Error(`No current interest config found for loan ${input.loanId}`);
+    throw new Error(`No interest config found for loan ${input.loanId}`);
   }
 
   const ruleRows = await getInterestRulesForConfig(config.id);

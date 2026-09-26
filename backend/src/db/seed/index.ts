@@ -52,7 +52,7 @@ const SYSTEM_ROLES: { name: string; description: string }[] = [
  * What every employee needs to operate the LMS day to day. ADMIN inherits all of
  * it — an admin can do anything an employee can.
  */
-const EMPLOYEE_PERMISSIONS = ["loan:read", "loan:create"];
+const EMPLOYEE_PERMISSIONS = ["loan:read", "loan:create", "loan:update", "borrower:update"];
 
 /**
  * User management: exactly the capabilities an employee must NOT have. Note the
@@ -65,8 +65,6 @@ const ADMIN_PERMISSIONS = [
     "user:update",
     "user:activate",
     "user:deactivate",
-    "loan:update",
-    "borrower:update",
 ];
 
 /** The canonical permission catalogue (RBAC). Keys are "resource:action". */

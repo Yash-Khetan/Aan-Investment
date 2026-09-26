@@ -9,7 +9,6 @@ import { TextField } from "../../components/ui/Field";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { SlideOver } from "../../components/ui/SlideOver";
 import { formatCurrency, formatDate } from "../../lib/format";
-import { useAuth } from "../auth/AuthContext";
 import { deleteLoan, listLoans } from "./api";
 import { LoanDetailView } from "./components/LoanDetailView";
 import type { Loan } from "./types";
@@ -27,8 +26,6 @@ export function LoansPage() {
   const [search, setSearch] = useState("");
   const [viewingId, setViewingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const isAdmin = user?.roles.includes("ADMIN") ?? false;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["loans", search],
@@ -47,6 +44,7 @@ export function LoansPage() {
   }
 
   const columns: Column<Loan>[] = [
+    { key: "borrowerName", header: "Borrower", render: (l) => l.borrowerName ?? "—" },
     { key: "loanAccountNumber", header: "Loan A/C No.", render: (l) => l.loanAccountNumber },
     { key: "loanType", header: "Type", render: (l) => l.loanType },
     { key: "repaymentType", header: "Repayment", render: (l) => l.repaymentType.replace(/_/g, " ") },
@@ -67,11 +65,9 @@ export function LoansPage() {
           <Button variant="secondary" onClick={() => setViewingId(l.id)}>
             View
           </Button>
-          {isAdmin && (
-            <Link to={`/loans/${l.id}/edit`}>
-              <Button variant="secondary">Edit</Button>
-            </Link>
-          )}
+          <Link to={`/loans/${l.id}/edit`}>
+            <Button variant="secondary">Edit</Button>
+          </Link>
           <Button variant="danger" onClick={() => handleDelete(l)} disabled={deleteMutation.isPending}>
             Delete
           </Button>

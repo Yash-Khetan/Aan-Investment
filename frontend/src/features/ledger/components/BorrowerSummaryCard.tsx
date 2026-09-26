@@ -51,91 +51,97 @@ export function BorrowerSummaryCard({ borrowerId }: { borrowerId: string }) {
     <SummaryCard
       title="Borrower Details"
       badges={<Badge status={borrower.status} />}
+      moreDetails={
+        <>
+          <SummaryGroup title="Basic Details">
+            <DetailField
+              label="Borrower Type"
+              value={BORROWER_TYPE_LABELS[borrower.borrowerType] ?? borrower.borrowerType}
+            />
+            {isConsumer ? (
+              <>
+                <DetailField label="Gender" value={labelOf(GENDERS, borrower.gender)} />
+                <DetailField label="Date of Birth" value={formatDate(borrower.dateOfBirth)} />
+              </>
+            ) : (
+              <>
+                <DetailField label="Borrower Legal Constitution" value={borrower.constitution?.replace(/_/g, " ")} />
+                <DetailField label="Applicant Type" value={labelOf(APPLICANT_TYPES, borrower.applicantType)} />
+                <DetailField label="Date of Incorporation" value={formatDate(borrower.dateOfIncorporation)} />
+                <DetailField label="Business Category" value={labelOf(BUSINESS_CATEGORIES, borrower.businessCategory)} />
+                <DetailField label="Business Type" value={labelOf(BUSINESS_TYPES, borrower.businessType)} />
+                <DetailField label="Class of Activity 1" value={borrower.classOfActivity1} />
+              </>
+            )}
+          </SummaryGroup>
+
+          <SummaryGroup title="Identity">
+            {isConsumer ? (
+              <>
+                <DetailField label="Income Tax ID Number (PAN)" value={borrower.pan} />
+                <DetailField label="Aadhaar" value={borrower.aadhaar} />
+                <DetailField label="CKYC Number" value={borrower.ckycNumber} />
+              </>
+            ) : (
+              <DetailField label="PAN" value={borrower.pan} />
+            )}
+          </SummaryGroup>
+
+          <SummaryGroup title="Contact">
+            <DetailField label={isConsumer ? "Email ID" : "Email"} value={borrower.email} />
+            <DetailField label={isConsumer ? "Mobile No." : "Mobile"} value={borrower.phone} />
+          </SummaryGroup>
+
+          <SummaryGroup title={isConsumer ? "Address" : "Registered Address"}>
+            <div className="sm:col-span-2">
+              <DetailField label="Address" value={borrower.addressLine1} />
+            </div>
+            {!isConsumer && (
+              <>
+                <DetailField label="City" value={borrower.city} />
+                <DetailField label="District" value={borrower.district} />
+              </>
+            )}
+            <DetailField label="State" value={borrower.state} />
+            <DetailField label="Pincode" value={borrower.pincode} />
+            {isConsumer && (
+              <>
+                <DetailField label="Address Category" value={labelOf(ADDRESS_CATEGORIES, borrower.addressCategory)} />
+                <DetailField label="Residence Code" value={labelOf(RESIDENCE_CODES, borrower.residenceCode)} />
+                <DetailField label="Ownership Indicator" value={labelOf(OWNERSHIP_INDICATORS, borrower.ownershipIndicator)} />
+              </>
+            )}
+          </SummaryGroup>
+
+          {!isConsumer && (
+            <SummaryGroup title="Internal">
+              <DetailField label="Internal Rating" value={borrower.internalRating} />
+              <div className="sm:col-span-2 lg:col-span-3">
+                <DetailField label="Rating Remarks" value={borrower.ratingRemarks} />
+              </div>
+            </SummaryGroup>
+          )}
+
+          {borrower.promoters.length > 0 && (
+            <div>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Related Persons</h3>
+              <div className="flex flex-wrap gap-2">
+                {borrower.promoters.map((p) => (
+                  <div key={p.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">
+                    <span className="font-medium text-slate-800">{p.name}</span>{" "}
+                    {p.designation && <span className="text-slate-400">({p.designation})</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      }
     >
       <SummaryGroup title="Basic Details">
-        <DetailField
-          label="Borrower Type"
-          value={BORROWER_TYPE_LABELS[borrower.borrowerType] ?? borrower.borrowerType}
-        />
         <DetailField label={isConsumer ? "Account Number" : "Borrower Code"} value={borrower.borrowerCode} />
         <DetailField label="Name" value={borrower.name} />
-        {isConsumer ? (
-          <>
-            <DetailField label="Gender" value={labelOf(GENDERS, borrower.gender)} />
-            <DetailField label="Date of Birth" value={formatDate(borrower.dateOfBirth)} />
-          </>
-        ) : (
-          <>
-            <DetailField label="Borrower Legal Constitution" value={borrower.constitution?.replace(/_/g, " ")} />
-            <DetailField label="Applicant Type" value={labelOf(APPLICANT_TYPES, borrower.applicantType)} />
-            <DetailField label="Date of Incorporation" value={formatDate(borrower.dateOfIncorporation)} />
-            <DetailField label="Business Category" value={labelOf(BUSINESS_CATEGORIES, borrower.businessCategory)} />
-            <DetailField label="Business Type" value={labelOf(BUSINESS_TYPES, borrower.businessType)} />
-            <DetailField label="Class of Activity 1" value={borrower.classOfActivity1} />
-          </>
-        )}
       </SummaryGroup>
-
-      <SummaryGroup title="Identity">
-        {isConsumer ? (
-          <>
-            <DetailField label="Income Tax ID Number (PAN)" value={borrower.pan} />
-            <DetailField label="Aadhaar" value={borrower.aadhaar} />
-            <DetailField label="CKYC Number" value={borrower.ckycNumber} />
-          </>
-        ) : (
-          <DetailField label="PAN" value={borrower.pan} />
-        )}
-      </SummaryGroup>
-
-      <SummaryGroup title="Contact">
-        <DetailField label={isConsumer ? "Email ID" : "Email"} value={borrower.email} />
-        <DetailField label={isConsumer ? "Mobile No." : "Mobile"} value={borrower.phone} />
-      </SummaryGroup>
-
-      <SummaryGroup title={isConsumer ? "Address" : "Registered Address"}>
-        <div className="sm:col-span-2">
-          <DetailField label="Address" value={borrower.addressLine1} />
-        </div>
-        {!isConsumer && (
-          <>
-            <DetailField label="City" value={borrower.city} />
-            <DetailField label="District" value={borrower.district} />
-          </>
-        )}
-        <DetailField label="State" value={borrower.state} />
-        <DetailField label="Pincode" value={borrower.pincode} />
-        {isConsumer && (
-          <>
-            <DetailField label="Address Category" value={labelOf(ADDRESS_CATEGORIES, borrower.addressCategory)} />
-            <DetailField label="Residence Code" value={labelOf(RESIDENCE_CODES, borrower.residenceCode)} />
-            <DetailField label="Ownership Indicator" value={labelOf(OWNERSHIP_INDICATORS, borrower.ownershipIndicator)} />
-          </>
-        )}
-      </SummaryGroup>
-
-      {!isConsumer && (
-        <SummaryGroup title="Internal">
-          <DetailField label="Internal Rating" value={borrower.internalRating} />
-          <div className="sm:col-span-2 lg:col-span-3">
-            <DetailField label="Rating Remarks" value={borrower.ratingRemarks} />
-          </div>
-        </SummaryGroup>
-      )}
-
-      {borrower.promoters.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Related Persons</h3>
-          <div className="flex flex-wrap gap-2">
-            {borrower.promoters.map((p) => (
-              <div key={p.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">
-                <span className="font-medium text-slate-800">{p.name}</span>{" "}
-                {p.designation && <span className="text-slate-400">({p.designation})</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </SummaryCard>
   );
 }
