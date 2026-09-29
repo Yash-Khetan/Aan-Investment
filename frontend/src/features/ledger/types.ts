@@ -60,10 +60,10 @@ export interface CreateEntryInput {
 export type DpdClassification = "STD" | "SMA-0" | "SMA-1" | "SMA-2" | "NPA";
 
 export interface DpdMonth {
-  /** Days past due as at this month's end (as at today, for the month in progress). */
+  /** Days past due as at this month's end (as at today, for the month in progress). Part-payments count proportionally. */
   dpd: number;
   classification: DpdClassification;
-  /** Net interest posted by then and still not received. */
+  /** Balance: net interest already past due by then and still not received, in rupees. */
   amountOverdue: number;
   /** The month still in progress - its figure is still moving. */
   isCurrentMonth: boolean;

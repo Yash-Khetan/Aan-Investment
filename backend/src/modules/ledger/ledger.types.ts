@@ -42,11 +42,15 @@ export interface LedgerBalanceEvent {
 ============================================================ */
 
 export interface DpdMonth {
-  /** Days past due as at this month's end (as at today, for the month in progress). */
+  /**
+   * Days past due as at this month's end (as at today, for the month in
+   * progress). A part-paid obligation counts in proportion to what is still
+   * unpaid on it. See dpd.service.ts.
+   */
   dpd: number;
   /** RBI asset classification for that DPD: STD, SMA-0, SMA-1, SMA-2 or NPA. */
   classification: LoanClassification;
-  /** Net interest posted by then and still not received, in rupees. */
+  /** Balance: net interest already past due by then and still not received, in rupees. */
   amountOverdue: number;
   /** True for the month still in progress, whose figure is still moving. */
   isCurrentMonth: boolean;
