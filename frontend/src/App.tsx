@@ -43,10 +43,8 @@ export default function App() {
           <Route path="/borrowers/new" element={<CreateBorrowerPage />} />
           <Route path="/loans" element={<LoansPage />} />
           <Route path="/loans/new" element={<CreateLoanPage />} />
-          <Route element={<AdminRoute />}>
-            <Route path="/borrowers/:id/edit" element={<EditBorrowerPage />} />
-            <Route path="/loans/:id/edit" element={<EditLoanPage />} />
-          </Route>
+          <Route path="/borrowers/:id/edit" element={<EditBorrowerPage />} />
+          <Route path="/loans/:id/edit" element={<EditLoanPage />} />
           <Route path="/get-kpi" element={<GetKpiPage />} />
           <Route path="/ledger" element={<LedgerPage />} />
           <Route path="/repayment" element={<RepaymentEnginePage />} />

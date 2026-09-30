@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { Card } from "../../../components/ui/Card";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/ui/States";
+import { formatCurrency } from "../../../lib/format";
 import type { DpdClassification, DpdGrid, DpdMonth } from "../types";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -88,7 +89,7 @@ export function DpdHistoryTable({
               return (
                 <Fragment key={row.year}>
                   <tr className={shade}>
-                    <td rowSpan={2} className={`${labelCell} font-medium text-slate-900`}>
+                    <td rowSpan={3} className={`${labelCell} font-medium text-slate-900`}>
                       {row.year}
                     </td>
                     <td className={labelCell}>dpd</td>
@@ -111,6 +112,14 @@ export function DpdHistoryTable({
                       </td>
                     ))}
                   </tr>
+                  <tr className={shade}>
+                    <td className={labelCell}>balance</td>
+                    {row.months.map((month, i) => (
+                      <td key={i} className={`${labelCell} ${cellClass(month)} whitespace-nowrap`}>
+                        {month ? formatCurrency(month.amountOverdue, 2) : NO_DATA}
+                      </td>
+                    ))}
+                  </tr>
                 </Fragment>
               );
             })}
@@ -120,8 +129,9 @@ export function DpdHistoryTable({
 
       <p className="mt-2 text-xs text-slate-400">
         Days past due at each month end, measured against this ledger&apos;s month-end interest. Receipts clear the
-        oldest month first; a part-payment lowers the amount overdue but does not reset the day count. An asterisk marks
-        the month still in progress. <span className="font-medium">{NO_DATA}</span> means no figure — before the
+        oldest month first. A part-paid month counts toward DPD in proportion to what is still unpaid on it, so paying
+        half of a 30-day month&apos;s interest leaves 15 days. Balance is the overdue interest still unpaid, in rupees.
+        An asterisk marks the month still in progress. <span className="font-medium">{NO_DATA}</span> means no figure — before the
         loan&apos;s first entry, or a month not yet reached.
       </p>
     </Card>

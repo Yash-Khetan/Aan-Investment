@@ -9,7 +9,6 @@ import { SelectField, TextField } from "../../components/ui/Field";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { SlideOver } from "../../components/ui/SlideOver";
 import { formatDate } from "../../lib/format";
-import { useAuth } from "../auth/AuthContext";
 import { deleteBorrower, listBorrowers } from "./api";
 import { BorrowerDetailView } from "./components/BorrowerDetailView";
 import { BORROWER_TYPES, BORROWER_TYPE_LABELS } from "./types";
@@ -20,8 +19,6 @@ export function BorrowersPage() {
   const [borrowerType, setBorrowerType] = useState<BorrowerType | "">("");
   const [viewingId, setViewingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const isAdmin = user?.roles.includes("ADMIN") ?? false;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["borrowers", search, borrowerType],
@@ -60,11 +57,9 @@ export function BorrowersPage() {
           <Button variant="secondary" onClick={() => setViewingId(b.id)}>
             View
           </Button>
-          {isAdmin && (
-            <Link to={`/borrowers/${b.id}/edit`}>
-              <Button variant="secondary">Edit</Button>
-            </Link>
-          )}
+          <Link to={`/borrowers/${b.id}/edit`}>
+            <Button variant="secondary">Edit</Button>
+          </Link>
           <Button variant="danger" onClick={() => handleDelete(b)} disabled={deleteMutation.isPending}>
             Delete
           </Button>
