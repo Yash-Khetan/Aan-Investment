@@ -1,4 +1,5 @@
 import type { CalculationMethod, InterestBasis, InterestConfig } from "../interest/types";
+import type { BalanceBifurcation } from "../ledger/types";
 
 export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
 
@@ -213,6 +214,8 @@ export interface Loan {
   classification: string;
   /** Earliest due date among unpaid installments (overdue or upcoming); null if none. */
   nextDueDate: string | null;
+  /** The loan's current Ledger balance split into principal and each month's unpaid interest. Null while the ledger is empty. */
+  balanceBifurcation: BalanceBifurcation | null;
   /**
    * Annualized IRR from this loan's realized cash flows (disbursements out, actual
    * payments in) plus its current outstanding principal as a final notional inflow.

@@ -11,6 +11,7 @@ import { SlideOver } from "../../components/ui/SlideOver";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { deleteLoan, listLoans } from "./api";
 import { LoanDetailView } from "./components/LoanDetailView";
+import { BalanceBifurcationCell } from "../ledger/components/BalanceBifurcation";
 import type { Loan } from "./types";
 
 /** Traffic-light DPD text color, keyed by the loan's classification bucket. */
@@ -74,6 +75,14 @@ export function LoansPage() {
         </div>
       ),
       className: "text-right",
+    },
+    {
+      // Last, as on the Ledger: the loan's current ledger balance split into
+      // principal and each month whose interest is still unpaid.
+      key: "balanceBifurcation",
+      header: "Balance Bifurcation",
+      render: (l) => <BalanceBifurcationCell bifurcation={l.balanceBifurcation} />,
+      className: "border-l border-slate-300 p-0!",
     },
   ];
 

@@ -28,9 +28,9 @@ const CLASSIFICATION_CLASS: Record<DpdClassification, string> = {
 };
 
 const headerCell =
-  "border border-slate-200 bg-amber-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-700";
+  "border border-slate-300 bg-amber-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-700";
 
-const labelCell = "border border-slate-200 px-3 py-2 text-center text-sm text-slate-700";
+const labelCell = "border border-slate-300 px-3 py-2 text-center text-sm text-slate-700";
 
 function cellClass(month: DpdMonth | null): string {
   return month ? CLASSIFICATION_CLASS[month.classification] : "text-slate-700";
@@ -129,7 +129,7 @@ export function DpdHistoryTable({
 
       <p className="mt-2 text-xs text-slate-400">
         Days past due at each month end, measured against this ledger&apos;s month-end interest. Receipts clear the
-        oldest month first. A part-paid month counts toward DPD in proportion to what is still unpaid on it, so paying
+        oldest month first, and anything beyond the interest due reduces principal. A part-paid month counts toward DPD in proportion to what is still unpaid on it, so paying
         half of a 30-day month&apos;s interest leaves 15 days. Balance is the overdue interest still unpaid, in rupees.
         An asterisk marks the month still in progress. <span className="font-medium">{NO_DATA}</span> means no figure — before the
         loan&apos;s first entry, or a month not yet reached.

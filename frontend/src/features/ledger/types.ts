@@ -18,6 +18,27 @@ export interface LedgerEntry {
   includeOpeningClosingDays: boolean | null;
   /** Computed cumulative running balance, attached server-side — never independently stored. */
   balance: number;
+  /** What `balance` is made of right after this entry: principal plus each month's unpaid net interest. */
+  bifurcation: BalanceBifurcation;
+  /** On a Receipt, how it was appropriated — interest oldest month first, then principal. Null on every other row. */
+  allocation: ReceiptAllocation | null;
+}
+
+/**
+ * A ledger balance split into principal and each accrual month's interest
+ * (net of TDS) still unpaid. The parts always add up to the balance.
+ */
+export interface BalanceBifurcation {
+  /** Negative only when receipts have paid back more than was lent. */
+  principal: number;
+  /** Oldest first; fully-paid months are left out. `month` is the first of the accrual month, YYYY-MM-DD. */
+  interest: Array<{ month: string; amount: number }>;
+}
+
+export interface ReceiptAllocation {
+  /** `cleared` is true when this receipt finished paying off the month. */
+  interest: Array<{ month: string; amount: number; cleared: boolean }>;
+  principal: number;
 }
 
 /**

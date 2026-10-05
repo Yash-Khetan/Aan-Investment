@@ -1,4 +1,4 @@
-import { eq, and, asc, lte, gte, isNotNull } from "drizzle-orm";
+import { eq, and, asc, lte, gte, inArray, isNotNull } from "drizzle-orm";
 import { db, ledgerEntries, loans } from "../../db";
 import { NotFoundError } from "../../common/errors";
 
@@ -14,6 +14,16 @@ export async function getEntriesForLoan(loanId: string): Promise<LedgerEntryRow[
     .from(ledgerEntries)
     .where(eq(ledgerEntries.loanId, loanId))
     .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.sequenceNo));
+}
+
+/** All entries for several loans in one read, each loan's oldest first — for list views. */
+export async function getEntriesForLoans(loanIds: string[]): Promise<LedgerEntryRow[]> {
+  if (loanIds.length === 0) return [];
+  return db
+    .select()
+    .from(ledgerEntries)
+    .where(inArray(ledgerEntries.loanId, loanIds))
+    .orderBy(asc(ledgerEntries.loanId), asc(ledgerEntries.entryDate), asc(ledgerEntries.sequenceNo));
 }
 
 /** Every entry dated on or before `monthEnd`, oldest first — the raw material for a month's balance walk. */

@@ -32,6 +32,35 @@ export interface LedgerBalanceEvent {
 }
 
 /* ============================================================
+   BALANCE BIFURCATION
+
+   What a ledger balance is made of: principal, plus each accrual
+   month's interest (net of TDS) still unpaid. See allocation.ts.
+============================================================ */
+
+export interface BalanceBifurcation {
+  /** Principal outstanding. Negative only when receipts have paid back more than was lent. */
+  principal: number;
+  /** Unpaid net interest per accrual month, oldest first. Months fully paid are left out. */
+  interest: Array<{
+    /** First of the accrual month, YYYY-MM-DD. */
+    month: string;
+    amount: number;
+  }>;
+}
+
+/** How one Receipt was appropriated: interest oldest month first, then principal with whatever is left. */
+export interface ReceiptAllocation {
+  interest: Array<{
+    month: string;
+    amount: number;
+    /** True when this receipt finished paying off the month. */
+    cleared: boolean;
+  }>;
+  principal: number;
+}
+
+/* ============================================================
    DPD HISTORY
 
    The Ledger's month-by-month Days Past Due grid for one loan,

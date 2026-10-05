@@ -4,6 +4,7 @@ import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
 import {
   getEntriesForLoan,
+  getEntriesForLoans,
   getEntriesUpTo,
   getExistingAccrualMonths,
   getJournalInterestEntriesFromMonth,
@@ -15,7 +16,13 @@ import {
   getLoanRates,
   type LedgerEntryRow,
 } from "./ledger.repository";
-import { CreateLedgerEntryInput, LedgerBalanceEvent, MonthAccrualConfig } from "./ledger.types";
+import {
+  BalanceBifurcation,
+  CreateLedgerEntryInput,
+  LedgerBalanceEvent,
+  MonthAccrualConfig,
+} from "./ledger.types";
+import { allocateLedger } from "./allocation";
 
 /**
  * The day-count this ledger has always accrued at, and still does whenever a
@@ -314,17 +321,48 @@ export async function getSettings(loanId: string) {
   };
 }
 
-/** Full ledger for a loan: self-heals missing month-end journals, then returns entries with a computed running balance. */
+/**
+ * What each loan's current ledger balance is made of — principal plus each
+ * month's unpaid net interest — for the Loans list. Self-heals each loan's
+ * missing month-end journals first, so a ledger nobody has opened lately
+ * still shows last month's interest. Loans with no ledger entries are absent.
+ */
+export async function getClosingBifurcations(loanIds: string[]): Promise<Map<string, BalanceBifurcation>> {
+  await Promise.all(loanIds.map((id) => syncMissingMonthEndJournals(id)));
+
+  const byLoan = new Map<string, LedgerEntryRow[]>();
+  for (const row of await getEntriesForLoans(loanIds)) {
+    const rows = byLoan.get(row.loanId);
+    if (rows) rows.push(row);
+    else byLoan.set(row.loanId, [row]);
+  }
+
+  const result = new Map<string, BalanceBifurcation>();
+  for (const [loanId, rows] of byLoan) result.set(loanId, allocateLedger(rows).closing);
+  return result;
+}
+
+/**
+ * Full ledger for a loan: self-heals missing month-end journals, then returns
+ * entries with a computed running balance, what that balance is made of, and
+ * — on Receipts — how the receipt was appropriated.
+ */
 export async function getLoanLedger(loanId: string) {
   await syncMissingMonthEndJournals(loanId);
 
   const rows = await getEntriesForLoan(loanId);
+  const allocation = allocateLedger(rows);
 
   let balance = 0;
   const entries = rows.map((row) => {
     balance += row.debit ? Number(row.debit) : 0;
     balance -= row.credit ? Number(row.credit) : 0;
-    return { ...row, balance };
+    return {
+      ...row,
+      balance,
+      bifurcation: allocation.bifurcationAfter.get(row.id)!,
+      allocation: allocation.receipts.get(row.id) ?? null,
+    };
   });
 
   const settings = await getSettings(loanId);

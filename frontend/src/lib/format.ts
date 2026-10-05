@@ -31,3 +31,11 @@ export function formatPercent(value: number | string | null | undefined, decimal
   if (Number.isNaN(num)) return "—";
   return `${(num * 100).toFixed(decimals)}%`;
 }
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-08-01" → "Aug-26", the way the source Excel ledger labels a month. */
+export function formatAccrualMonth(month: string): string {
+  const [year, m] = month.split("-");
+  return `${SHORT_MONTHS[Number(m) - 1]}-${year!.slice(2)}`;
+}

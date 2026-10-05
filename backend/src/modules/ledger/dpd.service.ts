@@ -2,6 +2,7 @@ import { classifyByDpd } from "../loan/loan.metrics";
 import { getEntriesForLoan, getLoanMaturityDate, type LedgerEntryRow } from "./ledger.repository";
 import { syncMissingMonthEndJournals } from "./ledger.service";
 import type { DpdGrid, DpdMonth, DpdYearRow } from "./ledger.types";
+import { allocateLedger } from "./allocation";
 
 /**
  * Days Past Due for one loan, month by month, measured against the loan's
@@ -9,9 +10,10 @@ import type { DpdGrid, DpdMonth, DpdYearRow } from "./ledger.types";
  *
  * The obligation each month is the Interest journal the ledger posts at
  * month-end, net of the TDS credit paired with it — the amount the borrower
- * actually has to remit. Receipts clear those obligations oldest-first, and
- * only interest is ever an obligation here, so a receipt reaches principal
- * only once every month's interest due so far has been settled.
+ * actually has to remit. Receipts are appropriated exactly as the Ledger's
+ * balance bifurcation shows them (allocation.ts): oldest month's interest
+ * first, and whatever is left over reduces principal for good. Only
+ * interest is ever an obligation here.
  *
  * DPD counts a part-payment proportionally. Each overdue obligation owns the
  * days from its due date to the next obligation's due date (to the as-of
@@ -73,43 +75,32 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** One month's interest, net of its TDS, falling due on the day it was posted. */
+/** One due date's net interest, after the receipts have been appropriated to it. */
 interface DpdObligation {
   dueDate: string;
   netAmount: number;
+  remaining: number;
 }
 
 /**
- * The obligations in a ledger, oldest first. Each Interest journal is paired
- * with its TDS journal by `pairedEntryId`; the TDS is deducted at source and
- * remitted by the borrower to the government rather than to us, so it is
- * settled the moment it is posted and only the net remains to be received.
+ * The obligations in a ledger, oldest first, as the receipt appropriation
+ * leaves them. Months with nothing net to pay are no obligation at all, and
+ * two months posted on the same day merge, so each owns a distinct stretch
+ * of days.
  */
 function toObligations(entries: LedgerEntryRow[]): DpdObligation[] {
-  const tdsById = new Map<string, number>();
-  for (const e of entries) {
-    if (e.vchType === "JOURNAL_TDS") tdsById.set(e.id, Number(e.credit ?? 0));
-  }
-
-  const obligations: DpdObligation[] = [];
-  for (const e of entries) {
-    if (e.vchType !== "JOURNAL_INTEREST") continue;
-    const tds = e.pairedEntryId ? (tdsById.get(e.pairedEntryId) ?? 0) : 0;
-    const netAmount = round2(Number(e.debit ?? 0) - tds);
-    if (netAmount <= 0) continue;
-    obligations.push({ dueDate: e.entryDate, netAmount });
-  }
-
-  obligations.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
-
-  // One obligation per due date, so each owns a distinct stretch of days.
   const merged: DpdObligation[] = [];
-  for (const o of obligations) {
+  for (const o of allocateLedger(entries).obligations) {
+    if (o.netAmount <= 0) continue;
     const last = merged[merged.length - 1];
-    if (last && last.dueDate === o.dueDate) last.netAmount = round2(last.netAmount + o.netAmount);
-    else merged.push({ ...o });
+    if (last && last.dueDate === o.dueDate) {
+      last.netAmount = round2(last.netAmount + o.netAmount);
+      last.remaining = round2(last.remaining + o.remaining);
+    } else {
+      merged.push({ dueDate: o.dueDate, netAmount: o.netAmount, remaining: o.remaining });
+    }
   }
-  return merged;
+  return merged.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
 }
 
 export interface DpdAsOf {
@@ -118,11 +109,6 @@ export interface DpdAsOf {
   /** Unpaid remainder of the obligations past due, in rupees — the grid's Balance row. */
   amountOverdue: number;
   oldestOverdueDueDate: string | null;
-}
-
-/** An obligation after the pooled receipts have been appropriated to it. */
-interface AppropriatedObligation extends DpdObligation {
-  remaining: number;
 }
 
 /**
@@ -134,38 +120,21 @@ const DPD_EPSILON = 1e-6;
 /**
  * The loan's DPD as at `asOf`, from the entries dated on or before it.
  *
- * Every Receipt received by `asOf` goes into one pool that is applied to the
- * obligations oldest-first. A borrower who has remitted at least as much as
- * every month's net interest posted so far is current, whichever months the
- * individual receipts were labelled for. Disbursements (Payments) create no
- * obligation: in an interest-serviced loan the principal is not due until
- * maturity.
+ * Each Receipt received by `asOf` clears the interest posted before it,
+ * oldest month first, whichever months it was labelled for; any surplus goes
+ * to principal and is not held back for interest posted later. Disbursements
+ * (Payments) create no obligation: in an interest-serviced loan the
+ * principal is not due until maturity.
  *
  * Only obligations due before `asOf` are overdue. One falling due on `asOf`
  * itself has had no day in which to be paid, so it adds to neither the DPD
- * nor the Balance, though it still takes its turn at the pool.
+ * nor the Balance.
  *
  * The proportional sum is rounded up to a whole day, so any overdue amount
  * left unpaid, however small, reads as at least 1 day past due.
  */
 export function computeDpdAsOf(entries: LedgerEntryRow[], asOf: string): DpdAsOf {
-  let pool = 0;
-  for (const e of entries) {
-    if (e.vchType === "RECEIPT" && e.entryDate <= asOf) pool = round2(pool + Number(e.credit ?? 0));
-  }
-
-  const appropriated: AppropriatedObligation[] = [];
-  for (const obligation of toObligations(entries)) {
-    if (obligation.dueDate > asOf) break;
-
-    const applied = Math.min(pool, obligation.netAmount);
-    pool = round2(pool - applied);
-
-    // Round before comparing: money accumulated in floating point can land on
-    // 124.60999999999 and leave a genuinely settled month "unpaid".
-    const remaining = round2(obligation.netAmount - applied);
-    appropriated.push({ ...obligation, remaining });
-  }
+  const appropriated = toObligations(entries.filter((e) => e.entryDate <= asOf));
 
   let oldestOverdueDueDate: string | null = null;
   let amountOverdue = 0;

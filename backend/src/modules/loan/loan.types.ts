@@ -7,6 +7,7 @@ import type {
     listLoansQuerySchema,
 } from "./loan.validators";
 import type { LoanOverdueMetrics } from "./loan.metrics";
+import type { BalanceBifurcation } from "../ledger/ledger.types";
 
 /** Row as stored/returned by the database. */
 export type Loan = typeof loans.$inferSelect;
@@ -26,4 +27,5 @@ export type ListLoansQuery = z.infer<typeof listLoansQuerySchema>;
 export type LoanWithBorrower = Loan & { borrowerName: string | null };
 
 /** Loan row further enriched with derived overdue/DPD/classification fields. */
-export type LoanWithMetrics = LoanWithBorrower & LoanOverdueMetrics;
+export type LoanWithMetrics = LoanWithBorrower &
+    LoanOverdueMetrics & { balanceBifurcation: BalanceBifurcation | null };

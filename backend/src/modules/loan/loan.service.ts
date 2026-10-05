@@ -17,6 +17,7 @@ import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators
 import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
 import { syncRepaymentSchedule } from "../repayment/repayment.service";
+import { getClosingBifurcations } from "../ledger/ledger.service";
 import {
     createInterestConfigRevision,
     createInterestRule,
@@ -337,19 +338,23 @@ export const createLoan = async (
  * Attach derived overdue/DPD/classification/next-due-date fields to each
  * loan, and overwrite `outstandingPrincipal` with the computed value (see
  * `loan.metrics.ts` — the stored column isn't kept in sync with payments).
+ * `balanceBifurcation` is the loan's current ledger balance split into
+ * principal and each month's unpaid interest — null while the ledger is empty.
  */
 const enrichWithMetrics = async (
     loans: LoanWithBorrower[],
 ): Promise<LoanWithMetrics[]> => {
     const loanIds = loans.map((l) => l.id);
-    const [metrics, outstanding] = await Promise.all([
+    const [metrics, outstanding, bifurcations] = await Promise.all([
         getOverdueMetrics(loanIds),
         getOutstandingPrincipal(loanIds),
+        getClosingBifurcations(loanIds),
     ]);
     return loans.map((loan) => ({
         ...loan,
         ...(metrics.get(loan.id) ?? EMPTY_METRICS),
         outstandingPrincipal: (outstanding.get(loan.id) ?? 0).toFixed(2),
+        balanceBifurcation: bifurcations.get(loan.id) ?? null,
     }));
 };
 

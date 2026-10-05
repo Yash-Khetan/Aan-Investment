@@ -68,8 +68,8 @@ export function LedgerTable({
   const headers = ["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit", "Balance"];
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
+    <div className="overflow-x-auto rounded-lg border border-slate-300">
+      <table className="min-w-full divide-y divide-slate-300 text-sm">
         <thead className="bg-slate-50">
           <tr>
             {headers.map((h) => (
@@ -83,7 +83,7 @@ export function LedgerTable({
             {editable && <th className="px-3 py-2.5" />}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
+        <tbody className="divide-y divide-slate-300 bg-white">
           {rows.map((row) => {
             const isEditing = editingId === row.id;
             return (
