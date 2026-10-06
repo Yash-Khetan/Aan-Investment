@@ -3,6 +3,7 @@ import { SelectField } from "../../../components/ui/Field";
 import { BORROWER_TYPES, BORROWER_TYPE_LABELS, clearFieldsForOtherType } from "../types";
 import type { BorrowerFormState, BorrowerType } from "../types";
 import { CommercialBorrowerFields } from "./CommercialBorrowerFields";
+import type { BorrowerFormSection } from "./ConsumerBorrowerFields";
 import { ConsumerBorrowerFields } from "./ConsumerBorrowerFields";
 import { SectionTitle } from "./borrowerFormShared";
 
@@ -28,10 +29,13 @@ export function BorrowerMasterFields({
   form,
   onChange,
   showStatus,
+  section,
 }: {
   form: BorrowerFormState;
   onChange: (patch: Partial<BorrowerFormState>) => void;
   showStatus?: boolean;
+  /** Render only this part (one step of a stepped form). The borrower type picker belongs to "basic". */
+  section?: BorrowerFormSection;
 }) {
   /**
    * Switching type drops whatever the other sheet had filled in, so a half-typed
@@ -48,8 +52,9 @@ export function BorrowerMasterFields({
 
   return (
     <>
+      {(!section || section === "basic") && (
       <Card className="p-4">
-        <SectionTitle>Borrower Type</SectionTitle>
+        {!section && <SectionTitle>Borrower Type</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <SelectField
             label="Borrower Type"
@@ -65,14 +70,15 @@ export function BorrowerMasterFields({
           </SelectField>
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Determines which CIBIL field set is captured below. Changing it clears the fields that do not apply.
+          Decides which CIBIL fields are asked for. Changing it clears the fields that no longer apply.
         </p>
       </Card>
+      )}
 
       {form.borrowerType === "CONSUMER" ? (
-        <ConsumerBorrowerFields form={form} onChange={onChange} showStatus={showStatus} />
+        <ConsumerBorrowerFields form={form} onChange={onChange} showStatus={showStatus} section={section} />
       ) : (
-        <CommercialBorrowerFields form={form} onChange={onChange} showStatus={showStatus} />
+        <CommercialBorrowerFields form={form} onChange={onChange} showStatus={showStatus} section={section} />
       )}
     </>
   );

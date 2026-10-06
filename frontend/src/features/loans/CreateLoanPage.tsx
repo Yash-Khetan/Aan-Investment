@@ -1,57 +1,30 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
 import { Button } from "../../components/ui/Button";
 import { FormErrors } from "../../components/ui/FormErrors";
-import { LoanMasterFields } from "./components/LoanMasterFields";
+import { StepForm } from "../../components/ui/StepForm";
+import { SuccessState } from "../../components/ui/States";
 import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { createLoan } from "./api";
+import { loanFormSteps } from "./components/loanFormSteps";
 import { EMPTY_LOAN_FORM, formStateToCreateInput } from "./types";
 import type { Loan, LoanFormState } from "./types";
 
 const DRAFT_KEY = "loan:create";
 
 /**
- * Two-step loan creation. The loan and its interest configuration are saved
- * together in step one; guarantor records key off the new loan's id, so they
- * follow in step two. Money is never entered here — disbursements and
- * receipts go on the loan's Ledger.
+ * A new loan, filled in step by step. Saving creates the loan and its
+ * interest configuration together; guarantors can then be added against it.
+ * Money is never entered here — disbursements and receipts go on the loan's
+ * Ledger tab.
  */
-const STEPS = ["Loan Details", "Guarantors"] as const;
-
-function StepIndicator({ current }: { current: number }) {
-  return (
-    <div className="mb-6 flex items-center gap-3">
-      {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-3">
-          {i > 0 && <div className="h-px w-10 bg-slate-300" />}
-          <div className="flex items-center gap-2">
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                i === current
-                  ? "bg-slate-900 text-white"
-                  : i < current
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-200 text-slate-500"
-              }`}
-            >
-              {i < current ? "✓" : i + 1}
-            </span>
-            <span className={`text-sm font-medium ${i === current ? "text-slate-900" : "text-slate-500"}`}>
-              {label}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function CreateLoanPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { status } = useAuth();
   // Draft laid over the defaults, so one saved before a field existed still
   // yields a complete form rather than undefined values.
@@ -68,6 +41,9 @@ export function CreateLoanPage() {
     onSuccess: (loan) => {
       clearDraft(DRAFT_KEY);
       setCreatedLoan(loan);
+      queryClient.invalidateQueries({ queryKey: ["loans"] });
+      queryClient.invalidateQueries({ queryKey: ["lookup"] });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
   });
 
@@ -75,52 +51,40 @@ export function CreateLoanPage() {
     setForm((f) => ({ ...f, ...p }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    mutation.mutate(formStateToCreateInput(form));
+  if (createdLoan) {
+    return (
+      <div>
+        <PageHeader
+          title={`Loan ${createdLoan.loanAccountNumber} created`}
+          description="Add any guarantors now, or open the loan to record its first disbursement."
+        />
+        <div className="flex flex-col gap-6">
+          <SuccessState message={`${createdLoan.loanAccountNumber} for ${createdLoan.borrowerName ?? "the borrower"} is saved.`} />
+          <GuarantorsSection loanId={createdLoan.id} />
+          <div className="flex gap-2">
+            <Button type="button" onClick={() => navigate(`/loans/${createdLoan.id}?tab=ledger`)}>
+              Open the loan's ledger
+            </Button>
+            <Link to={`/loans/${createdLoan.id}`}>
+              <Button variant="secondary">Open the loan</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div>
-      <PageHeader
-        title="New Loan"
-        description={
-          createdLoan
-            ? `Loan ${createdLoan.loanAccountNumber} created — add any guarantors, then record its disbursements on the Ledger.`
-            : "Loan master — sanction terms, tenure, and key dates."
-        }
+      <PageHeader back={{ to: "/loans", label: "All loans" }} title="New loan" />
+      <StepForm
+        steps={loanFormSteps(form, patch)}
+        onSubmit={() => mutation.mutate(formStateToCreateInput(form))}
+        submitLabel="Create loan"
+        isSubmitting={mutation.isPending}
+        onCancel={() => navigate("/loans")}
+        footer={mutation.isError && <FormErrors error={mutation.error} />}
       />
-
-      <StepIndicator current={createdLoan ? 1 : 0} />
-
-      {!createdLoan && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <LoanMasterFields form={form} onChange={patch} />
-
-          {mutation.isError && <FormErrors error={mutation.error} />}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : "Create Loan"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate("/loans")}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {createdLoan && (
-        <div className="flex flex-col gap-6">
-          <GuarantorsSection loanId={createdLoan.id} />
-
-          <div className="flex gap-2">
-            <Button type="button" onClick={() => navigate(`/loans/${createdLoan.id}`)}>
-              Done
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

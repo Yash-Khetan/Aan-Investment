@@ -6,7 +6,9 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextField } from "../../components/ui/Field";
 import { FormErrors } from "../../components/ui/FormErrors";
-import { BorrowerMasterFields, PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
+import { StepForm } from "../../components/ui/StepForm";
+import { PHONE_PATTERN, PHONE_TITLE } from "./components/BorrowerMasterFields";
+import { borrowerFormSteps } from "./components/borrowerFormSteps";
 import { ChooseOption } from "./components/borrowerFormShared";
 import { createBorrower, getBorrower } from "./api";
 import { uploadIdentityDocument, type IdentityDocumentKind } from "./identityDocumentApi";
@@ -35,10 +37,6 @@ const DRAFT_KEY = "borrower:create";
 interface BorrowerDraft {
   form: BorrowerFormState;
   promoters: Promoter[];
-}
-
-function SectionTitle({ children }: { children: string }) {
-  return <h2 className="mb-3 text-sm font-semibold text-slate-500">{children}</h2>;
 }
 
 export function CreateBorrowerPage() {
@@ -127,10 +125,8 @@ export function CreateBorrowerPage() {
     setPromoters((rows) => rows.map((r, i) => (i === index ? { ...r, ...patchVal } : r)));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    // The borrower was already created and only the uploads failed. Submitting
+  function handleSubmit() {
+    // The borrower was already created and only the uploads failed. Saving
     // now means "I'm done retrying" - never "create another borrower".
     if (createdBorrowerId) {
       clearDraft(DRAFT_KEY);
@@ -141,30 +137,14 @@ export function CreateBorrowerPage() {
     mutation.mutate(formStateToCreateInput(form, promoters));
   }
 
-  return (
-    <div>
-      <PageHeader title="New Borrower" description="Borrower master — identity, address, and internal details." />
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <BorrowerDocumentsProvider
-          borrowerId={createdBorrowerId ?? undefined}
-          borrower={createdBorrower}
-          pendingFiles={pendingFiles}
-          setPendingFile={setPendingFile}
-        >
-          <BorrowerMasterFields form={form} onChange={patch} />
-        </BorrowerDocumentsProvider>
-
-        {/* "Related Person" is a Commercial-sheet block — consumers have none. */}
-        {form.borrowerType === "COMMERCIAL" && (
-          <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <SectionTitle>Related Persons</SectionTitle>
-              <Button type="button" variant="secondary" onClick={() => setPromoters((rows) => [...rows, { ...emptyPromoter }])}>
-                + Add Related Person
-              </Button>
-            </div>
-            {promoters.length === 0 && <p className="text-sm text-slate-400">No related persons added.</p>}
+  const relatedPersons = (
+    <Card className="p-4">
+      <div className="mb-3 flex justify-end">
+        <Button type="button" variant="secondary" onClick={() => setPromoters((rows) => [...rows, { ...emptyPromoter }])}>
+          Add related person
+        </Button>
+      </div>
+      {promoters.length === 0 && <p className="text-sm text-slate-400">No related persons added.</p>}
             <div className="flex flex-col gap-3">
               {promoters.map((p, i) => (
                 <div key={i} className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -238,30 +218,41 @@ export function CreateBorrowerPage() {
                 </div>
               ))}
             </div>
-          </Card>
-        )}
+    </Card>
+  );
 
-        {mutation.isError && <FormErrors error={mutation.error} />}
+  return (
+    <div>
+      <PageHeader back={{ to: "/borrowers", label: "All borrowers" }} title="New borrower" />
 
-        {failedUploads.length > 0 && (
-          <Card className="border-amber-300 bg-amber-50 p-4">
-            <p className="text-sm text-amber-800">
-              Borrower created, but {failedUploads.join(" and ")} failed to upload. Pick{" "}
-              {failedUploads.length > 1 ? "those files" : "that file"} again above to retry &mdash; it uploads straight
-              away now &mdash; then press Done.
-            </p>
-          </Card>
-        )}
-
-        <div className="flex gap-2">
-          <Button type="submit" disabled={mutation.isPending}>
-            {createdBorrowerId ? "Done" : mutation.isPending ? "Saving..." : "Create Borrower"}
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate("/borrowers")}>
-            Cancel
-          </Button>
-        </div>
-      </form>
+      <BorrowerDocumentsProvider
+        borrowerId={createdBorrowerId ?? undefined}
+        borrower={createdBorrower}
+        pendingFiles={pendingFiles}
+        setPendingFile={setPendingFile}
+      >
+        <StepForm
+          steps={borrowerFormSteps(form, patch, { relatedPersons })}
+          onSubmit={handleSubmit}
+          submitLabel={createdBorrowerId ? "Done" : "Create borrower"}
+          isSubmitting={mutation.isPending}
+          onCancel={() => navigate("/borrowers")}
+          footer={
+            <>
+              {mutation.isError && <FormErrors error={mutation.error} />}
+              {failedUploads.length > 0 && (
+                <Card className="border-amber-300 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-800">
+                    The borrower is saved, but the {failedUploads.join(" and ")} scan did not upload. Open the Identity
+                    step and pick {failedUploads.length > 1 ? "those files" : "that file"} again - it uploads straight
+                    away now - then press Done.
+                  </p>
+                </Card>
+              )}
+            </>
+          }
+        />
+      </BorrowerDocumentsProvider>
     </div>
   );
 }

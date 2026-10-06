@@ -52,25 +52,32 @@ function CodedSelect({
   );
 }
 
+export type LoanFormSection = "basic" | "interest" | "dates" | "cibil" | "notes";
+
 /** Loan master-data fields shared by the create and edit pages. */
 export function LoanMasterFields({
   form,
   onChange,
   lockedBorrowerLabel,
+  section,
 }: {
   form: LoanFormState;
   onChange: (patch: Partial<LoanFormState>) => void;
   /** On edit, the borrower a loan belongs to isn't changeable — pass a display label to show it read-only instead of the picker. */
   lockedBorrowerLabel?: string;
+  /** Render only this part of the form (one step of a stepped form). Omitted: every part. */
+  section?: LoanFormSection;
 }) {
+  const show = (part: LoanFormSection) => !section || section === part;
   const tenure = formatTenure(form.sanctionDate, form.maturityDate);
   /** Drives both the disabled state and the required flag on Value of Collateral. */
   const noCollateral = form.collateralType === "NO_COLLATERAL";
 
   return (
     <>
+      {show("basic") && (
       <Card className="p-4">
-        <SectionTitle>Basic Details</SectionTitle>
+        {!section && <SectionTitle>Basic Details</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Loan Account Number"
@@ -152,9 +159,11 @@ export function LoanMasterFields({
           {/* intentionally removed since the default loan status has to active and the user should not be able to create it in the first place  */}
         </div>
       </Card>
+      )}
 
+      {show("interest") && (
       <Card className="p-4">
-        <SectionTitle>Amounts &amp; Interest</SectionTitle>
+        {!section && <SectionTitle>Amounts &amp; Interest</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Sanctioned Amount (INR)"
@@ -230,9 +239,11 @@ export function LoanMasterFields({
           configuration they were calculated under. Disbursements and receipts are entered on the Ledger, not here.
         </p>
       </Card>
+      )}
 
+      {show("dates") && (
       <Card className="p-4">
-        <SectionTitle>Key Dates</SectionTitle>
+        {!section && <SectionTitle>Key Dates</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Sanction Date"
@@ -256,9 +267,11 @@ export function LoanMasterFields({
           </div>
         </div>
       </Card>
+      )}
 
+      {show("cibil") && (
       <Card className="p-4">
-        <SectionTitle>CIBIL Reporting</SectionTitle>
+        {!section && <SectionTitle>CIBIL Reporting</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <CodedSelect
             label="Credit Type / Account Type"
@@ -308,15 +321,18 @@ export function LoanMasterFields({
           Reported to CIBIL. Separate from Loan Type, Status and Repayment Type above, which drive the app's own workflow.
         </p>
       </Card>
+      )}
 
+      {show("notes") && (
       <Card className="p-4">
-        <SectionTitle>Purpose &amp; Notes</SectionTitle>
+        {!section && <SectionTitle>Purpose &amp; Notes</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           <TextAreaField label="Purpose" value={form.purpose} onChange={(e) => onChange({ purpose: e.target.value })} />
           <TextAreaField label="Approval Notes" value={form.approvalNotes} onChange={(e) => onChange({ approvalNotes: e.target.value })} />
           <TextAreaField label="Remarks" value={form.remarks} onChange={(e) => onChange({ remarks: e.target.value })} />
         </div>
       </Card>
+      )}
     </>
   );
 }

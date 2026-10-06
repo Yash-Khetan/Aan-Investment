@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
-import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
-import { LoanMasterFields } from "./components/LoanMasterFields";
-import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
-import { KpiLedgerSection } from "../get-kpi/components/KpiLedgerSection";
+import { StepForm } from "../../components/ui/StepForm";
+import { loanFormSteps } from "./components/loanFormSteps";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { getLoan, updateLoan } from "./api";
@@ -64,43 +62,27 @@ export function EditLoanPage() {
     setForm((f) => ({ ...f, ...p }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    mutation.mutate();
-  }
-
   return (
     <div>
-      <PageHeader title="Edit Loan" description="Update loan master data." />
+      <PageHeader
+        back={id ? { to: `/loans/${id}`, label: data ? `Back to ${data.loanAccountNumber}` : "Back to loan" } : undefined}
+        title={data ? `Edit ${data.loanAccountNumber}` : "Edit loan"}
+        description="Open any step to change it, then save."
+      />
 
       {isLoading && <LoadingState label="Loading loan..." />}
-      {isError && <ErrorState message={error instanceof Error ? error.message : "Failed to load loan."} />}
+      {isError && <ErrorState message={error instanceof Error ? error.message : "Could not load the loan."} />}
 
       {data && loaded && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <LoanMasterFields form={form} onChange={patch} lockedBorrowerLabel={data.borrowerName ?? data.borrowerId} />
-
-          {mutation.isError && <FormErrors error={mutation.error} />}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate(`/loans/${id}`)}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {data && loaded && (
-        <div className="mt-6 flex flex-col gap-6">
-          <GuarantorsSection loanId={data.id} />
-          <KpiLedgerSection
-            loanId={data.id}
-            loanLabel={`${data.loanAccountNumber} — ${data.borrowerName ?? data.borrowerId}`}
-          />
-        </div>
+        <StepForm
+          steps={loanFormSteps(form, patch, data.borrowerName ?? data.borrowerId)}
+          onSubmit={() => mutation.mutate()}
+          submitLabel="Save changes"
+          isSubmitting={mutation.isPending}
+          onCancel={() => navigate(`/loans/${id}`)}
+          freeNavigation
+          footer={mutation.isError && <FormErrors error={mutation.error} />}
+        />
       )}
     </div>
   );

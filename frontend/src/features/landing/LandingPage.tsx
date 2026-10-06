@@ -14,7 +14,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-white">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
         <div>
-          <div className="text-xs font-semiboldst text-slate-400">Aan Finance &amp; Investment Pvt. Ltd.</div>
+          <div className="text-xs font-semibold text-slate-400">Aan Finance &amp; Investment Pvt. Ltd.</div>
           <div className="text-lg font-semibold text-slate-900">Aan Investment LMS</div>
         </div>
         {/* <Link

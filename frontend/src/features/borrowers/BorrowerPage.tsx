@@ -161,7 +161,7 @@ export function BorrowerPage() {
           )}
         </>
       )}
-      {tab === "profile" && <BorrowerDetailView borrowerId={borrowerId} showDocuments={false} />}
+      {tab === "profile" && <BorrowerDetailView borrowerId={borrowerId} />}
       {tab === "documents" && <BorrowerDocuments borrowerId={borrowerId} />}
     </div>
   );

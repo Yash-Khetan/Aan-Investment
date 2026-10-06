@@ -39,6 +39,7 @@ export function ReportsPage() {
   const tableColumns: Column<ReportRow>[] = columns.map((col) => ({
     key: col.key,
     header: col.header,
+    align: col.type === "currency" || col.type === "number" ? "right" : "left",
     render: (row) => renderCell(row, col.key, col.type),
   }));
 
@@ -56,7 +57,7 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="Reports" description="Read-only MIS reports. View as JSON, or export to CSV / Excel." />
+      <PageHeader title="Reports" description="Pick a report and filters, then export it to CSV or Excel if you need a copy." />
 
       <Card className="mb-6 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -77,7 +78,7 @@ export function ReportsPage() {
             value={filters.loanStatus ?? ""}
             onChange={(e) => setFilters((f) => ({ ...f, loanStatus: e.target.value || undefined }))}
           >
-            <option value="">Any</option>
+            <option value="">Any status</option>
             {LOAN_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
