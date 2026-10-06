@@ -25,7 +25,20 @@ export interface PortfolioSummary {
     /** Loans with DPD above zero. */
     loansOverdue: number;
   };
+  /** Loans with interest already past due, most days past due first. */
+  needsAttention: NeedsAttentionLoan[];
   byClassification: PortfolioByClassification[];
+}
+
+export interface NeedsAttentionLoan {
+  loanId: string;
+  loanAccountNumber: string;
+  borrowerName: string;
+  amountOverdue: number;
+  dpd: number;
+  classification: DpdClassification;
+  oldestOverdueDueDate: string | null;
+  totalPayable: number;
 }
 
 export interface PortfolioReturns {

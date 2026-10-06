@@ -28,7 +28,7 @@ const CLASSIFICATION_CLASS: Record<DpdClassification, string> = {
 };
 
 const headerCell =
-  "border border-slate-300 bg-amber-50 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-700";
+  "border border-slate-300 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-slate-700";
 
 const labelCell = "border border-slate-300 px-3 py-2 text-center text-sm text-slate-700";
 
@@ -139,5 +139,5 @@ export function DpdHistoryTable({
 }
 
 function SectionHeading() {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">DPD History</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-slate-500">DPD History</h2>;
 }

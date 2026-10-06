@@ -1,123 +1,141 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Table, type Column } from "../../components/ui/Table";
-import { TextField } from "../../components/ui/Field";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
-import { SlideOver } from "../../components/ui/SlideOver";
-import { formatCurrency, formatDate } from "../../lib/format";
-import { deleteLoan, listLoans } from "./api";
-import { LoanDetailView } from "./components/LoanDetailView";
-import { BalanceBifurcationCell } from "../ledger/components/BalanceBifurcation";
+import { formatCurrency } from "../../lib/format";
+import { FIGURE } from "../../lib/glossary";
+import { listLoans } from "./api";
 import type { Loan } from "./types";
 
-/** Traffic-light DPD text color, keyed by the loan's classification bucket. */
-const DPD_COLOR: Record<string, string> = {
-  STD: "text-emerald-700",
-  "SMA-0": "text-amber-700",
-  "SMA-1": "text-amber-700",
-  "SMA-2": "text-amber-700",
-  NPA: "text-red-700 font-semibold",
-};
+/** Enough to show the whole book on one page; the totals row adds up exactly what is listed. */
+const PAGE_SIZE = 100;
 
+const sum = (rows: Loan[], pick: (l: Loan) => number) => rows.reduce((acc, l) => acc + pick(l), 0);
+
+/**
+ * Every loan with the figures people look up most, one row each, totals at
+ * the bottom. Click a row to open the loan.
+ */
 export function LoansPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [viewingId, setViewingId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["loans", search],
-    queryFn: () => listLoans({ search: search || undefined }),
+    queryKey: ["loans", { search, limit: PAGE_SIZE }],
+    queryFn: () => listLoans({ search: search || undefined, limit: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteLoan,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["loans"] }),
-  });
-
-  function handleDelete(l: Loan) {
-    if (window.confirm(`Delete loan "${l.loanAccountNumber}"? This cannot be undone from the UI.`)) {
-      deleteMutation.mutate(l.id);
-    }
-  }
+  const rows = data?.data ?? [];
 
   const columns: Column<Loan>[] = [
-    { key: "borrowerName", header: "Borrower", render: (l) => l.borrowerName ?? "—" },
-    { key: "loanAccountNumber", header: "Loan A/C No.", render: (l) => l.loanAccountNumber },
-    { key: "loanType", header: "Type", render: (l) => l.loanType },
-    { key: "repaymentType", header: "Repayment", render: (l) => l.repaymentType.replace(/_/g, " ") },
-    { key: "sanctionedAmount", header: "Sanctioned", render: (l) => formatCurrency(l.sanctionedAmount) },
-    { key: "principalOutstanding", header: "Outstanding", render: (l) => formatCurrency(l.snapshot.principalOutstanding) },
-    { key: "amountOverdue", header: "Amount Overdue", render: (l) => formatCurrency(l.amountOverdue) },
-    { key: "dpd", header: "DPD", render: (l) => <span className={DPD_COLOR[l.classification] ?? "text-slate-700"}>{l.dpd}</span> },
-    { key: "classification", header: "Classification", render: (l) => <Badge status={l.classification} /> },
-    { key: "nextDueDate", header: "Next Due Date", render: (l) => formatDate(l.nextDueDate) },
-    { key: "interestRate", header: "Rate", render: (l) => `${Number(l.interestRate).toFixed(2)}%` },
-    { key: "status", header: "Status", render: (l) => <Badge status={l.status} /> },
-    { key: "maturityDate", header: "Maturity", render: (l) => formatDate(l.maturityDate) },
     {
-      key: "actions",
-      header: "",
+      key: "loan",
+      header: "Loan",
       render: (l) => (
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setViewingId(l.id)}>
-            View
-          </Button>
-          <Link to={`/loans/${l.id}/edit`}>
-            <Button variant="secondary">Edit</Button>
-          </Link>
-          <Button variant="danger" onClick={() => handleDelete(l)} disabled={deleteMutation.isPending}>
-            Delete
-          </Button>
+        <div>
+          <div className="font-semibold text-slate-900">{l.loanAccountNumber}</div>
+          <div className="text-xs text-slate-500">{l.borrowerName ?? "—"}</div>
         </div>
       ),
-      className: "text-right",
     },
     {
-      // Last, as on the Ledger: the loan's current ledger balance split into
-      // principal and each month whose interest is still unpaid.
-      key: "balanceBifurcation",
-      header: "Balance Bifurcation",
-      render: (l) => <BalanceBifurcationCell bifurcation={l.balanceBifurcation} />,
-      className: "border-l border-slate-300 p-0!",
+      key: "principal",
+      header: FIGURE.principalOutstanding,
+      align: "right",
+      render: (l) => formatCurrency(l.snapshot.principalOutstanding),
+      total: formatCurrency(sum(rows, (l) => l.snapshot.principalOutstanding)),
     },
+    {
+      key: "interest",
+      header: FIGURE.interestDue,
+      align: "right",
+      render: (l) => formatCurrency(l.snapshot.interestOutstanding),
+      total: formatCurrency(sum(rows, (l) => l.snapshot.interestOutstanding)),
+    },
+    {
+      key: "payable",
+      header: FIGURE.totalPayable,
+      align: "right",
+      render: (l) => <span className="font-semibold">{formatCurrency(l.snapshot.totalPayable)}</span>,
+      total: formatCurrency(sum(rows, (l) => l.snapshot.totalPayable)),
+    },
+    {
+      key: "overdue",
+      header: FIGURE.overdue,
+      align: "right",
+      render: (l) =>
+        l.amountOverdue > 0 ? (
+          <span className="font-semibold text-dr">{formatCurrency(l.amountOverdue)}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
+      total: formatCurrency(sum(rows, (l) => l.amountOverdue)),
+    },
+    {
+      key: "dpd",
+      header: FIGURE.dpd,
+      align: "right",
+      render: (l) => (l.dpd > 0 ? <span className="font-semibold text-dr">{l.dpd}</span> : <span className="text-slate-400">0</span>),
+    },
+    { key: "classification", header: FIGURE.classification, render: (l) => <Badge status={l.classification} /> },
+    {
+      key: "rate",
+      header: "Rate",
+      align: "right",
+      render: (l) => `${Number(l.interestRate).toFixed(2)}%`,
+    },
+    { key: "status", header: "Status", render: (l) => <Badge status={l.status} /> },
   ];
+
+  const shown = rows.length;
+  const total = data?.meta.total ?? 0;
 
   return (
     <div>
-      <PageHeader title="Loans" description="Loan master data — sanction, disbursement, and lifecycle status." />
+      <PageHeader
+        title="Loans"
+        description={data ? `${total} loan${total === 1 ? "" : "s"}${shown < total ? `, first ${shown} shown` : ""}` : undefined}
+        actions={
+          <Link to="/loans/new">
+            <Button>New loan</Button>
+          </Link>
+        }
+      />
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:w-80">
-          <TextField
-            label="Search"
-            placeholder="Loan account number…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Link to="/loans/new">
-          <Button>+ New Loan</Button>
-        </Link>
+      <div className="mb-4 w-full sm:w-96">
+        <label htmlFor="loan-search" className="sr-only">
+          Search loans
+        </label>
+        <input
+          id="loan-search"
+          type="search"
+          placeholder="Search by loan number or purpose"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none"
+        />
       </div>
 
       {isLoading && <LoadingState label="Loading loans..." />}
-      {isError && <ErrorState message={error instanceof Error ? error.message : "Failed to load loans."} />}
-      {deleteMutation.isError && (
-        <div className="mb-4">
-          <ErrorState message={deleteMutation.error instanceof Error ? deleteMutation.error.message : "Failed to delete loan."} />
-        </div>
+      {isError && <ErrorState message={error instanceof Error ? error.message : "Could not load loans."} />}
+      {data && rows.length === 0 && (
+        <EmptyState message={search ? "No loan matches that search." : "No loans yet. Create the first one with New loan."} />
       )}
-      {data && data.data.length === 0 && <EmptyState message="No loans yet — create the first one." />}
 
-      {data && data.data.length > 0 && <Table columns={columns} rows={data.data} rowKey={(l) => l.id} />}
-
-      <SlideOver open={!!viewingId} title="Loan Details" onClose={() => setViewingId(null)}>
-        {viewingId && <LoanDetailView loanId={viewingId} />}
-      </SlideOver>
+      {rows.length > 0 && (
+        <Table
+          columns={columns}
+          rows={rows}
+          rowKey={(l) => l.id}
+          onRowClick={(l) => navigate(`/loans/${l.id}`)}
+          totalLabel={shown === 1 ? "Total" : `Total of ${shown}`}
+        />
+      )}
     </div>
   );
 }

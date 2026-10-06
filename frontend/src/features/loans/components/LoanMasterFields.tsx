@@ -23,7 +23,7 @@ const EFFECTIVE_FROM_TOOLTIP =
   "The date this interest configuration takes effect. Periods already calculated under an earlier configuration keep it — set a later date here to change the rates from that point on without disturbing what came before.";
 
 function SectionTitle({ children }: { children: string }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-slate-500">{children}</h2>;
 }
 
 /** A coded CIBIL dropdown, blank until the user picks a value. */

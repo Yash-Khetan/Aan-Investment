@@ -2,7 +2,7 @@ import type { PropsWithChildren } from "react";
 
 export function Card({ children, className = "" }: PropsWithChildren<{ className?: string }>) {
   return (
-    <div className={`rounded-lg border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div className={`rounded-lg border border-slate-200 bg-white ${className}`}>
       {children}
     </div>
   );

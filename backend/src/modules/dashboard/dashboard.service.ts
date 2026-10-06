@@ -25,11 +25,34 @@ const CLASSIFICATIONS: LoanClassification[] = ["STD", "SMA-0", "SMA-1", "SMA-2",
  */
 export async function getPortfolioSummary() {
     const loanRows = await db
-        .select({ id: loans.id, sanctionedAmount: loans.sanctionedAmount })
+        .select({
+            id: loans.id,
+            sanctionedAmount: loans.sanctionedAmount,
+            loanAccountNumber: loans.loanAccountNumber,
+            borrowerName: borrowers.name,
+        })
         .from(loans)
+        .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
         .where(isNull(loans.deletedAt));
 
     const snapshots = await getLoanSnapshots(loanRows.map((l) => l.id));
+
+    // Every loan with money already past due, worst first: most days past
+    // due, then the largest amount.
+    const needsAttention = loanRows
+        .map((loan) => ({ loan, s: snapshots.get(loan.id)! }))
+        .filter(({ s }) => s.amountOverdue > 0)
+        .sort((a, b) => b.s.dpd - a.s.dpd || b.s.amountOverdue - a.s.amountOverdue)
+        .map(({ loan, s }) => ({
+            loanId: loan.id,
+            loanAccountNumber: loan.loanAccountNumber,
+            borrowerName: loan.borrowerName,
+            amountOverdue: s.amountOverdue,
+            dpd: s.dpd,
+            classification: s.classification,
+            oldestOverdueDueDate: s.oldestOverdueDueDate,
+            totalPayable: s.totalPayable,
+        }));
 
     const byClassification = new Map(
         CLASSIFICATIONS.map((c) => [
@@ -78,6 +101,7 @@ export async function getPortfolioSummary() {
             totalPayable: round2(totals.totalPayable),
             totalOverdue: round2(totals.totalOverdue),
         },
+        needsAttention,
         byClassification: [...byClassification.values()].map((b) => ({
             ...b,
             principalOutstanding: round2(b.principalOutstanding),

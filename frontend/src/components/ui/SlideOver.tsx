@@ -44,7 +44,7 @@ export function SlideOver({
 export function DetailField({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-xs font-medium text-slate-400">{label}</div>
       <div className="mt-0.5 text-sm text-slate-800">{value ?? "—"}</div>
     </div>
   );
@@ -54,7 +54,7 @@ export function DetailField({ label, value }: { label: string; value: ReactNode 
 export function DetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="mb-6">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+      <h3 className="mb-3 text-sm font-semibold text-slate-500">{title}</h3>
       <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
     </div>
   );

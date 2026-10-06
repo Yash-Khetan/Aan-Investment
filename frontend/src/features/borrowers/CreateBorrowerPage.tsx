@@ -38,7 +38,7 @@ interface BorrowerDraft {
 }
 
 function SectionTitle({ children }: { children: string }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-slate-500">{children}</h2>;
 }
 
 export function CreateBorrowerPage() {
@@ -115,7 +115,7 @@ export function CreateBorrowerPage() {
       }
 
       clearDraft(DRAFT_KEY);
-      navigate(`/borrowers`, { state: { createdId: borrower.id } });
+      navigate(`/borrowers/${borrower.id}`);
     },
   });
 
@@ -134,7 +134,7 @@ export function CreateBorrowerPage() {
     // now means "I'm done retrying" - never "create another borrower".
     if (createdBorrowerId) {
       clearDraft(DRAFT_KEY);
-      navigate(`/borrowers`, { state: { createdId: createdBorrowerId } });
+      navigate(`/borrowers/${createdBorrowerId}`);
       return;
     }
 

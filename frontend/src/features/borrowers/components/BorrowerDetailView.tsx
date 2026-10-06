@@ -23,8 +23,11 @@ function labelOf(options: CodedOption[], value: string | null): string | null {
   return options.find((o) => o.value === value)?.label ?? value;
 }
 
-/** Read-only borrower summary shown in the View slide-over — the borrower itself is locked once created. */
-export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
+/**
+ * Read-only borrower profile. `showDocuments` lists the borrower's documents
+ * underneath — off where the page shows documents on a tab of their own.
+ */
+export function BorrowerDetailView({ borrowerId, showDocuments = true }: { borrowerId: string; showDocuments?: boolean }) {
   const { data: borrower, isLoading, isError, error } = useQuery({
     queryKey: ["borrower", borrowerId],
     queryFn: () => getBorrower(borrowerId),
@@ -34,6 +37,7 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
   const { data: documentPage } = useQuery({
     queryKey: ["documents", "search", { borrowerId }],
     queryFn: () => searchDocuments({ borrowerId, limit: 100 }),
+    enabled: showDocuments,
   });
   const documents = documentPage?.rows;
 
@@ -124,7 +128,7 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
 
       {borrower.promoters.length > 0 && (
         <div className="mb-6">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Related Persons</h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-500">Related Persons</h3>
           <div className="flex flex-col gap-2">
             {borrower.promoters.map((p) => (
               <div key={p.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">
@@ -136,8 +140,9 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
         </div>
       )}
 
+      {showDocuments && (
       <div>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Documents</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-500">Documents</h3>
         {documents && documents.length === 0 && <EmptyState message="No documents uploaded yet." />}
         <div className="flex flex-col gap-2">
           {documents?.map((doc) => (
@@ -164,6 +169,7 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function LedgerTable({
             {headers.map((h) => (
               <th
                 key={h}
-                className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-slate-500"
               >
                 {h}
               </th>

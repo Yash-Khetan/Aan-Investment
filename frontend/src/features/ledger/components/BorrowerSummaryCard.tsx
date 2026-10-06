@@ -124,7 +124,7 @@ export function BorrowerSummaryCard({ borrowerId }: { borrowerId: string }) {
 
           {borrower.promoters.length > 0 && (
             <div>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Related Persons</h3>
+              <h3 className="mb-3 text-xs font-semibold text-slate-500">Related Persons</h3>
               <div className="flex flex-wrap gap-2">
                 {borrower.promoters.map((p) => (
                   <div key={p.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">

@@ -115,7 +115,7 @@ export function CreateLoanPage() {
           <GuarantorsSection loanId={createdLoan.id} />
 
           <div className="flex gap-2">
-            <Button type="button" onClick={() => navigate("/loans")}>
+            <Button type="button" onClick={() => navigate(`/loans/${createdLoan.id}`)}>
               Done
             </Button>
           </div>

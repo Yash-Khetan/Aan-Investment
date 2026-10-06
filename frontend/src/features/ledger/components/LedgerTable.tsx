@@ -52,7 +52,7 @@ function ReceiptAllocationDetails({ allocation }: { allocation: ReceiptAllocatio
   );
 }
 
-const HEADER_CELL = "whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500";
+const HEADER_CELL = "whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold text-slate-500";
 
 /**
  * The ledger as posted, then — separately — whatever is scheduled. Rows are

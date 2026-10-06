@@ -42,15 +42,15 @@ export function AddEntryForm({ loanId, onAdded }: { loanId: string; onAdded: () 
 
   return (
     <Card className="p-4">
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">Add Record</h2>
+      <h2 className="mb-3 text-base font-semibold text-slate-900">Record money in or out</h2>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
         <TextField label="Date" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required />
         <SelectField label="Type" value={vchType} onChange={(e) => setVchType(e.target.value as "PAYMENT" | "RECEIPT")}>
-          <option value="PAYMENT">Payment (paid to borrower)</option>
-          <option value="RECEIPT">Receipt (received from borrower)</option>
+          <option value="PAYMENT">Disbursement — paid to the borrower</option>
+          <option value="RECEIPT">Receipt — received from the borrower</option>
         </SelectField>
         <TextField
-          label="Amount (INR)"
+          label="Amount (₹)"
           type="number"
           min="0"
           step="0.01"
@@ -63,7 +63,7 @@ export function AddEntryForm({ loanId, onAdded }: { loanId: string; onAdded: () 
         </div>
         <div className="lg:col-span-5">
           <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Adding…" : "Add Record"}
+            {isSaving ? "Recording…" : "Record entry"}
           </Button>
         </div>
       </form>

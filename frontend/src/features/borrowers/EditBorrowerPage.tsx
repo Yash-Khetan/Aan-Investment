@@ -58,7 +58,7 @@ export function EditBorrowerPage() {
       clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["borrowers"] });
       queryClient.invalidateQueries({ queryKey: ["borrower", id] });
-      navigate("/borrowers");
+      navigate(`/borrowers/${id}`);
     },
   });
 
@@ -97,7 +97,7 @@ export function EditBorrowerPage() {
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate("/borrowers")}>
+            <Button type="button" variant="ghost" onClick={() => navigate(`/borrowers/${id}`)}>
               Cancel
             </Button>
           </div>
@@ -116,7 +116,7 @@ export function EditBorrowerPage() {
       {id && (
         <Card className="mt-6 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Documents</h2>
+            <h2 className="text-sm font-semibold text-slate-500">Documents</h2>
             <Button type="button" variant="secondary" onClick={() => setShowUploadForm((s) => !s)}>
               {showUploadForm ? "Cancel" : "+ Upload"}
             </Button>

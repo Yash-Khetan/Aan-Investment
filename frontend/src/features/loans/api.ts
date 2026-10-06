@@ -7,10 +7,14 @@ interface Envelope<T> {
   meta?: PaginationMeta;
 }
 
-export async function listLoans(params: { search?: string; page?: number } = {}): Promise<ListLoansResult> {
+export async function listLoans(
+  params: { search?: string; page?: number; limit?: number; borrowerId?: string } = {},
+): Promise<ListLoansResult> {
   const qs = toQueryString({
     search: params.search,
     page: params.page ? String(params.page) : undefined,
+    limit: params.limit ? String(params.limit) : undefined,
+    borrowerId: params.borrowerId,
   });
   const res = await apiRequest<Envelope<Loan[]>>(`/api/v1/loans${qs}`);
   return { data: res.data, meta: res.meta! };

@@ -102,7 +102,7 @@ export function DocumentsPage() {
                   {["Document", "Type", "Borrower", "Loan", "Uploaded", "Size", ""].map((h) => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold text-slate-500"
                     >
                       {h}
                     </th>

@@ -21,7 +21,7 @@ const EMPTY_ENTRY: KpiLedgerRowInput = {
 };
 
 function SectionTitle({ children }: { children: string }) {
-  return <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+  return <h2 className="text-sm font-semibold text-slate-500">{children}</h2>;
 }
 
 /**

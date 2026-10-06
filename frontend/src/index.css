@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+/*
+ * Ledger palette. The neutral scale is re-tinted from Tailwind's slate to the
+ * blue-black of account-book ink and the pale blue of its ruled lines, so
+ * every screen picks it up through the slate-* classes it already uses.
+ * Red and green stay functional only: Dr and Cr, overdue and current.
+ */
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-slate-50: #f6f7f9;
+  --color-slate-100: #edf0f4;
+  --color-slate-200: #dce1e8;
+  --color-slate-300: #c5cdd8;
+  --color-slate-400: #8c97a8;
+  --color-slate-500: #5b6779;
+  --color-slate-600: #46546a;
+  --color-slate-700: #34435a;
+  --color-slate-800: #253449;
+  --color-slate-900: #1b2a41;
+  --color-slate-950: #111c2e;
+
+  --color-accent: #2457a6;
+  --color-accent-soft: #e8eef8;
+  --color-dr: #b42318;
+  --color-cr: #087443;
+}
+
 html,
 body,
 #root {
@@ -8,7 +35,27 @@ body,
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+  font-family: var(--font-sans);
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Amounts line up digit for digit in every table. */
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

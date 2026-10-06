@@ -16,6 +16,9 @@ dashboard always adds up to the list.
 - `portfolio.totals`: loan count, sanctioned (the loan rows), and from the snapshots
   disbursed, received, principal outstanding, interest due, total payable, amount
   overdue, and the count of loans with DPD above zero.
+- `portfolio.needsAttention`: every loan with interest already past due, most days past due
+  first, then largest amount: loan number, borrower, amount overdue, DPD, classification,
+  oldest unpaid due date, total payable.
 - `portfolio.byClassification`: loan count, principal outstanding and amount overdue per
   DPD classification (STD, SMA-0, SMA-1, SMA-2, NPA). All five are always present.
 - `returns`: portfolio XIRR over every loan's ledger cash flows (`loan/loan.irr.ts`), and

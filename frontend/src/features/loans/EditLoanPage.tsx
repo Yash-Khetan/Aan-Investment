@@ -56,7 +56,7 @@ export function EditLoanPage() {
       // accrues at — drop its cached copies so it isn't served pre-edit.
       queryClient.invalidateQueries({ queryKey: ["ledger", id] });
       queryClient.invalidateQueries({ queryKey: ["ledger-dpd", id] });
-      navigate("/loans");
+      navigate(`/loans/${id}`);
     },
   });
 
@@ -86,7 +86,7 @@ export function EditLoanPage() {
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate("/loans")}>
+            <Button type="button" variant="ghost" onClick={() => navigate(`/loans/${id}`)}>
               Cancel
             </Button>
           </div>

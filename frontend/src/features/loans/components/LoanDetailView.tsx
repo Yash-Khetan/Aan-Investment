@@ -99,7 +99,7 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
       )}
 
       <div className="mb-6">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Guarantors</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-500">Guarantors</h3>
         {guarantors && guarantors.length === 0 && <p className="text-sm text-slate-400">No guarantors on this loan.</p>}
         <div className="flex flex-col gap-2">
           {guarantors?.map((g) => (
@@ -112,7 +112,7 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
       </div>
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Documents</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-500">Documents</h3>
         {documents && documents.length === 0 && <EmptyState message="No documents uploaded yet." />}
         <div className="flex flex-col gap-2">
           {documents?.map((doc) => (
