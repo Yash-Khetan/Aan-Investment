@@ -7,7 +7,6 @@ import {
   GENDERS,
   OWNERSHIP_INDICATORS,
   RESIDENCE_CODES,
-  todayIso,
 } from "../types";
 import type { BorrowerFormState } from "../types";
 import {
@@ -66,7 +65,6 @@ export function ConsumerBorrowerFields({
           <TextField
             label="Date of Birth"
             type="date"
-            max={todayIso()}
             value={form.dateOfBirth}
             onChange={(e) => onChange({ dateOfBirth: e.target.value })}
             required

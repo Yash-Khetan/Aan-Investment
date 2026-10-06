@@ -25,7 +25,6 @@ import {
   RELATED_PERSON_RELATIONSHIPS,
   RELATED_PERSON_TYPES,
   formStateToCreateInput,
-  todayIso,
 } from "./types";
 import type { BorrowerFormState, Promoter } from "./types";
 
@@ -188,7 +187,6 @@ export function CreateBorrowerPage() {
                   <TextField
                     label="Date of Birth"
                     type="date"
-                    max={todayIso()}
                     value={p.dateOfBirth ?? ""}
                     onChange={(e) => updatePromoter(i, { dateOfBirth: e.target.value || undefined })}
                   />

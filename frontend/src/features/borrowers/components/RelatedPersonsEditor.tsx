@@ -17,7 +17,6 @@ import {
   RELATED_PERSON_TYPES,
   promoterToCreateInput,
   promoterToUpdateInput,
-  todayIso,
 } from "../types";
 import type { Promoter } from "../types";
 import { ChooseOption, PHONE_PATTERN, PHONE_TITLE, SectionTitle } from "./borrowerFormShared";
@@ -241,7 +240,6 @@ function PromoterFields({
         <TextField
           label="Date of Birth"
           type="date"
-          max={todayIso()}
           value={value.dateOfBirth ?? ""}
           onChange={(e) => onChange({ dateOfBirth: e.target.value })}
           disabled={disabled}
