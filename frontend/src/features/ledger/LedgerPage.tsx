@@ -62,11 +62,13 @@ export function LedgerPage() {
     }
   }
 
+  // Posted entries only — scheduled ones count in nothing until their date.
   const stats = data
     ? (() => {
-        const totalDebit = data.entries.reduce((sum, r) => sum + (r.debit ? Number(r.debit) : 0), 0);
-        const totalCredit = data.entries.reduce((sum, r) => sum + (r.credit ? Number(r.credit) : 0), 0);
-        const balance = data.entries.length > 0 ? data.entries[data.entries.length - 1].balance : 0;
+        const posted = data.entries.filter((r) => !r.isScheduled);
+        const totalDebit = posted.reduce((sum, r) => sum + (r.debit ? Number(r.debit) : 0), 0);
+        const totalCredit = posted.reduce((sum, r) => sum + (r.credit ? Number(r.credit) : 0), 0);
+        const balance = posted.length > 0 ? posted[posted.length - 1].balance : 0;
         return { totalDebit, totalCredit, balance };
       })()
     : null;

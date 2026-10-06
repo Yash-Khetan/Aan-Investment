@@ -1,3 +1,4 @@
+import type { IdentityDocumentFields } from "./identity-document.service";
 import type { z } from "zod";
 
 import type { borrowers, promoters } from "../../db/schema";
@@ -27,9 +28,11 @@ export type CreatePromoterInput = z.infer<typeof promoterSchema>;
 export type UpdatePromoterInput = z.infer<typeof updatePromoterSchema>;
 
 /** Borrower enriched with relationship-manager name for list/detail views. */
-export type BorrowerWithManager = Borrower & {
-    relationshipManagerName: string | null;
-};
+/** A borrower read: the row, its manager's name, and its current identity scans (from `documents`). */
+export type BorrowerWithManager = Borrower &
+    IdentityDocumentFields & {
+        relationshipManagerName: string | null;
+    };
 
 /** Full borrower detail including its child entities. */
 export type BorrowerDetail = BorrowerWithManager & {

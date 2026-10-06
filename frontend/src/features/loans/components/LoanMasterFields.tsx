@@ -9,7 +9,7 @@ import {
   PAYMENT_FREQUENCIES,
   REPAYMENT_TYPES,
   SECURITY_TYPES,
-  calcTenureMonths,
+  formatTenure,
 } from "../types";
 import type { CodedOption, LoanFormState } from "../types";
 
@@ -63,7 +63,7 @@ export function LoanMasterFields({
   /** On edit, the borrower a loan belongs to isn't changeable — pass a display label to show it read-only instead of the picker. */
   lockedBorrowerLabel?: string;
 }) {
-  const tenureMonths = calcTenureMonths(form.sanctionDate, form.maturityDate);
+  const tenure = formatTenure(form.sanctionDate, form.maturityDate);
   /** Drives both the disabled state and the required flag on Value of Collateral. */
   const noCollateral = form.collateralType === "NO_COLLATERAL";
 
@@ -251,7 +251,7 @@ export function LoanMasterFields({
           <div>
             <div className="mb-1 text-xs font-medium text-slate-600">Tenure (auto-calculated)</div>
             <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
-              {tenureMonths > 0 ? `${tenureMonths} month${tenureMonths === 1 ? "" : "s"}` : "Maturity Date - Sanction Date"}
+              {tenure ?? "Maturity Date - Sanction Date"}
             </div>
           </div>
         </div>

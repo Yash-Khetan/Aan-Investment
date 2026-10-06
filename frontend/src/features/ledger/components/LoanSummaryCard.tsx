@@ -7,6 +7,7 @@ import {
   CIBIL_COLLATERAL_TYPES,
   CREDIT_TYPES,
   PAYMENT_FREQUENCIES,
+  formatTenure,
 } from "../../loans/types";
 import type { Loan } from "../../loans/types";
 import { INTEREST_BASIS_OPTIONS } from "../../loans/interestConfig";
@@ -64,7 +65,7 @@ export function LoanSummaryCard({ loan }: { loan: Loan }) {
             <DetailField label="Sanction Date" value={formatDate(loan.sanctionDate)} />
             <DetailField label="First Disbursement" value={formatDate(loan.snapshot.firstDisbursementDate)} />
             <DetailField label="Maturity Date" value={formatDate(loan.maturityDate)} />
-            <DetailField label="Tenure (months)" value={loan.tenureMonths} />
+            <DetailField label="Tenure" value={formatTenure(loan.sanctionDate, loan.maturityDate)} />
             <DetailField label="Next Due Date" value={formatDate(loan.nextDueDate)} />
             <DetailField label="DPD" value={loan.dpd} />
           </SummaryGroup>

@@ -25,6 +25,27 @@ export const DOCUMENT_TYPES = [
   "OTHER",
 ] as const;
 
+/** Every document_type the backend knows, for filtering (uploads offer DOCUMENT_TYPES only). */
+export const ALL_DOCUMENT_TYPES = [
+  "SANCTION_LETTER",
+  "LOAN_AGREEMENT",
+  "MORTGAGE_DEED",
+  "HYPOTHECATION_DEED",
+  "DPN",
+  "BOARD_RESOLUTION",
+  "PERSONAL_GUARANTEE",
+  "CORPORATE_GUARANTEE",
+  "LEGAL_OPINION",
+  "VALUATION_REPORT",
+  "INSURANCE",
+  "KYC",
+  "PAN_CARD",
+  "GSTIN_CERTIFICATE",
+  "AADHAAR",
+  "FINANCIAL_STATEMENT",
+  "OTHER",
+] as const;
+
 export interface DocumentMetadata {
   id: string;
   entityType: string;
@@ -37,4 +58,29 @@ export interface DocumentMetadata {
   isVerified: boolean | null;
   remarks: string | null;
   createdAt: string | null;
+}
+
+/** A document in the "All documents" search, labelled with the borrower (and loan) it belongs to. */
+export interface DocumentSearchRow extends DocumentMetadata {
+  borrowerId: string | null;
+  borrowerName: string | null;
+  loanId: string | null;
+  loanAccountNumber: string | null;
+}
+
+export interface DocumentSearchResult {
+  rows: DocumentSearchRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface DocumentSearchFilters {
+  /** The borrower's own documents and those of every loan they hold. */
+  borrowerId?: string;
+  loanId?: string;
+  documentType?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }

@@ -320,12 +320,16 @@ export async function getLoanLedger(loanId: string) {
   const rows = await getEntriesForLoan(loanId);
   const allocation = allocateLedger(rows);
 
+  // Entries dated after today are scheduled: they sort after every posted
+  // entry, so posted balances are untouched by them, and theirs is projected.
+  const today = toIsoDate(new Date());
   let balance = 0;
   const entries = rows.map((row) => {
     balance += row.debit ? Number(row.debit) : 0;
     balance -= row.credit ? Number(row.credit) : 0;
     return {
       ...row,
+      isScheduled: row.entryDate > today,
       balance,
       bifurcation: allocation.bifurcationAfter.get(row.id)!,
       allocation: allocation.receipts.get(row.id) ?? null,

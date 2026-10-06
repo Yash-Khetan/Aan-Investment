@@ -48,6 +48,34 @@ export interface DocumentMetadata {
     updatedAt: Date | null;
 }
 
+/** Filters for the cross-entity document search. All optional. */
+export interface DocumentSearchInput {
+    /** The borrower's own documents AND those of every loan they hold. */
+    borrowerId?: string;
+    /** One loan's documents. */
+    loanId?: string;
+    documentType?: string;
+    /** Matches document name, file name, borrower name or loan account number. */
+    search?: string;
+    page: number;
+    limit: number;
+}
+
+/** A document in the cross-entity search, labelled with who it belongs to. */
+export interface DocumentSearchRow extends DocumentMetadata {
+    borrowerId: string | null;
+    borrowerName: string | null;
+    loanId: string | null;
+    loanAccountNumber: string | null;
+}
+
+export interface DocumentSearchResult {
+    rows: DocumentSearchRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 export interface DownloadResult {
     buffer: Buffer;
     metadata: DocumentMetadata;

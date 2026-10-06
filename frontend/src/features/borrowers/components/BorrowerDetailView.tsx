@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../../components/ui/Sta
 import { DetailField, DetailSection } from "../../../components/ui/SlideOver";
 import { formatDate } from "../../../lib/format";
 import { getBorrower } from "../api";
-import { listDocuments, downloadDocument, viewDocument } from "../../documents/api";
+import { searchDocuments, downloadDocument, viewDocument } from "../../documents/api";
 import {
   ADDRESS_CATEGORIES,
   APPLICANT_TYPES,
@@ -30,10 +30,12 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
     queryFn: () => getBorrower(borrowerId),
   });
 
-  const { data: documents } = useQuery({
-    queryKey: ["documents", "BORROWER", borrowerId],
-    queryFn: () => listDocuments("BORROWER", borrowerId),
+  // The borrower's own documents (identity scans included) and every loan's.
+  const { data: documentPage } = useQuery({
+    queryKey: ["documents", "search", { borrowerId }],
+    queryFn: () => searchDocuments({ borrowerId, limit: 100 }),
   });
+  const documents = documentPage?.rows;
 
   if (isLoading) return <LoadingState label="Loading borrower..." />;
   if (isError) return <ErrorState message={error instanceof Error ? error.message : "Failed to load borrower."} />;
@@ -140,7 +142,12 @@ export function BorrowerDetailView({ borrowerId }: { borrowerId: string }) {
         <div className="flex flex-col gap-2">
           {documents?.map((doc) => (
             <div key={doc.id} className="flex items-center justify-between rounded-md border border-slate-100 px-3 py-2 text-sm">
-              <span className="truncate text-slate-700">{doc.name}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-slate-700">{doc.name}</span>
+                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                  {doc.loanAccountNumber ? `Loan ${doc.loanAccountNumber}` : "Borrower"}
+                </span>
+              </span>
               <span className="flex shrink-0 gap-2">
                 <button type="button" className="text-xs text-slate-500 underline" onClick={() => viewDocument(doc.id)}>
                   View

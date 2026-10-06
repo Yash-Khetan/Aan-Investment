@@ -1,12 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 
-import { getOverallReturns, getPortfolioSummary } from "./dashboard.service.js";
+import { getOverallReturns, getPortfolioSummary, getScheduledSummary } from "./dashboard.service.js";
 
 export async function getDashboardSummary(_req: Request, res: Response, next: NextFunction) {
     try {
-        const [portfolio, returns] = await Promise.all([getPortfolioSummary(), getOverallReturns()]);
+        const [portfolio, returns, scheduled] = await Promise.all([
+            getPortfolioSummary(),
+            getOverallReturns(),
+            getScheduledSummary(),
+        ]);
 
-        res.json({ portfolio, returns });
+        res.json({ portfolio, returns, scheduled });
     } catch (err) {
         next(err);
     }

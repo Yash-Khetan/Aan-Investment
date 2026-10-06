@@ -8,8 +8,9 @@ import { HorizontalBarChart, type BarDatum } from "../../components/charts/Horiz
 import { Meter } from "../../components/charts/Meter";
 import { StatusLegend } from "../../components/charts/StatusLegend";
 import { CLASSIFICATION_ROLE } from "../../components/charts/palette";
-import { formatCurrency, formatNumber, formatPercent } from "../../lib/format";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "../../lib/format";
 import { getDashboardSummary } from "./api";
+import type { ScheduledSummary, ScheduledWindow } from "./types";
 
 /**
  * Portfolio overview. Every money figure is the sum of each loan's ledger
@@ -105,8 +106,89 @@ export function DashboardPage() {
               </Card>
             </div>
           </section>
+
+          <ScheduledSection scheduled={data.scheduled} />
         </div>
       )}
     </div>
+  );
+}
+
+function WindowCard({ label, window }: { label: string; window: ScheduledWindow }) {
+  return (
+    <StatCard
+      label={label}
+      value={`${formatNumber(window.count)} entr${window.count === 1 ? "y" : "ies"}`}
+      sub={`Disbursements ${formatCurrency(window.disbursements)} · Receipts ${formatCurrency(window.receipts)}`}
+    />
+  );
+}
+
+/**
+ * Disbursements and receipts dated after today. Kept apart from every figure
+ * above: none of them counts anywhere until its date arrives, when it moves
+ * into the portfolio figures on its own.
+ */
+function ScheduledSection({ scheduled }: { scheduled: ScheduledSummary }) {
+  return (
+    <section>
+      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Scheduled</h2>
+      <p className="mb-3 text-xs text-slate-500">
+        Dated after today — not included in any figure above until their date arrives.
+      </p>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <WindowCard label="Next 7 days" window={scheduled.next7Days} />
+        <WindowCard label="Next 30 days" window={scheduled.next30Days} />
+        <WindowCard label="All scheduled" window={scheduled.all} />
+      </div>
+
+      {scheduled.entries.length === 0 ? (
+        <Card className="mt-4 p-4 text-sm text-slate-400">Nothing scheduled.</Card>
+      ) : (
+        <Card className="mt-4 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {["Date", "Loan", "Borrower", "Type", "Amount", "Particulars"].map((h) => (
+                  <th
+                    key={h}
+                    className={`whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 ${
+                      h === "Amount" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {scheduled.entries.map((e) => (
+                <tr key={e.id}>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{formatDate(e.entryDate)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900">{e.loanAccountNumber}</td>
+                  <td className="px-4 py-2.5 text-slate-700">{e.borrowerName}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        e.type === "DISBURSEMENT" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {e.type === "DISBURSEMENT" ? "Disbursement" : "Receipt"}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-900">
+                    {formatCurrency(e.amount, 2)}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-2.5 text-slate-500" title={e.narration ?? ""}>
+                    {e.narration || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </section>
   );
 }

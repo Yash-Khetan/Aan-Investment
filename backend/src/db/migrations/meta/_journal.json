@@ -8,6 +8,13 @@
       "when": 1791307635880,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791310424507,
+      "tag": "0001_identity_scans_in_documents_and_scheduled_entries",
+      "breakpoints": true
     }
   ]
 }

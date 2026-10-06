@@ -6,6 +6,7 @@ import {
     downloadDocument,
     deleteDocument,
     listDocuments,
+    searchDocuments,
     getSignedUrl,
 } from "../controllers/document.controller";
 
@@ -13,6 +14,7 @@ const documentRouter = Router();
 
 documentRouter.use(authenticate);
 
+documentRouter.get("/", searchDocuments);
 documentRouter.post("/upload", uploadSingleFile, uploadDocument);
 documentRouter.get("/entity/:entityType/:entityId", listDocuments);
 documentRouter.get("/:id/signed-url", getSignedUrl);

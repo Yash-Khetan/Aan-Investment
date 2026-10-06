@@ -3,12 +3,11 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 /**
- * Supabase Storage access for borrower identity scans.
- *
- * Deliberately self-contained rather than reaching into the document-vault
- * module: these scans are part of the borrower master record and never appear
- * as rows in that module's `documents` table. Only the bucket is shared, under
- * a distinct `borrower-identity/` prefix so the two never collide.
+ * Supabase Storage access for borrower identity scans. The scans are recorded
+ * as rows in the `documents` table like every other document (see
+ * identity-document.service.ts); only their objects live under their own
+ * `borrower-identity/` prefix in the shared bucket, and only photos are
+ * accepted, so OCR can read them.
  */
 
 const BUCKET_NAME = "Aan_documents";

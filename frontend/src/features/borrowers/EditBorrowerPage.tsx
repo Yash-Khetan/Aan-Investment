@@ -129,7 +129,7 @@ export function EditBorrowerPage() {
           {documents && documents.length === 0 && <p className="text-sm text-slate-400">No documents uploaded yet.</p>}
           <div className="flex flex-col gap-3">
             {documents?.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} entityType="BORROWER" entityId={id} />
+              <DocumentCard key={doc.id} doc={doc} />
             ))}
           </div>
         </Card>

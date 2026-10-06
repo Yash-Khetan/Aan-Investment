@@ -34,7 +34,35 @@ export interface PortfolioReturns {
   overallMirr: number | null;
 }
 
+/** One disbursement or receipt dated after today. */
+export interface ScheduledEntry {
+  id: string;
+  entryDate: string;
+  type: "DISBURSEMENT" | "RECEIPT";
+  amount: number;
+  narration: string | null;
+  loanId: string;
+  loanAccountNumber: string;
+  borrowerName: string;
+}
+
+export interface ScheduledWindow {
+  count: number;
+  disbursements: number;
+  receipts: number;
+}
+
+/** Money movements dated after today. Counted in no other dashboard figure until their date arrives. */
+export interface ScheduledSummary {
+  next7Days: ScheduledWindow;
+  next30Days: ScheduledWindow;
+  all: ScheduledWindow;
+  /** Soonest first. */
+  entries: ScheduledEntry[];
+}
+
 export interface DashboardSummary {
   portfolio: PortfolioSummary;
   returns: PortfolioReturns;
+  scheduled: ScheduledSummary;
 }

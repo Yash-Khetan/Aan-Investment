@@ -16,6 +16,8 @@ export interface LedgerEntry {
   /** Day-count basis this entry was accrued under. Null on rows posted before it was snapshotted. */
   interestBasis: string | null;
   includeOpeningClosingDays: boolean | null;
+  /** Dated after today: shown, but counted in no figure until its date arrives. */
+  isScheduled: boolean;
   /** Computed cumulative running balance, attached server-side — never independently stored. */
   balance: number;
   /** What `balance` is made of right after this entry: principal plus each month's unpaid net interest. */

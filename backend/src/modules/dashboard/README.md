@@ -4,7 +4,7 @@ Read-only portfolio overview. Mounted at `/dashboard`; every route requires auth
 
 | Route | Returns |
 |---|---|
-| `GET /dashboard/summary` | `{ portfolio, returns }` |
+| `GET /dashboard/summary` | `{ portfolio, returns, scheduled }` |
 | `GET /dashboard/portfolio` | `portfolio` only |
 
 ## Where the figures come from
@@ -20,3 +20,6 @@ dashboard always adds up to the list.
   DPD classification (STD, SMA-0, SMA-1, SMA-2, NPA). All five are always present.
 - `returns`: portfolio XIRR over every loan's ledger cash flows (`loan/loan.irr.ts`), and
   MIRR at the disbursement-weighted average interest rate.
+- `scheduled`: every disbursement and receipt dated after today on a live loan, soonest
+  first, with counts and totals for the next 7 days, the next 30 days and overall. These
+  are counted in no other figure until their date arrives (every snapshot is as at today).

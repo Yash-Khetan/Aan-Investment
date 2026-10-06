@@ -16,10 +16,45 @@ export const SECURITY_TYPES = [
 export const REPAYMENT_TYPES = ["EMI", "BULLET", "INTEREST_ONLY", "STRUCTURED", "CUSTOM"] as const;
 
 /**
- * Tenure is never entered directly — it's derived from the disbursement and
- * maturity dates. Whole months, floored, with a 1-month minimum whenever the
- * maturity date is after the disbursement date (so a same-month loan doesn't
- * round down to a rejected 0).
+ * Exact tenure between two dates: whole calendar months, then the days left
+ * over. 15 Jan to 27 Mar is 2 months 12 days. Null when either date is
+ * missing or the end is not after the start.
+ */
+export function calcTenure(startDate: string | null, endDate: string | null): { months: number; days: number } | null {
+  if (!startDate || !endDate) return null;
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const [ey, em, ed] = endDate.split("-").map(Number);
+  const start = Date.UTC(sy, sm - 1, sd);
+  const end = Date.UTC(ey, em - 1, ed);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+
+  let months = (ey - sy) * 12 + (em - sm);
+  if (ed < sd) months -= 1;
+
+  // The start date moved forward by `months`, clamped to that month's last day.
+  const anchorMonth = sm - 1 + months;
+  const lastDay = new Date(Date.UTC(sy, anchorMonth + 1, 0)).getUTCDate();
+  const anchor = Date.UTC(sy, anchorMonth, Math.min(sd, lastDay));
+  const days = Math.round((end - anchor) / 86_400_000);
+
+  return { months, days };
+}
+
+/** "2 months 12 days", "1 month", "20 days" — or null when there is no tenure to show. */
+export function formatTenure(startDate: string | null, endDate: string | null): string | null {
+  const t = calcTenure(startDate, endDate);
+  if (!t) return null;
+  const parts: string[] = [];
+  if (t.months > 0) parts.push(`${t.months} month${t.months === 1 ? "" : "s"}`);
+  if (t.days > 0) parts.push(`${t.days} day${t.days === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}
+
+/**
+ * Whole months of tenure, as the loan stores it: floored, with a 1-month
+ * minimum whenever the maturity date is after the start (so a short loan
+ * doesn't round down to a rejected 0). The exact figure, days included, is
+ * formatTenure's.
  */
 export function calcTenureMonths(startDate: string, endDate: string): number {
   if (!startDate || !endDate) return 0;

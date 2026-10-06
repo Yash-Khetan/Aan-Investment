@@ -1,11 +1,11 @@
-import { isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
-import { loans } from "../../db/schema/index.js";
+import { borrowers, ledgerEntries, loans } from "../../db/schema/index.js";
 import { xirr, xmirr } from "../../common/finance/xirr.js";
 import { getPortfolioCashFlows } from "../loan/loan.irr.js";
 import type { LoanClassification } from "../ledger/dpd.js";
-import { getLoanSnapshots } from "../ledger/snapshot.service.js";
+import { getLoanSnapshots, todayIso } from "../ledger/snapshot.service.js";
 import { getCurrentRates } from "../interest/interest.repository.js";
 
 function toNumber(value: string | null): number {
@@ -123,5 +123,65 @@ export async function getOverallReturns() {
     return {
         overallIrr: xirr(cashFlows),
         overallMirr: xmirr(cashFlows, blendedRate, blendedRate),
+    };
+}
+
+/** Adds whole days to a YYYY-MM-DD date. */
+function addDays(isoDate: string, days: number): string {
+    const d = new Date(`${isoDate}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Scheduled money movements: every Payment (disbursement) and Receipt dated
+ * after today on a live loan. None of them counts in any other dashboard
+ * figure until its date arrives — this is the one place they are shown,
+ * listed soonest first with totals for the next 7 and 30 days and overall.
+ */
+export async function getScheduledSummary() {
+    const today = todayIso();
+
+    const rows = await db
+        .select({
+            id: ledgerEntries.id,
+            entryDate: ledgerEntries.entryDate,
+            vchType: ledgerEntries.vchType,
+            debit: ledgerEntries.debit,
+            credit: ledgerEntries.credit,
+            narration: ledgerEntries.narration,
+            loanId: loans.id,
+            loanAccountNumber: loans.loanAccountNumber,
+            borrowerName: borrowers.name,
+        })
+        .from(ledgerEntries)
+        .innerJoin(loans, and(eq(ledgerEntries.loanId, loans.id), isNull(loans.deletedAt)))
+        .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+        .where(and(gt(ledgerEntries.entryDate, today), inArray(ledgerEntries.vchType, ["PAYMENT", "RECEIPT"])))
+        .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.sequenceNo));
+
+    const entries = rows.map((r) => ({
+        id: r.id,
+        entryDate: r.entryDate,
+        type: r.vchType === "PAYMENT" ? ("DISBURSEMENT" as const) : ("RECEIPT" as const),
+        amount: Number(r.vchType === "PAYMENT" ? r.debit : r.credit),
+        narration: r.narration,
+        loanId: r.loanId,
+        loanAccountNumber: r.loanAccountNumber,
+        borrowerName: r.borrowerName,
+    }));
+
+    const window = (lastDate: string | null) => {
+        const inWindow = entries.filter((e) => lastDate === null || e.entryDate <= lastDate);
+        const sum = (type: "DISBURSEMENT" | "RECEIPT") =>
+            round2(inWindow.filter((e) => e.type === type).reduce((acc, e) => acc + e.amount, 0));
+        return { count: inWindow.length, disbursements: sum("DISBURSEMENT"), receipts: sum("RECEIPT") };
+    };
+
+    return {
+        next7Days: window(addDays(today, 7)),
+        next30Days: window(addDays(today, 30)),
+        all: window(null),
+        entries,
     };
 }

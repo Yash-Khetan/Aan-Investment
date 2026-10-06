@@ -19,6 +19,7 @@ import {
     users,
 } from "../../db/schema";
 import { SORTABLE_COLUMNS } from "./borrower.constants";
+import { getIdentityDocumentFields } from "./identity-document.service";
 import type {
     BorrowerDetail,
     BorrowerWithManager,
@@ -86,8 +87,11 @@ export const findById = async (
         .where(and(eq(promoters.borrowerId, id), isNull(promoters.deletedAt)))
         .orderBy(asc(promoters.createdAt));
 
+    const identity = await getIdentityDocumentFields([id]);
+
     return {
-        ...(row as BorrowerWithManager),
+        ...row,
+        ...identity.get(id)!,
         promoters: promoterRows,
     };
 };
@@ -144,8 +148,10 @@ export const findAll = async (
         .from(borrowers)
         .where(whereClause);
 
+    const identity = await getIdentityDocumentFields(rows.map((r) => r.id));
+
     return {
-        rows: rows as BorrowerWithManager[],
+        rows: rows.map((r) => ({ ...r, ...identity.get(r.id)! })),
         total: countRow?.total ?? 0,
     };
 };

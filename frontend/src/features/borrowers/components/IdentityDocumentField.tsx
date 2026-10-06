@@ -55,12 +55,19 @@ export function IdentityDocumentField({
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadIdentityDocument(borrowerId!, kind, file),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
+    // The scan is a document like any other, so every document list moves too.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteIdentityDocument(borrowerId!, kind),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["borrower", borrowerId] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
   });
 
   /**

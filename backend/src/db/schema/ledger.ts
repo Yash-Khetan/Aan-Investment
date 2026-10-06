@@ -6,6 +6,7 @@ import {
     date,
     numeric,
     boolean,
+    timestamp,
     bigserial,
     index,
     uniqueIndex,
@@ -110,6 +111,15 @@ export const ledgerEntries = pgTable("ledger_entries", {
     isSystemGenerated: boolean("is_system_generated")
         .notNull()
         .default(false),
+
+    /**
+     * A Payment/Receipt dated after the day it was entered is SCHEDULED: shown
+     * on the ledger, but counted in no figure until its date arrives (every
+     * figure is computed as at today). This records when the audit trail logged
+     * it becoming effective — null until then, and for entries that were never
+     * scheduled.
+     */
+    effectiveLoggedAt: timestamp("effective_logged_at", { withTimezone: true }),
 
     /** Stable same-day ordering (e.g. Journal Interest must sort before its paired TDS row). */
     sequenceNo: bigserial("sequence_no", { mode: "number" })

@@ -32,7 +32,7 @@ export function SecurityDocumentTile({
       return uploadDocument({ entityType: "LOAN", entityId: loanId, documentType, file });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents", "LOAN", loanId] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
       setFile(null);
       setShowForm(false);
     },
@@ -40,7 +40,7 @@ export function SecurityDocumentTile({
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDocument(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", "LOAN", loanId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
 
   return (

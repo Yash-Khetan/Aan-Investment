@@ -52,30 +52,47 @@ function ReceiptAllocationDetails({ allocation }: { allocation: ReceiptAllocatio
   );
 }
 
+const HEADER_CELL = "whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500";
+
 /**
- * The ledger as posted. Rows are not editable here: the rates and day-count a
- * month accrues at come from the Loan module's interest configuration, and
- * each posted row keeps the configuration it was calculated under.
+ * The ledger as posted, then — separately — whatever is scheduled. Rows are
+ * not editable here: the rates and day-count a month accrues at come from the
+ * Loan module's interest configuration, and each posted row keeps the
+ * configuration it was calculated under.
  *
- * Balance Bifurcation splits each row's running balance into principal and
- * the months whose interest is still unpaid, one mini-row each. Receipts carry
- * an (i) showing which months' interest, and how much principal, they paid.
+ * Balance Bifurcation splits each posted row's running balance into principal
+ * and the months whose interest is still unpaid, one mini-row each. Receipts
+ * carry an (i) showing which months' interest, and how much principal, they
+ * paid.
+ *
+ * A Payment or Receipt dated after today is scheduled. It counts in no figure
+ * until its date arrives, so it is listed below the posted ledger with its own
+ * total rather than inside it — the last posted balance is always today's.
  */
 export function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   if (entries.length === 0) {
     return <EmptyState message="No records yet for this loan. Add one using the form above." />;
   }
 
+  const posted = entries.filter((e) => !e.isScheduled);
+  const scheduled = entries.filter((e) => e.isScheduled);
+
+  return (
+    <div className="flex flex-col gap-6">
+      {posted.length > 0 ? <PostedTable entries={posted} /> : <EmptyState message="Nothing posted yet." />}
+      {scheduled.length > 0 && <ScheduledTable entries={scheduled} />}
+    </div>
+  );
+}
+
+function PostedTable({ entries }: { entries: LedgerEntry[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-300">
       <table className="min-w-full divide-y divide-slate-300 text-sm">
         <thead className="bg-slate-50">
           <tr>
             {["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit", "Balance", "Balance Bifurcation"].map((h) => (
-              <th
-                key={h}
-                className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
-              >
+              <th key={h} className={HEADER_CELL}>
                 {h}
               </th>
             ))}
@@ -114,5 +131,60 @@ export function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ScheduledTable({ entries }: { entries: LedgerEntry[] }) {
+  const totalDebit = entries.reduce((sum, r) => sum + (r.debit ? Number(r.debit) : 0), 0);
+  const totalCredit = entries.reduce((sum, r) => sum + (r.credit ? Number(r.credit) : 0), 0);
+
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-slate-900">Scheduled</h3>
+      <p className="mb-2 text-xs text-slate-500">
+        Dated after today. Not counted in the balance, dues or any other figure until their date arrives.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-dashed border-slate-300">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead className="bg-slate-50">
+            <tr>
+              {["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit"].map((h) => (
+                <th key={h} className={HEADER_CELL}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white text-slate-500">
+            {entries.map((row) => (
+              <tr key={row.id}>
+                <td className="whitespace-nowrap px-4 py-2.5">{formatDate(row.entryDate)}</td>
+                <td className="max-w-xs truncate px-4 py-2.5" title={row.narration ?? ""}>
+                  {row.narration || "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-2.5">
+                  <VchTypeBadge vchType={row.vchType} />
+                  <span className="ml-1.5 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    Scheduled
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-4 py-2.5">{row.vchNo}</td>
+                <td className="whitespace-nowrap px-4 py-2.5">{row.debit != null ? formatCurrency(row.debit, 2) : "—"}</td>
+                <td className="whitespace-nowrap px-4 py-2.5">{row.credit != null ? formatCurrency(row.credit, 2) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-slate-50 font-medium text-slate-700">
+            <tr>
+              <td className="px-4 py-2.5" colSpan={4}>
+                Total scheduled
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5">{formatCurrency(totalDebit, 2)}</td>
+              <td className="whitespace-nowrap px-4 py-2.5">{formatCurrency(totalCredit, 2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
   );
 }

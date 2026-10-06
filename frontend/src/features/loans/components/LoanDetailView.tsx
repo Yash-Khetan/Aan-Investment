@@ -12,6 +12,7 @@ import {
   CIBIL_COLLATERAL_TYPES,
   CREDIT_TYPES,
   PAYMENT_FREQUENCIES,
+  formatTenure,
 } from "../types";
 import type { CodedOption } from "../types";
 
@@ -76,7 +77,7 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
         <DetailField label="Sanction Date" value={formatDate(loan.sanctionDate)} />
         <DetailField label="First Disbursement" value={formatDate(loan.snapshot.firstDisbursementDate)} />
         <DetailField label="Maturity Date" value={formatDate(loan.maturityDate)} />
-        <DetailField label="Tenure (months)" value={loan.tenureMonths} />
+        <DetailField label="Tenure" value={formatTenure(loan.sanctionDate, loan.maturityDate)} />
       </DetailSection>
 
       <DetailSection title="CIBIL Reporting">
