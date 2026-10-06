@@ -450,3 +450,15 @@ export const ledgerVchTypeEnum = pgEnum("ledger_vch_type", [
     "JOURNAL_INTEREST",
     "JOURNAL_TDS",
 ]);
+
+/**
+ * Where a ledger entry came from. MANUAL: recorded on the Ledger tab. SYSTEM:
+ * a month-end Interest/TDS pair the ledger posted itself — the only entries
+ * it ever recalculates. IMPORT: copied verbatim from a client's historical
+ * ledger sheet, and never recalculated.
+ */
+export const ledgerEntrySourceEnum = pgEnum("ledger_entry_source", [
+    "MANUAL",
+    "SYSTEM",
+    "IMPORT",
+]);

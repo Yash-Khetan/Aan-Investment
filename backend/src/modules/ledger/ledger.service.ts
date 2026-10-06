@@ -1,4 +1,5 @@
-import { NotFoundError } from "../../common/errors";
+import { BadRequestError, NotFoundError } from "../../common/errors";
+import { firstSystemAccrualMonth } from "../kpi-ledger/sheet";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
@@ -13,6 +14,8 @@ import {
   insertJournalPair,
   getEntryById,
   updateEntryAmountAndRate,
+  getHistoryCutoff,
+  getLoanStatus,
   type LedgerEntryRow,
 } from "./ledger.repository";
 import {
@@ -188,6 +191,10 @@ export async function generateMonthEndJournalPair(loanId: string, monthStart: Da
  * of order or in parallel). Silent — a failure here must never block a
  * ledger read.
  *
+ * Months covered by imported history are never generated: the sheet's own
+ * Interest journals stand for them, and the ledger takes over from the month
+ * after the last one. A CLOSED loan accrues nothing.
+ *
  * Each generated month resolves its own configuration, so back-filling a
  * stretch that spans a configuration change gives every month the values
  * that were in effect for it rather than today's.
@@ -196,12 +203,13 @@ export async function syncMissingMonthEndJournals(loanId: string): Promise<void>
   try {
     const earliest = await getEarliestEntryDate(loanId);
     if (!earliest) return;
+    if ((await getLoanStatus(loanId)) === "CLOSED") return;
 
     const existingMonths = new Set(await getExistingAccrualMonths(loanId));
+    const { lastInterestMonth } = await getHistoryCutoff(loanId);
 
     const today = new Date();
-    const earliestDate = parseIsoDate(earliest);
-    let cursor = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+    let cursor = parseIsoDate(firstSystemAccrualMonth(`${earliest.slice(0, 7)}-01`, lastInterestMonth));
     const lastElapsedMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 
     while (cursor.getTime() <= lastElapsedMonthStart.getTime()) {
@@ -278,6 +286,15 @@ export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promi
 }
 
 export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Promise<LedgerEntryRow> {
+  // Imported history is the record up to its last row; nothing is added by hand inside it.
+  const { lastEntryDate } = await getHistoryCutoff(input.loanId);
+  if (lastEntryDate && input.entryDate <= lastEntryDate) {
+    throw new BadRequestError(
+      `This loan's imported history runs to ${lastEntryDate}. Entries on or before that date come from the imported sheet; record this one with a later date.`,
+      { field: "entryDate" },
+    );
+  }
+
   const created = await insertPaymentOrReceipt({
     loanId: input.loanId,
     entryDate: input.entryDate,

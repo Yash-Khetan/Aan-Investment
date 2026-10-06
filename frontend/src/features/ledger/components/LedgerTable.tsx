@@ -107,13 +107,17 @@ function PostedTable({ entries }: { entries: LedgerEntry[] }) {
               </td>
               <td className="whitespace-nowrap px-4 py-2.5">
                 <VchTypeBadge vchType={row.vchType} />
+                {row.source === "IMPORT" && <span className="ml-1.5 text-xs text-slate-500">From sheet</span>}
                 {row.allocation && (
                   <InfoPopover label="How this receipt was applied">
                     <ReceiptAllocationDetails allocation={row.allocation} />
                   </InfoPopover>
                 )}
               </td>
-              <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">{row.vchNo}</td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-700">
+                {row.vchNo}
+                {row.sourceVchNo && <span className="ml-1.5 text-xs text-slate-400">sheet {row.sourceVchNo}</span>}
+              </td>
               <td className="whitespace-nowrap px-4 py-2.5 text-red-700">
                 {row.debit != null ? formatCurrency(row.debit, 2) : "—"}
               </td>

@@ -16,6 +16,11 @@ export interface LedgerEntry {
   /** Day-count basis this entry was accrued under. Null on rows posted before it was snapshotted. */
   interestBasis: string | null;
   includeOpeningClosingDays: boolean | null;
+  /** MANUAL: recorded on the Ledger tab. SYSTEM: the ledger's own month-end interest/TDS. IMPORT: from an imported sheet. */
+  source: "MANUAL" | "SYSTEM" | "IMPORT";
+  /** The voucher type and number the imported sheet printed. Null unless imported. */
+  sourceVchType: string | null;
+  sourceVchNo: string | null;
   /** Dated after today: shown, but counted in no figure until its date arrives. */
   isScheduled: boolean;
   /** Computed cumulative running balance, attached server-side — never independently stored. */

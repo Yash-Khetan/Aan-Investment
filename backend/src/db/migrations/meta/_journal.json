@@ -15,6 +15,13 @@
       "when": 1791310424507,
       "tag": "0001_identity_scans_in_documents_and_scheduled_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791314258751,
+      "tag": "0002_ledger_imports",
+      "breakpoints": true
     }
   ]
 }

@@ -69,7 +69,8 @@ function createApp(): Application {
     app.use(apiRateLimiter);
 
     // Body parsers.
-    app.use(express.json());
+    // Imported ledger sheets run to thousands of rows; 100kb (the default) is a few hundred.
+    app.use(express.json({ limit: "5mb" }));
     app.use(express.urlencoded({ extended: true }));
 
     // (5) Cookie parser — populates req.cookies (the refresh endpoint reads the
@@ -90,7 +91,7 @@ function createApp(): Application {
     app.use("/users", userRouter); //  /users/me (protected)
 
     app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, GET /:loanId/settings, GET /:loanId/dpd — the only way money enters a loan
-    app.use("/kpi-ledger", kpiLedgerRouter); //  POST /:loanId/rows, GET /:loanId?page=&limit=, PATCH/DELETE /:loanId/rows/:rowId — "Get KPI" history
+    app.use("/kpi-ledger", kpiLedgerRouter); //  a loan's imported history: preview / post / list / remove imports, read imported rows
 
     app.use("/documents", documentRouter);
     app.use("/ocr", ocrRouter); //  POST /extract
