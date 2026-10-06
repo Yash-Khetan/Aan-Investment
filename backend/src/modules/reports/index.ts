@@ -14,7 +14,6 @@ export type {
     LoanRegisterRow,
     CustomerReportRow,
     CollateralReportRow,
-    CollectionsReportRow,
     DocumentReportRow,
     PortfolioSummaryRow,
 } from "./types/report.types";
@@ -44,13 +43,11 @@ if (isDirectExecution) {
         "GET  /reports/loan-register",
         "GET  /reports/customer-report",
         "GET  /reports/collateral-report",
-        "GET  /reports/collections-report",
         "GET  /reports/document-report",
         "GET  /reports/portfolio-summary",
         "GET  /reports/export/loan-register?format=csv|xlsx|json",
         "GET  /reports/export/customer-report?format=csv|xlsx|json",
         "GET  /reports/export/collateral-report?format=csv|xlsx|json",
-        "GET  /reports/export/collections-report?format=csv|xlsx|json",
         "GET  /reports/export/document-report?format=csv|xlsx|json",
         "GET  /reports/export/portfolio-summary?format=csv|xlsx|json",
     ];

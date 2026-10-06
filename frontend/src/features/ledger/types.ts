@@ -47,9 +47,6 @@ export interface ReceiptAllocation {
  */
 export interface LedgerSettings {
   loanId: string;
-  /** The loan row's own rates. */
-  defaultInterestRatePercent: string;
-  defaultTdsRatePercent: string;
   /** The rates and day-count actually in effect today, from the current interest configuration. */
   currentInterestRatePercent: string;
   currentTdsRatePercent: string;

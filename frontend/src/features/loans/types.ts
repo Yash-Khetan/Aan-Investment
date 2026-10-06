@@ -1,4 +1,4 @@
-import type { CalculationMethod, InterestBasis, InterestConfig } from "../interest/types";
+import type { InterestBasis, InterestConfig } from "./interestConfig";
 import type { BalanceBifurcation, LoanSnapshot } from "../ledger/types";
 
 export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
@@ -33,7 +33,8 @@ export function calcTenureMonths(startDate: string, endDate: string): number {
 }
 
 /** Mirrors the database's `loan_status` type — ACTIVE and NPA were missing here. */
-export const LOAN_STATUSES = ["PENDING", "ACTIVE", "OVERDUE", "NPA", "CLOSED", "WRITTEN_OFF"] as const;
+/** Lifecycle only — how overdue a loan is (SMA/NPA) is its DPD classification, read off the ledger. */
+export const LOAN_STATUSES = ["PENDING", "ACTIVE", "CLOSED", "WRITTEN_OFF"] as const;
 
 /* ------------------------------------------------------------------ */
 /* CIBIL reporting code lists                                          */
@@ -175,14 +176,12 @@ export interface Loan {
   otherSecurityType: string | null;
   repaymentType: string;
   sanctionedAmount: string;
-  disbursedAmount: string | null;
-  outstandingPrincipal: string | null;
+  /** From the loan's current interest configuration. */
   interestRate: string;
   tdsRatePercent: string;
   tenureMonths: number;
   moratoriumMonths: number | null;
   sanctionDate: string | null;
-  firstDisbursementDate: string | null;
   maturityDate: string | null;
   purpose: string | null;
   approvalNotes: string | null;
@@ -236,20 +235,15 @@ export interface CreateLoanInput {
   otherSecurityType?: string;
   repaymentType: string;
   sanctionedAmount: number;
-  disbursedAmount?: number;
-  outstandingPrincipal?: number;
+  /* Interest configuration — saved as an effective-dated interest_configs revision. */
   interestRate: number;
   tdsRatePercent?: number;
-  /* Interest configuration — saved as an effective-dated interest_configs revision. */
   interestBasis?: InterestBasis;
-  calculationMethod?: CalculationMethod;
   includeOpeningClosingDays?: boolean;
-  customFormula?: string;
   interestEffectiveFrom?: string;
   tenureMonths: number;
   moratoriumMonths?: number;
   sanctionDate?: string;
-  firstDisbursementDate?: string;
   maturityDate?: string;
   purpose?: string;
   approvalNotes?: string;
@@ -274,21 +268,16 @@ export interface UpdateLoanInput {
   otherSecurityType: string | null;
   repaymentType: string;
   sanctionedAmount: number;
-  disbursedAmount: number;
-  outstandingPrincipal: number;
+  /* Interest configuration — saved as an effective-dated interest_configs revision. */
   interestRate: number;
   tdsRatePercent: number;
-  /* Interest configuration — saved as an effective-dated interest_configs revision. */
   interestBasis: InterestBasis;
-  calculationMethod: CalculationMethod;
   includeOpeningClosingDays: boolean;
-  customFormula: string | null;
   /** Omitted rather than blank when there is no date to send — the API rejects an empty string. */
   interestEffectiveFrom?: string;
   tenureMonths: number;
   moratoriumMonths: number;
   sanctionDate: string | null;
-  firstDisbursementDate: string | null;
   maturityDate: string | null;
   purpose: string | null;
   approvalNotes: string | null;
@@ -314,18 +303,14 @@ export interface LoanFormState {
   repaymentType: string;
   status: string;
   sanctionedAmount: string;
-  disbursedAmount: string;
   interestRate: string;
   tdsRatePercent: string;
   /* Interest configuration. Booleans are carried as "yes"/"no" like every other field here. */
   interestBasis: string;
-  calculationMethod: string;
   includeOpeningClosingDays: string;
-  customFormula: string;
   interestEffectiveFrom: string;
   moratoriumMonths: string;
   sanctionDate: string;
-  firstDisbursementDate: string;
   maturityDate: string;
   purpose: string;
   approvalNotes: string;
@@ -349,17 +334,13 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
   repaymentType: "EMI",
   status: "PENDING",
   sanctionedAmount: "",
-  disbursedAmount: "",
   interestRate: "",
   tdsRatePercent: "10",
   interestBasis: "ACTUAL_365",
-  calculationMethod: "SIMPLE_INTEREST",
   includeOpeningClosingDays: "no",
-  customFormula: "",
   interestEffectiveFrom: "",
   moratoriumMonths: "",
   sanctionDate: "",
-  firstDisbursementDate: "",
   maturityDate: "",
   purpose: "",
   approvalNotes: "",
@@ -375,8 +356,7 @@ export const EMPTY_LOAN_FORM: LoanFormState = {
 
 export function loanToFormState(l: Loan): LoanFormState {
   // Interest values come from the configuration in effect, so reopening the
-  // loan shows what was saved rather than the form's defaults. The rates
-  // themselves stay on the loan row, which is what the operator edits here.
+  // loan shows what was saved rather than the form's defaults.
   const config = l.interestConfig ?? null;
   return {
     loanAccountNumber: l.loanAccountNumber,
@@ -387,17 +367,13 @@ export function loanToFormState(l: Loan): LoanFormState {
     repaymentType: l.repaymentType,
     status: l.status ?? "PENDING",
     sanctionedAmount: l.sanctionedAmount ?? "",
-    disbursedAmount: l.disbursedAmount ?? "",
     interestRate: l.interestRate ?? "",
     tdsRatePercent: l.tdsRatePercent ?? "10",
     interestBasis: config?.interestBasis ?? "ACTUAL_365",
-    calculationMethod: config?.calculationMethod ?? "SIMPLE_INTEREST",
     includeOpeningClosingDays: config?.includeOpeningClosingDays ? "yes" : "no",
-    customFormula: config?.customFormula ?? "",
-    interestEffectiveFrom: config?.effectiveFrom ?? l.firstDisbursementDate ?? "",
+    interestEffectiveFrom: config?.effectiveFrom ?? l.sanctionDate ?? "",
     moratoriumMonths: String(l.moratoriumMonths ?? 0),
     sanctionDate: l.sanctionDate ?? "",
-    firstDisbursementDate: l.firstDisbursementDate ?? "",
     maturityDate: l.maturityDate ?? "",
     purpose: l.purpose ?? "",
     approvalNotes: l.approvalNotes ?? "",
@@ -421,18 +397,14 @@ export function formStateToCreateInput(f: LoanFormState): CreateLoanInput {
     otherSecurityType: f.securityType === "OTHERS" ? f.otherSecurityType || undefined : undefined,
     repaymentType: f.repaymentType,
     sanctionedAmount: Number(f.sanctionedAmount),
-    disbursedAmount: f.disbursedAmount ? Number(f.disbursedAmount) : undefined,
     interestRate: Number(f.interestRate),
     tdsRatePercent: f.tdsRatePercent ? Number(f.tdsRatePercent) : undefined,
     interestBasis: f.interestBasis as InterestBasis,
-    calculationMethod: f.calculationMethod as CalculationMethod,
     includeOpeningClosingDays: f.includeOpeningClosingDays === "yes",
-    customFormula: f.interestBasis === "CUSTOM" ? f.customFormula || undefined : undefined,
-    interestEffectiveFrom: f.interestEffectiveFrom || f.firstDisbursementDate || undefined,
-    tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
+    interestEffectiveFrom: f.interestEffectiveFrom || f.sanctionDate || undefined,
+    tenureMonths: calcTenureMonths(f.sanctionDate, f.maturityDate),
     moratoriumMonths: f.moratoriumMonths ? Number(f.moratoriumMonths) : undefined,
     sanctionDate: f.sanctionDate || undefined,
-    firstDisbursementDate: f.firstDisbursementDate || undefined,
     maturityDate: f.maturityDate || undefined,
     purpose: f.purpose || undefined,
     approvalNotes: f.approvalNotes || undefined,
@@ -457,19 +429,14 @@ export function formStateToUpdateInput(f: LoanFormState): UpdateLoanInput {
     otherSecurityType: f.securityType === "OTHERS" ? f.otherSecurityType || null : null,
     repaymentType: f.repaymentType,
     sanctionedAmount: Number(f.sanctionedAmount),
-    disbursedAmount: Number(f.disbursedAmount || 0),
-    outstandingPrincipal: 0,
     interestRate: Number(f.interestRate),
     tdsRatePercent: Number(f.tdsRatePercent || 10),
     interestBasis: f.interestBasis as InterestBasis,
-    calculationMethod: f.calculationMethod as CalculationMethod,
     includeOpeningClosingDays: f.includeOpeningClosingDays === "yes",
-    customFormula: f.interestBasis === "CUSTOM" ? f.customFormula || null : null,
-    interestEffectiveFrom: f.interestEffectiveFrom || f.firstDisbursementDate || undefined,
-    tenureMonths: calcTenureMonths(f.firstDisbursementDate, f.maturityDate),
+    interestEffectiveFrom: f.interestEffectiveFrom || f.sanctionDate || undefined,
+    tenureMonths: calcTenureMonths(f.sanctionDate, f.maturityDate),
     moratoriumMonths: Number(f.moratoriumMonths || 0),
     sanctionDate: f.sanctionDate || null,
-    firstDisbursementDate: f.firstDisbursementDate || null,
     maturityDate: f.maturityDate || null,
     purpose: f.purpose || null,
     approvalNotes: f.approvalNotes || null,

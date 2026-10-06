@@ -15,13 +15,12 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../db/index";
-import { borrowers, loans, loanTranches, users } from "../../db/schema";
+import { borrowers, interestConfigs, loans, users } from "../../db/schema";
 import { SORTABLE_COLUMNS } from "./loan.constants";
 import type {
     ListLoansQuery,
     LoanWithBorrower,
     NewLoan,
-    NewLoanTranche,
 } from "./loan.types";
 
 /**
@@ -41,18 +40,30 @@ const notDeleted = isNull(loans.deletedAt);
 const loanColumns = getTableColumns(loans);
 
 /**
- * Insert a new loan and return the created row. Pass a transaction handle to
- * make this atomic with a related write (e.g. the initial disbursement
- * tranche in `loan.service.ts`).
+ * What every loan read returns: the loan row, its borrower's name, and the
+ * interest and TDS rate of its current interest configuration — the only
+ * place those rates are stored. Every loan is created with a configuration in
+ * the same transaction, so the join always finds one.
+ */
+const loanReadColumns = {
+    ...loanColumns,
+    borrowerName: borrowers.name,
+    interestRate: sql<string>`${interestConfigs.annualRate}`,
+    tdsRatePercent: sql<string>`${interestConfigs.tdsRatePercent}`,
+};
+
+const currentConfigJoin = and(eq(interestConfigs.loanId, loans.id), eq(interestConfigs.isCurrent, true));
+
+/**
+ * Insert a new loan and return its id. Pass a transaction handle to make this
+ * atomic with its first interest configuration (see `loan.service.ts`).
  */
 export const create = async (
     data: NewLoan,
     executor: Executor = db,
-): Promise<LoanWithBorrower> => {
-    const [row] = await executor.insert(loans).values(data).returning();
-    // Re-read with borrower name for a consistent response shape.
-    const created = await findById(row!.id, executor);
-    return created!;
+): Promise<string> => {
+    const [row] = await executor.insert(loans).values(data).returning({ id: loans.id });
+    return row!.id;
 };
 
 /** Fetch a single non-deleted loan enriched with the borrower name. */
@@ -61,9 +72,10 @@ export const findById = async (
     executor: Executor = db,
 ): Promise<LoanWithBorrower | undefined> => {
     const [row] = await executor
-        .select({ ...loanColumns, borrowerName: borrowers.name })
+        .select(loanReadColumns)
         .from(loans)
         .leftJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+        .leftJoin(interestConfigs, currentConfigJoin)
         .where(and(eq(loans.id, id), notDeleted))
         .limit(1);
 
@@ -122,9 +134,10 @@ export const findAll = async (
     const offset = (query.page - 1) * query.limit;
 
     const rows = await db
-        .select({ ...loanColumns, borrowerName: borrowers.name })
+        .select(loanReadColumns)
         .from(loans)
         .leftJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+        .leftJoin(interestConfigs, currentConfigJoin)
         .where(whereClause)
         .orderBy(orderBy)
         .limit(query.limit)
@@ -146,45 +159,14 @@ export const update = async (
     id: string,
     data: Partial<NewLoan>,
     executor: Executor = db,
-): Promise<LoanWithBorrower | undefined> => {
+): Promise<boolean> => {
     const [row] = await executor
         .update(loans)
         .set({ ...data, updatedAt: new Date() })
         .where(and(eq(loans.id, id), notDeleted))
         .returning({ id: loans.id });
 
-    if (!row) return undefined;
-    return findById(row.id, executor);
-};
-
-/**
- * Count the tranches already recorded for a loan, so the caller can number
- * the next one. Not scoped to a transaction executor beyond what's passed in,
- * since tranches are never soft-deleted (no `deletedAt` column).
- */
-export const countTranches = async (
-    loanId: string,
-    executor: Executor = db,
-): Promise<number> => {
-    const [row] = await executor
-        .select({ total: sql<number>`count(*)::int` })
-        .from(loanTranches)
-        .where(eq(loanTranches.loanId, loanId));
-
-    return row?.total ?? 0;
-};
-
-/**
- * Record a disbursement tranche. Called whenever a loan's `disbursedAmount`
- * is set (on create) or increased (on update) — see `loan.service.ts`. Pass
- * the same transaction handle used for the loan write so the two commit
- * together.
- */
-export const createTranche = async (
-    data: NewLoanTranche,
-    executor: Executor = db,
-): Promise<void> => {
-    await executor.insert(loanTranches).values(data);
+    return Boolean(row);
 };
 
 /** Soft-delete a loan by stamping `deleted_at`. Returns the affected id. */

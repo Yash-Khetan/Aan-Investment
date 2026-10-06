@@ -5,8 +5,6 @@ import {
     text,
     date,
     integer,
-    numeric,
-    timestamp,
     index,
     uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -60,33 +58,14 @@ export const loans = pgTable("loans", {
     repaymentType: repaymentTypeEnum("repayment_type")
         .notNull(),
 
-    /* ── Amounts ── */
+    /* ── Amounts ──
+       Only what was sanctioned. What has been disbursed, received and is
+       outstanding is never stored on the loan: it is read off the loan's
+       ledger (ledger_entries), the only record of money moving. The interest
+       and TDS rates live in interest_configs, effective-dated. */
 
     sanctionedAmount: money("sanctioned_amount")
         .notNull(),
-
-    disbursedAmount: money("disbursed_amount")
-        .default("0"),
-
-    outstandingPrincipal: money("outstanding_principal")
-        .default("0"),
-
-    /* ── Interest ── */
-
-    interestRate: numeric("interest_rate", {
-        precision: 8,
-        scale: 4,
-    }).notNull(),
-
-    /**
-     * TDS withheld as a percentage of accrued interest. Lives here rather
-     * than on the ledger so the loan row is the single source of truth for
-     * both rates the ledger accrues at — see db/schema/ledger.ts.
-     */
-    tdsRatePercent: numeric("tds_rate_percent", {
-        precision: 5,
-        scale: 2,
-    }).notNull().default("10"),
 
     /* ── Tenure ── */
 
@@ -100,8 +79,6 @@ export const loans = pgTable("loans", {
 
     sanctionDate: date("sanction_date"),
 
-    firstDisbursementDate: date("first_disbursement_date"),
-
     maturityDate: date("maturity_date"),
 
     /* ── Purpose & Remarks ── */
@@ -114,8 +91,8 @@ export const loans = pgTable("loans", {
 
     /* ── Status ── */
 
-    // Matches the database's own default; declaring PENDING here disagreed with
-    // every row actually written.
+    // The loan's lifecycle only. How overdue it is (SMA/NPA) is not a status
+    // anyone sets: it is the DPD classification read off the ledger.
     status: loanStatusEnum("status")
         .default("ACTIVE"),
 
@@ -173,77 +150,5 @@ export const loans = pgTable("loans", {
 
     loanRmIdx: index("loan_rm_idx")
         .on(table.relationshipManagerId),
-
-}));
-
-/* ============================================================
-   LOAN TRANCHES
-============================================================ */
-
-export const loanTranches = pgTable("loan_tranches", {
-
-    id: uuid("id")
-        .defaultRandom()
-        .primaryKey(),
-
-    loanId: uuid("loan_id")
-        .references(() => loans.id, {
-            onDelete: "cascade",
-        })
-        .notNull(),
-
-    trancheNumber: integer("tranche_number")
-        .notNull(),
-
-    amount: money("amount")
-        .notNull(),
-
-    disbursementDate: date("disbursement_date"),
-
-    remarks: text("remarks"),
-
-    ...timestamps,
-
-}, (table) => ({
-
-    trancheLoanIdx: index("tranche_loan_idx")
-        .on(table.loanId),
-
-}));
-
-/* ============================================================
-   LOAN STATUS HISTORY
-============================================================ */
-
-export const loanStatusHistory = pgTable("loan_status_history", {
-
-    id: uuid("id")
-        .defaultRandom()
-        .primaryKey(),
-
-    loanId: uuid("loan_id")
-        .references(() => loans.id, {
-            onDelete: "cascade",
-        })
-        .notNull(),
-
-    fromStatus: loanStatusEnum("from_status"),
-
-    toStatus: loanStatusEnum("to_status")
-        .notNull(),
-
-    changedBy: uuid("changed_by")
-        .references(() => users.id),
-
-    reason: text("reason"),
-
-    changedAt: timestamp("changed_at", {
-        withTimezone: true,
-    }).defaultNow(),
-
-}, (table) => ({
-
-    statusHistoryLoanIdx: index("status_history_loan_idx")
-        .on(table.loanId),
 
 }));

@@ -1,7 +1,6 @@
 import type {
     loanStatusEnum,
     securityTypeEnum,
-    collectionStatusEnum,
     documentOwnerEnum,
 } from "../../../db/schema";
 
@@ -11,7 +10,6 @@ import type {
 
 export type LoanStatus = (typeof loanStatusEnum.enumValues)[number];
 export type SecurityType = (typeof securityTypeEnum.enumValues)[number];
-export type CollectionStatus = (typeof collectionStatusEnum.enumValues)[number];
 export type DocumentOwnerType = (typeof documentOwnerEnum.enumValues)[number];
 
 export type InsuranceStatus = "NOT_INSURED" | "ACTIVE" | "EXPIRED" | "INACTIVE";
@@ -24,7 +22,6 @@ export const REPORT_NAMES = [
     "loan-register",
     "customer-report",
     "collateral-report",
-    "collections-report",
     "document-report",
     "portfolio-summary",
 ] as const;
@@ -46,7 +43,6 @@ export interface ReportFilters {
     startDate?: string;
     endDate?: string;
     collateralType?: SecurityType;
-    collectionStatus?: CollectionStatus;
 }
 
 /* ============================================================
@@ -90,15 +86,6 @@ export interface CollateralReportRow {
     insuranceStatus: InsuranceStatus;
 }
 
-export interface CollectionsReportRow {
-    loanNumber: string;
-    customerName: string;
-    collectionStatus: CollectionStatus | null;
-    promiseToPay: string | null;
-    nextFollowUp: string | null;
-    assignedUser: string | null;
-}
-
 export interface DocumentReportRow {
     documentName: string;
     entityType: DocumentOwnerType;
@@ -126,7 +113,6 @@ export type ReportRow =
     | LoanRegisterRow
     | CustomerReportRow
     | CollateralReportRow
-    | CollectionsReportRow
     | DocumentReportRow
     | PortfolioSummaryRow;
 

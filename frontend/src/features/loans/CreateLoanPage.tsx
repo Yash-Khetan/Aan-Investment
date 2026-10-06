@@ -5,7 +5,6 @@ import { PageHeader } from "../../components/Layout";
 import { Button } from "../../components/ui/Button";
 import { FormErrors } from "../../components/ui/FormErrors";
 import { LoanMasterFields } from "./components/LoanMasterFields";
-import { InterestSetup } from "../interest/InterestSetup";
 import { GuarantorsSection } from "../guarantors/components/GuarantorsSection";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
@@ -16,12 +15,12 @@ import type { Loan, LoanFormState } from "./types";
 const DRAFT_KEY = "loan:create";
 
 /**
- * Two-step loan creation. Interest setup and guarantors both need a persisted
- * loanId (interest-engine calls and guarantor records key off it), so the loan
- * master is saved first and both open against the new loan — no separate
- * sidebar tabs.
+ * Two-step loan creation. The loan and its interest configuration are saved
+ * together in step one; guarantor records key off the new loan's id, so they
+ * follow in step two. Money is never entered here — disbursements and
+ * receipts go on the loan's Ledger.
  */
-const STEPS = ["Loan Details", "Interest Setup & Guarantors"] as const;
+const STEPS = ["Loan Details", "Guarantors"] as const;
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -87,7 +86,7 @@ export function CreateLoanPage() {
         title="New Loan"
         description={
           createdLoan
-            ? `Loan ${createdLoan.loanAccountNumber} created — set up interest and add any guarantors.`
+            ? `Loan ${createdLoan.loanAccountNumber} created — add any guarantors, then record its disbursements on the Ledger.`
             : "Loan master — sanction terms, tenure, and key dates."
         }
       />
@@ -102,7 +101,7 @@ export function CreateLoanPage() {
 
           <div className="flex gap-2">
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : "Create Loan & Set Up Interest"}
+              {mutation.isPending ? "Saving..." : "Create Loan"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => navigate("/loans")}>
               Cancel
@@ -113,8 +112,6 @@ export function CreateLoanPage() {
 
       {createdLoan && (
         <div className="flex flex-col gap-6">
-          <InterestSetup loanId={createdLoan.id} />
-
           <GuarantorsSection loanId={createdLoan.id} />
 
           <div className="flex gap-2">

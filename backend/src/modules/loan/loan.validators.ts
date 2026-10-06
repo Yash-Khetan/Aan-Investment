@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
     assetClassificationEnum,
-    calculationMethodEnum,
     cibilAccountStatusEnum,
     cibilCollateralTypeEnum,
     cibilCreditTypeEnum,
@@ -41,23 +40,15 @@ const money = (opts: { allowZero: boolean }) => {
 };
 
 /**
- * Interest rate is stored as loan master data. The Loan module records and
- * exposes it, and is where an operator edits it, but performs NO interest
- * logic (accrual, penal, step rules, EMI) — all interest behaviour is owned by
- * the Interest Engine. Saving here writes an effective-dated revision into the
- * Interest module's own interest_configs table; the calculation itself stays
- * entirely over there. Hence only a basic non-negative storage/integrity check
- * here, no rate policy/caps.
+ * Annual interest rate. Edited on the loan, but stored only as an
+ * effective-dated interest_configs revision — never on the loan row — which
+ * the ledger accrues at. Hence only a basic non-negative check here.
  */
 const interestRate = z.coerce
     .number({ error: "must be a number" })
     .nonnegative("must be zero or positive");
 
-/**
- * TDS withheld as a percentage of accrued interest. Loan master data, same as
- * the interest rate above — the Ledger reads it from here when it generates a
- * month's TDS entry.
- */
+/** TDS withheld as a percentage of accrued interest. Stored with the rate, in interest_configs. */
 const tdsRatePercent = z.coerce
     .number({ error: "must be a number" })
     .min(0, "must be zero or positive")
@@ -82,7 +73,6 @@ const uuid = z.string().uuid("must be a valid UUID");
 /* ------------------------------------------------------------------ */
 
 const interestBasisSchema = z.enum(interestBasisEnum.enumValues);
-const calculationMethodSchema = z.enum(calculationMethodEnum.enumValues);
 
 const loanTypeSchema = z.enum(loanTypeEnum.enumValues);
 const securityTypeSchema = z.enum(securityTypeEnum.enumValues);
@@ -102,65 +92,19 @@ const cibilCollateralTypeSchema = z.enum(cibilCollateralTypeEnum.enumValues);
 /* ------------------------------------------------------------------ */
 
 /**
- * Validates monetary and date invariants against an already-merged view of the
- * loan (used for both create and update, where update merges with the existing
- * record before checking).
+ * Date invariants, checked against an already-merged view of the loan (used
+ * for both create and update, where update merges with the existing record
+ * before checking). Amounts disbursed and outstanding are not checked here:
+ * they are not loan fields but ledger figures.
  */
 export const assertLoanInvariants = (
     data: {
-        sanctionedAmount?: number;
-        disbursedAmount?: number;
-        outstandingPrincipal?: number;
         sanctionDate?: string | null;
-        firstDisbursementDate?: string | null;
         maturityDate?: string | null;
     },
     ctx: z.RefinementCtx,
 ): void => {
-    const {
-        sanctionedAmount,
-        disbursedAmount,
-        outstandingPrincipal,
-        sanctionDate,
-        firstDisbursementDate,
-        maturityDate,
-    } = data;
-
-    if (
-        sanctionedAmount !== undefined &&
-        disbursedAmount !== undefined &&
-        disbursedAmount > sanctionedAmount
-    ) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["disbursedAmount"],
-            message: "disbursedAmount cannot exceed sanctionedAmount",
-        });
-    }
-
-    if (
-        sanctionedAmount !== undefined &&
-        outstandingPrincipal !== undefined &&
-        outstandingPrincipal > sanctionedAmount
-    ) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["outstandingPrincipal"],
-            message: "outstandingPrincipal cannot exceed sanctionedAmount",
-        });
-    }
-
-    if (
-        firstDisbursementDate &&
-        maturityDate &&
-        Date.parse(maturityDate) <= Date.parse(firstDisbursementDate)
-    ) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["maturityDate"],
-            message: "maturityDate must be after firstDisbursementDate",
-        });
-    }
+    const { sanctionDate, maturityDate } = data;
 
     if (
         sanctionDate &&
@@ -171,18 +115,6 @@ export const assertLoanInvariants = (
             code: z.ZodIssueCode.custom,
             path: ["maturityDate"],
             message: "maturityDate must be after sanctionDate",
-        });
-    }
-
-    if (
-        sanctionDate &&
-        firstDisbursementDate &&
-        Date.parse(firstDisbursementDate) < Date.parse(sanctionDate)
-    ) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["firstDisbursementDate"],
-            message: "firstDisbursementDate cannot be before sanctionDate",
         });
     }
 };
@@ -258,18 +190,13 @@ export const createLoanSchema = z
         repaymentType: repaymentTypeSchema,
 
         sanctionedAmount: money({ allowZero: false }),
-        disbursedAmount: money({ allowZero: true }).optional(),
-        outstandingPrincipal: money({ allowZero: true }).optional(),
-
-        interestRate,
-        tdsRatePercent: tdsRatePercent.optional(),
 
         /* Interest configuration — persisted as an interest_configs revision. */
+        interestRate,
+        tdsRatePercent: tdsRatePercent.optional(),
         interestBasis: interestBasisSchema.optional(),
-        calculationMethod: calculationMethodSchema.optional(),
         includeOpeningClosingDays: z.boolean().optional(),
-        customFormula: z.string().trim().optional(),
-        /** The date the configuration takes effect from. Defaults to the loan's first disbursement date. */
+        /** The date the configuration takes effect from. Defaults to the sanction date. */
         interestEffectiveFrom: dateString.optional(),
 
         tenureMonths: z.coerce
@@ -283,7 +210,6 @@ export const createLoanSchema = z
             .optional(),
 
         sanctionDate: dateString.optional(),
-        firstDisbursementDate: dateString.optional(),
         maturityDate: dateString.optional(),
 
         purpose: z.string().trim().optional(),
@@ -330,22 +256,17 @@ export const updateLoanSchema = z
         otherSecurityType: z.string().trim().max(255).nullable(),
         repaymentType: repaymentTypeSchema,
         sanctionedAmount: money({ allowZero: false }),
-        disbursedAmount: money({ allowZero: true }),
-        outstandingPrincipal: money({ allowZero: true }),
-        interestRate,
-        tdsRatePercent: tdsRatePercent.optional(),
 
         /* Interest configuration — persisted as an interest_configs revision. */
+        interestRate,
+        tdsRatePercent,
         interestBasis: interestBasisSchema,
-        calculationMethod: calculationMethodSchema,
         includeOpeningClosingDays: z.boolean(),
-        customFormula: z.string().trim().nullable(),
         interestEffectiveFrom: dateString,
 
         tenureMonths: z.coerce.number().int().positive(),
         moratoriumMonths: z.coerce.number().int().nonnegative(),
         sanctionDate: dateString.nullable(),
-        firstDisbursementDate: dateString.nullable(),
         maturityDate: dateString.nullable(),
         purpose: z.string().trim().nullable(),
         approvalNotes: z.string().trim().nullable(),

@@ -52,13 +52,10 @@ export function EditLoanPage() {
       clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["loans"] });
       queryClient.invalidateQueries({ queryKey: ["loan", id] });
-      // Saving here writes this loan's current interest configuration, which
-      // the Ledger and the Interest module both read. Their cached copies are
-      // stale the moment it lands — drop them, or those pages would keep
-      // serving the pre-edit values for the rest of their stale window.
+      // Saving here can write a new interest configuration, which the Ledger
+      // accrues at — drop its cached copies so it isn't served pre-edit.
       queryClient.invalidateQueries({ queryKey: ["ledger", id] });
-      queryClient.invalidateQueries({ queryKey: ["interest-config", id] });
-      queryClient.invalidateQueries({ queryKey: ["loan-interest-rate", id] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-dpd", id] });
       navigate("/loans");
     },
   });

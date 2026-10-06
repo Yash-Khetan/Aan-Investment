@@ -9,7 +9,7 @@ import {
   PAYMENT_FREQUENCIES,
 } from "../../loans/types";
 import type { Loan } from "../../loans/types";
-import { CALCULATION_METHOD_OPTIONS, INTEREST_BASIS_OPTIONS } from "../../interest/types";
+import { INTEREST_BASIS_OPTIONS } from "../../loans/interestConfig";
 import { labelOf } from "./codedLabel";
 import { SummaryCard, SummaryGroup } from "./summaryShared";
 
@@ -47,7 +47,6 @@ export function LoanSummaryCard({ loan }: { loan: Loan }) {
           </SummaryGroup>
 
           <SummaryGroup title="Interest Configuration (in effect)">
-            <DetailField label="Method" value={optionLabel(CALCULATION_METHOD_OPTIONS, config?.calculationMethod)} />
             <DetailField
               label="Include Opening & Closing Days"
               value={config ? (config.includeOpeningClosingDays ? "Yes" : "No") : null}

@@ -24,10 +24,13 @@ import { loans } from "./loan";
    sequenceNo. See modules/ledger/ledger.service.ts.
 
    This ledger owns NO configuration. The Interest/TDS rates and
-   the day-count basis it accrues at are read from the Loan module
-   and its interest configuration (loans.interestRate /
-   loans.tdsRatePercent, and the interest_configs revision in
-   effect for the month being accrued).
+   the day-count basis it accrues at are read from the loan's
+   interest configuration — the interest_configs revision in effect
+   for the month being accrued.
+
+   It is the ONLY record of money moving on a loan: a disbursement
+   is a PAYMENT row, a collection a RECEIPT row. Every figure the
+   app shows about a loan's money is read off these rows.
 
    What each posted Journal row DOES keep is a snapshot of the
    configuration it was actually calculated under — `ratePercent`,

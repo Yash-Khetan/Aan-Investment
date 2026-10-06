@@ -12,9 +12,8 @@ import { exportReport, getReport } from "./api";
 import { REPORT_LABELS, REPORT_NAMES, type ReportFilters, type ReportName, type ReportRow } from "./types";
 import { REPORT_COLUMNS } from "./columns";
 
-const LOAN_STATUSES = ["PENDING", "ACTIVE", "OVERDUE", "NPA", "CLOSED", "WRITTEN_OFF"];
+const LOAN_STATUSES = ["PENDING", "ACTIVE", "CLOSED", "WRITTEN_OFF"];
 const COLLATERAL_TYPES = ["PROPERTY", "MORTGAGE", "HYPOTHECATION_OF_RECEIVABLES", "PERSONAL_GUARANTEE", "CORPORATE_GUARANTEE", "OTHERS", "NONE"];
-const COLLECTION_STATUSES = ["OPEN", "PROMISE_TO_PAY", "FOLLOW_UP", "CLOSED"];
 
 function renderCell(row: ReportRow, key: string, type: string) {
   const value = row[key];
@@ -94,21 +93,6 @@ export function ReportsPage() {
             >
               <option value="">Any</option>
               {COLLATERAL_TYPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </SelectField>
-          )}
-
-          {report === "collections-report" && (
-            <SelectField
-              label="Collection Status"
-              value={filters.collectionStatus ?? ""}
-              onChange={(e) => setFilters((f) => ({ ...f, collectionStatus: e.target.value || undefined }))}
-            >
-              <option value="">Any</option>
-              {COLLECTION_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

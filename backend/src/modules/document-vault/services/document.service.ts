@@ -85,6 +85,7 @@ export class DocumentService {
                     remarks: input.remarks,
                 })
                 .returning();
+            if (!row) throw new Error("The database returned no row for this write.");
 
             documentLogger.success("UPLOAD", row.id);
             return toDocumentMetadata(row);

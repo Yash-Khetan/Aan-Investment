@@ -14,7 +14,6 @@ It exposes six reports:
 | Loan Register | `/reports/loan-register` | `loans`, `borrowers` |
 | Customer Report | `/reports/customer-report` | `borrowers`, `loans` |
 | Collateral Report | `/reports/collateral-report` | `collaterals`, `collateral_insurance`, `loans`, `borrowers` |
-| Collections Report | `/reports/collections-report` | `collection_cases`, `follow_ups`, `loans`, `borrowers`, `users` |
 | Document Report | `/reports/document-report` | `documents`, `users` |
 | Portfolio Summary | `/reports/portfolio-summary` | `loans` (aggregate) |
 
@@ -56,7 +55,6 @@ be `/reports` in this document).
 GET /reports/loan-register
 GET /reports/customer-report
 GET /reports/collateral-report
-GET /reports/collections-report
 GET /reports/document-report
 GET /reports/portfolio-summary
 ```
@@ -67,7 +65,6 @@ GET /reports/portfolio-summary
 GET /reports/export/loan-register?format=csv|xlsx|json
 GET /reports/export/customer-report?format=csv|xlsx|json
 GET /reports/export/collateral-report?format=csv|xlsx|json
-GET /reports/export/collections-report?format=csv|xlsx|json
 GET /reports/export/document-report?format=csv|xlsx|json
 GET /reports/export/portfolio-summary?format=csv|xlsx|json
 ```
@@ -89,7 +86,6 @@ are rejected with `400` (`.strict()` zod schemas), as are malformed values.
 | `customerId` | UUID | Borrower id |
 | `startDate` / `endDate` | `YYYY-MM-DD` | Inclusive range, applied to each report's `createdAt`. Max span: 5 years. `endDate` must be ≥ `startDate` |
 | `collateralType` | enum | One of `PROPERTY, MORTGAGE, STRUCTURED_CREDIT, PERSONAL_GUARANTEE, CORPORATE_GUARANTEE, NONE` |
-| `collectionStatus` | enum | One of `OPEN, PROMISE_TO_PAY, FOLLOW_UP, CLOSED` |
 | `branchId` | — | **Always rejected with 400.** See "Known schema gaps" below. |
 
 Per-report applicability:
@@ -97,8 +93,7 @@ Per-report applicability:
 - **Loan Register**: `loanStatus`, `customerId`, `startDate`/`endDate` (on `loans.createdAt`).
 - **Customer Report**: `customerId` (which borrower), `loanStatus` + `startDate`/`endDate` scope *which of that customer's loans* count toward `totalLoans`/`outstandingAmount`.
 - **Collateral Report**: `collateralType`, `loanStatus`, `customerId` (the loan's borrower), `startDate`/`endDate` (on `collaterals.createdAt`).
-- **Collections Report**: `collectionStatus`, `loanStatus`, `customerId`, `startDate`/`endDate` (on `collection_cases.createdAt`).
-- **Document Report**: `customerId` (matches documents where `ownerType = 'BORROWER'` and `ownerId = customerId`), `startDate`/`endDate` (on `documents.createdAt`). `loanStatus`/`collateralType`/`collectionStatus` are accepted but not applicable to documents.
+- **Document Report**: `customerId` (matches documents where `ownerType = 'BORROWER'` and `ownerId = customerId`), `startDate`/`endDate` (on `documents.createdAt`). `loanStatus`/`collateralType` are accepted but not applicable to documents.
 - **Portfolio Summary**: `customerId`, `startDate`/`endDate` only — `loanStatus` is not applied here since the report's whole purpose is to break totals down *by* status.
 
 ## 6. Export formats
@@ -168,27 +163,6 @@ Per-report applicability:
       "forcedSaleValue": null,
       "ltv": "66.67",
       "insuranceStatus": "ACTIVE"
-    }
-  ]
-}
-```
-
-### `GET /reports/collections-report?collectionStatus=FOLLOW_UP`
-
-```json
-{
-  "success": true,
-  "report": "collections-report",
-  "generatedAt": "2026-07-09T10:32:44.015Z",
-  "count": 1,
-  "data": [
-    {
-      "loanNumber": "LN-2026-0004",
-      "customerName": "Ravi Kumar",
-      "collectionStatus": "FOLLOW_UP",
-      "promiseToPay": null,
-      "nextFollowUp": "2026-07-12",
-      "assignedUser": "Priya Sharma"
     }
   ]
 }

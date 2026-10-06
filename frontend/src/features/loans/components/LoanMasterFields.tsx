@@ -1,13 +1,7 @@
 import { Card } from "../../../components/ui/Card";
 import { SelectField, TextField, TextAreaField } from "../../../components/ui/Field";
 import { BorrowerSelect } from "../../lookup/BorrowerSelect";
-import {
-  CALCULATION_METHOD_OPTIONS,
-  INCLUDE_OPENING_CLOSING_DAYS_OPTIONS,
-  INTEREST_BASIS_OPTIONS,
-  RUNNING_BALANCE_UNSUPPORTED_BASES,
-} from "../../interest/types";
-import type { InterestBasis } from "../../interest/types";
+import { INCLUDE_OPENING_CLOSING_DAYS_OPTIONS, INTEREST_BASIS_OPTIONS } from "../interestConfig";
 import {
   CIBIL_COLLATERAL_TYPES,
   CREDIT_TYPES,
@@ -27,20 +21,6 @@ const TDS_RATE_TOOLTIP =
 
 const EFFECTIVE_FROM_TOOLTIP =
   "The date this interest configuration takes effect. Periods already calculated under an earlier configuration keep it — set a later date here to change the rates from that point on without disturbing what came before.";
-
-/** Switching to Running Balance drops a basis it can't express back to the default. */
-function methodChange(method: string, currentBasis: string): Partial<LoanFormState> {
-  const invalid =
-    method === "RUNNING_BALANCE" && RUNNING_BALANCE_UNSUPPORTED_BASES.includes(currentBasis as InterestBasis);
-  return invalid
-    ? { calculationMethod: method, interestBasis: "ACTUAL_365", customFormula: "" }
-    : { calculationMethod: method };
-}
-
-/** A formula belongs only to the CUSTOM basis; leaving it behind would be saved and never used. */
-function clearedFormula(basis: string): Partial<LoanFormState> {
-  return basis === "CUSTOM" ? {} : { customFormula: "" };
-}
 
 function SectionTitle({ children }: { children: string }) {
   return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
@@ -83,13 +63,7 @@ export function LoanMasterFields({
   /** On edit, the borrower a loan belongs to isn't changeable — pass a display label to show it read-only instead of the picker. */
   lockedBorrowerLabel?: string;
 }) {
-  const tenureMonths = calcTenureMonths(form.firstDisbursementDate, form.maturityDate);
-  // Running Balance Method has no daily-rate concept for FULL_MONTH/CUSTOM, so
-  // those aren't offered alongside it — same rule the Interest module applies.
-  const basisOptions =
-    form.calculationMethod === "RUNNING_BALANCE"
-      ? INTEREST_BASIS_OPTIONS.filter((o) => !RUNNING_BALANCE_UNSUPPORTED_BASES.includes(o.value))
-      : INTEREST_BASIS_OPTIONS;
+  const tenureMonths = calcTenureMonths(form.sanctionDate, form.maturityDate);
   /** Drives both the disabled state and the required flag on Value of Collateral. */
   const noCollateral = form.collateralType === "NO_COLLATERAL";
 
@@ -192,14 +166,6 @@ export function LoanMasterFields({
             required
           />
           <TextField
-            label="Disbursed Amount (INR)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.disbursedAmount}
-            onChange={(e) => onChange({ disbursedAmount: e.target.value })}
-          />
-          <TextField
             label="Interest Rate (% p.a.)"
             type="number"
             min="0"
@@ -228,23 +194,12 @@ export function LoanMasterFields({
             tooltip={MORATORIUM_TOOLTIP}
           />
           <SelectField
-            label="Interest Calculation Method"
-            value={form.calculationMethod}
-            onChange={(e) => onChange(methodChange(e.target.value, form.interestBasis))}
-          >
-            {CALCULATION_METHOD_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
             label="Interest Basis (Day Count)"
             value={form.interestBasis}
-            onChange={(e) => onChange({ interestBasis: e.target.value, ...clearedFormula(e.target.value) })}
+            onChange={(e) => onChange({ interestBasis: e.target.value })}
             required
           >
-            {basisOptions.map((o) => (
+            {INTEREST_BASIS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -268,34 +223,22 @@ export function LoanMasterFields({
             onChange={(e) => onChange({ interestEffectiveFrom: e.target.value })}
             tooltip={EFFECTIVE_FROM_TOOLTIP}
           />
-          {form.interestBasis === "CUSTOM" && (
-            <div className="sm:col-span-2 lg:col-span-3">
-              <TextAreaField
-                label="Custom Formula"
-                value={form.customFormula}
-                onChange={(e) => onChange({ customFormula: e.target.value })}
-                placeholder="e.g. principal * rate * days / 365"
-                required
-              />
-            </div>
-          )}
         </div>
         <p className="mt-2 text-xs text-slate-400">
           These are the loan&apos;s interest settings. Saving them makes them the current configuration for this loan
-          &mdash; the Interest engine, Repayment schedule and Ledger all calculate from them. Already-posted Ledger
-          entries keep the configuration they were calculated under.
+          &mdash; the Ledger accrues each month&apos;s interest and TDS from them. Already-posted Ledger entries keep the
+          configuration they were calculated under. Disbursements and receipts are entered on the Ledger, not here.
         </p>
       </Card>
 
       <Card className="p-4">
         <SectionTitle>Key Dates</SectionTitle>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField label="Sanction Date" type="date" value={form.sanctionDate} onChange={(e) => onChange({ sanctionDate: e.target.value })} />
           <TextField
-            label="First Disbursement Date"
+            label="Sanction Date"
             type="date"
-            value={form.firstDisbursementDate}
-            onChange={(e) => onChange({ firstDisbursementDate: e.target.value })}
+            value={form.sanctionDate}
+            onChange={(e) => onChange({ sanctionDate: e.target.value })}
             required
           />
           <TextField

@@ -8,18 +8,10 @@ import {
    LOAN STATUS
 ============================================================ */
 
-/**
- * Mirrors the `loan_status` type as it actually exists in the database.
- *
- * ACTIVE and NPA were present in the database but missing here, and the column
- * defaults to ACTIVE — so every stored loan failed the API's own validator and
- * could not be saved from the edit form. Keep this list in step with the DB.
- */
+/** Lifecycle only — SMA/NPA is the DPD classification read off the ledger, never a status. */
 export const loanStatusEnum = pgEnum("loan_status", [
     "PENDING",
     "ACTIVE",
-    "OVERDUE",
-    "NPA",
     "CLOSED",
     "WRITTEN_OFF",
 ]);
@@ -327,72 +319,15 @@ export const cibilCollateralTypeEnum = pgEnum("cibil_collateral_type", [
    INTEREST BASIS
 ============================================================ */
 
+/**
+ * Day-count bases the ledger's daily running-balance walk supports — each one
+ * maps to a per-day rate in modules/interest/dailyRate.ts.
+ */
 export const interestBasisEnum = pgEnum("interest_basis", [
     "ACTUAL_365",
     "ACTUAL_360",
-    "THIRTY_360",
-    "MONTHLY",
-    "FIXED_MONTHLY",
-    "FULL_MONTH",
-    "CUSTOM",
     "MONTHLY_RATE_ACTUAL_30",
-]);
-
-/* ============================================================
-   INTEREST CALCULATION METHOD
-============================================================ */
-
-export const calculationMethodEnum = pgEnum("calculation_method", [
-    "RUNNING_BALANCE",
-    "SIMPLE_INTEREST",
-]);
-
-/* ============================================================
-   INTEREST RULE TYPE
-============================================================ */
-
-export const interestRuleTypeEnum = pgEnum("interest_rule_type", [
-    "NORMAL",
-    "STEP_UP",
-    "STEP_DOWN",
-    "EVENT_BASED",
-    "CUSTOM",
-]);
-
-/* ============================================================
-   PENAL INTEREST
-============================================================ */
-
-export const penalInterestTypeEnum = pgEnum("penal_interest_type", [
-    "PERCENTAGE",
-    "FIXED_AMOUNT",
-]);
-
-/* ============================================================
-   PAYMENT STATUS
-============================================================ */
-
-export const paymentStatusEnum = pgEnum("payment_status", [
-    "PENDING",
-    "PARTIAL",
-    "SUCCESS",
-    "FAILED",
-    "CANCELLED",
-]);
-
-/* ============================================================
-   PAYMENT MODE
-============================================================ */
-
-export const paymentModeEnum = pgEnum("payment_mode", [
-    "NEFT",
-    "RTGS",
-    "IMPS",
-    "UPI",
-    "CHEQUE",
-    "CASH",
-    "BANK_TRANSFER",
-    "OTHER",
+    "FIXED_MONTHLY",
 ]);
 
 /* ============================================================
@@ -444,16 +379,6 @@ export const documentOwnerEnum = pgEnum("document_owner", [
 ]);
 
 /* ============================================================
-   REMINDER STATUS
-============================================================ */
-
-export const reminderStatusEnum = pgEnum("reminder_status", [
-    "PENDING",
-    "SENT",
-    "FAILED",
-]);
-
-/* ============================================================
    REMINDER CHANNEL
 ============================================================ */
 
@@ -470,42 +395,6 @@ export const reminderChannelEnum = pgEnum("reminder_channel", [
 export const notificationStatusEnum = pgEnum("notification_status", [
     "SUCCESS",
     "FAILED",
-]);
-
-/* ============================================================
-   COLLECTION STATUS
-============================================================ */
-
-export const collectionStatusEnum = pgEnum("collection_status", [
-    "OPEN",
-    "PROMISE_TO_PAY",
-    "FOLLOW_UP",
-    "CLOSED",
-]);
-
-/* ============================================================
-   ACCOUNTING ENTRY TYPE
-============================================================ */
-
-export const accountingEntryTypeEnum = pgEnum("accounting_entry_type", [
-    "DISBURSEMENT",
-    "INTEREST_ACCRUAL",
-    "INTEREST_RECEIPT",
-    "PRINCIPAL_RECEIPT",
-    "PENAL_INTEREST",
-    "WRITE_OFF",
-]);
-
-/* ============================================================
-   AUDIT ACTIONS
-============================================================ */
-
-export const auditActionEnum = pgEnum("audit_action", [
-    "CREATE",
-    "UPDATE",
-    "DELETE",
-    "LOGIN",
-    "LOGOUT",
 ]);
 
 /* ============================================================
@@ -544,29 +433,6 @@ export const timestamps = {
         withTimezone: true,
     }),
 };
-
-
-/* ============================================================
-   PENAL INTEREST BASE
-============================================================ */
-
-export const penalInterestBaseEnum = pgEnum("penal_interest_base", [
-    "ENTIRE_OUTSTANDING",
-    "OVERDUE_INSTALLMENT_ONLY",
-]);
-
-
-/* ============================================================
-   PAYMENT WATERFALL BUCKET TYPE
-============================================================ */
-
-export const waterfallBucketTypeEnum = pgEnum("waterfall_bucket_type", [
-    "PENALTY",
-    "INTEREST",
-    "PRINCIPAL",
-    "SPECIFIC_TRANCHE",
-]);
-
 
 /* ============================================================
    BORROWER LEDGER VOUCHER TYPE

@@ -40,14 +40,6 @@ export const REPORT_COLUMNS: Record<ReportName, ReportColumnDef[]> = {
     { key: "ltv", header: "LTV %", type: "text" },
     { key: "insuranceStatus", header: "Insurance", type: "badge" },
   ],
-  "collections-report": [
-    { key: "loanNumber", header: "Loan Number", type: "text" },
-    { key: "customerName", header: "Customer", type: "text" },
-    { key: "collectionStatus", header: "Status", type: "badge" },
-    { key: "promiseToPay", header: "Promise Amount", type: "currency" },
-    { key: "nextFollowUp", header: "Next Follow-up", type: "date" },
-    { key: "assignedUser", header: "Assigned To", type: "text" },
-  ],
   "document-report": [
     { key: "documentName", header: "Document", type: "text" },
     { key: "entityType", header: "Owner Type", type: "badge" },

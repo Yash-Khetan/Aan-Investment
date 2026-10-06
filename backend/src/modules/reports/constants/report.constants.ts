@@ -3,20 +3,19 @@ import type {
     LoanRegisterRow,
     CustomerReportRow,
     CollateralReportRow,
-    CollectionsReportRow,
     DocumentReportRow,
     PortfolioSummaryRow,
+    ReportName,
 } from "../types/report.types";
 
 /* ============================================================
    REPORT DISPLAY NAMES
 ============================================================ */
 
-export const REPORT_TITLES: Record<string, string> = {
+export const REPORT_TITLES: Record<ReportName, string> = {
     "loan-register": "Loan Register",
     "customer-report": "Customer Report",
     "collateral-report": "Collateral Report",
-    "collections-report": "Collections Report",
     "document-report": "Document Report",
     "portfolio-summary": "Portfolio Summary Report",
 };
@@ -61,15 +60,6 @@ export const COLLATERAL_REPORT_COLUMNS: ReportColumn<CollateralReportRow>[] = [
     { key: "forcedSaleValue", label: "Forced Sale Value" },
     { key: "ltv", label: "LTV" },
     { key: "insuranceStatus", label: "Insurance Status" },
-];
-
-export const COLLECTIONS_REPORT_COLUMNS: ReportColumn<CollectionsReportRow>[] = [
-    { key: "loanNumber", label: "Loan Number" },
-    { key: "customerName", label: "Customer Name" },
-    { key: "collectionStatus", label: "Collection Status" },
-    { key: "promiseToPay", label: "Promise To Pay" },
-    { key: "nextFollowUp", label: "Next Follow-up" },
-    { key: "assignedUser", label: "Assigned User" },
 ];
 
 export const DOCUMENT_REPORT_COLUMNS: ReportColumn<DocumentReportRow>[] = [

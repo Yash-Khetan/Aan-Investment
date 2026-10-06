@@ -236,44 +236,13 @@ export async function updateEntryAmountAndRate(
 }
 
 /* ============================================================
-   RATES — READ ONLY, FROM THE LOAN ROW
+   LOAN READS
 
    There is no ledger settings table, and no write path from here
-   back onto the loan. The Loan module owns the configuration; the
-   ledger only reads it. These loan-row rates are the fallback for
-   a loan that has no interest configuration yet — otherwise the
-   effective-dated revision is what a month accrues at. See
+   back onto the loan. The rates a month accrues at come from the
+   loan's effective-dated interest configuration — see
    ledger.service.ts's resolveAccrualConfig.
 ============================================================ */
-
-export interface LoanLedgerRates {
-  loanId: string;
-  defaultInterestRatePercent: string;
-  defaultTdsRatePercent: string;
-}
-
-export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
-  const rows = await db
-    .select({
-      id: loans.id,
-      interestRate: loans.interestRate,
-      tdsRatePercent: loans.tdsRatePercent,
-    })
-    .from(loans)
-    .where(eq(loans.id, loanId))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) {
-    throw new NotFoundError(`Loan ${loanId} not found.`);
-  }
-
-  return {
-    loanId: row.id,
-    defaultInterestRatePercent: row.interestRate,
-    defaultTdsRatePercent: row.tdsRatePercent,
-  };
-}
 
 /** The loan's maturity date — the far edge of its DPD grid. Null when the loan has none recorded. */
 export async function getLoanMaturityDate(loanId: string): Promise<string | null> {

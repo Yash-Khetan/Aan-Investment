@@ -50,7 +50,7 @@ export function LoansPage() {
     { key: "loanType", header: "Type", render: (l) => l.loanType },
     { key: "repaymentType", header: "Repayment", render: (l) => l.repaymentType.replace(/_/g, " ") },
     { key: "sanctionedAmount", header: "Sanctioned", render: (l) => formatCurrency(l.sanctionedAmount) },
-    { key: "outstandingPrincipal", header: "Outstanding", render: (l) => formatCurrency(l.outstandingPrincipal) },
+    { key: "principalOutstanding", header: "Outstanding", render: (l) => formatCurrency(l.snapshot.principalOutstanding) },
     { key: "amountOverdue", header: "Amount Overdue", render: (l) => formatCurrency(l.amountOverdue) },
     { key: "dpd", header: "DPD", render: (l) => <span className={DPD_COLOR[l.classification] ?? "text-slate-700"}>{l.dpd}</span> },
     { key: "classification", header: "Classification", render: (l) => <Badge status={l.classification} /> },

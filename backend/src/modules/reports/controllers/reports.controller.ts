@@ -33,11 +33,6 @@ export const getCollateralReport = asyncHandler(async (req, res) => {
     sendReport(res, "collateral-report", data);
 });
 
-export const getCollectionsReport = asyncHandler(async (req, res) => {
-    const data = await ReportsService.getCollectionsReport(getFilters(req));
-    sendReport(res, "collections-report", data);
-});
-
 export const getDocumentReport = asyncHandler(async (req, res) => {
     const data = await ReportsService.getDocumentReport(getFilters(req));
     sendReport(res, "document-report", data);

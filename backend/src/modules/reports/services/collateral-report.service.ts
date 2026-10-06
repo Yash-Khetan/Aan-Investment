@@ -70,7 +70,6 @@ export async function getCollateralReport(
             loanNumber: loans.loanAccountNumber,
             marketValue: collaterals.estimatedValue,
             loanId: collaterals.loanId,
-            storedLtv: collaterals.ltvRatio,
             insuranceStatus: latestInsurance.status,
             insuranceExpiryDate: latestInsurance.expiryDate,
         })
@@ -81,16 +80,15 @@ export async function getCollateralReport(
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(collaterals.createdAt));
 
-    // LTV as of now, against the loan's ledger principal — the stored ratio is
-    // only what it was when the collateral was last written.
+    // LTV as of now, against the loan's ledger principal. Never stored.
     const snapshots = await getLoanSnapshots([...new Set(rows.map((r) => r.loanId))]);
     const liveLtv = (row: (typeof rows)[number]): string | null => {
-        if (!row.marketValue) return row.storedLtv;
+        if (!row.marketValue) return null;
         try {
             const principal = Math.max(snapshots.get(row.loanId)!.principalOutstanding, 0);
             return String(calculateLtv(principal, row.marketValue));
         } catch {
-            return row.storedLtv;
+            return null;
         }
     };
 

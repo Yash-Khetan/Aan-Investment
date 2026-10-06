@@ -1,4 +1,5 @@
-import { getDailyRateFraction, supportsDailyRate } from "../interest/dailyRate";
+import { NotFoundError } from "../../common/errors";
+import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
@@ -12,7 +13,6 @@ import {
   insertJournalPair,
   getEntryById,
   updateEntryAmountAndRate,
-  getLoanRates,
   type LedgerEntryRow,
 } from "./ledger.repository";
 import {
@@ -23,12 +23,9 @@ import {
 import { allocateLedger } from "./allocation";
 
 /**
- * The day-count this ledger has always accrued at, and still does whenever a
- * loan has no interest configuration to read one from — or has one whose basis
- * has no daily-rate concept at all (FULL_MONTH, CUSTOM), which the month-end
- * daily walk below cannot express. Journal rows posted before the basis was
- * snapshotted per row also read back as this, so their amounts reproduce
- * unchanged.
+ * What a Journal row posted before the basis was snapshotted per row reads
+ * back as — the day-count this ledger accrued at then — so such rows
+ * reproduce their amounts unchanged on recompute.
  */
 const LEDGER_FALLBACK_BASIS: InterestBasis = "ACTUAL_365";
 
@@ -105,8 +102,8 @@ export async function assembleMonthBalanceEvents(
 
 /**
  * The interest configuration a given month must accrue under: the
- * interest_configs revision in effect on that month's end date, falling back
- * to the loan's own rates when the loan has no configuration at all.
+ * interest_configs revision in effect on that month's end date. Every loan
+ * is created with one, so a loan without any is a defect, not a default.
  *
  * Resolving per month — rather than always reading the loan's current values —
  * is what gives a configuration change its effective point. A month that
@@ -117,20 +114,14 @@ export async function resolveAccrualConfig(loanId: string, monthEnd: Date): Prom
   const config = await getInterestConfigEffectiveOn(loanId, toIsoDate(monthEnd));
 
   if (!config) {
-    const rates = await getLoanRates(loanId);
-    return {
-      interestRatePercent: Number(rates.defaultInterestRatePercent),
-      tdsRatePercent: Number(rates.defaultTdsRatePercent),
-      interestBasis: LEDGER_FALLBACK_BASIS,
-      includeOpeningClosingDays: LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
-    };
+    throw new NotFoundError(`Loan ${loanId} has no interest configuration.`);
   }
 
   return {
     interestRatePercent: Number(config.annualRate),
     tdsRatePercent: Number(config.tdsRatePercent),
-    interestBasis: supportsDailyRate(config.interestBasis) ? config.interestBasis : LEDGER_FALLBACK_BASIS,
-    includeOpeningClosingDays: config.includeOpeningClosingDays ?? LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
+    interestBasis: config.interestBasis,
+    includeOpeningClosingDays: config.includeOpeningClosingDays,
   };
 }
 
@@ -307,11 +298,10 @@ export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Pro
  * write path back to them.
  */
 export async function getSettings(loanId: string) {
-  const rates = await getLoanRates(loanId);
   const config = await resolveAccrualConfig(loanId, new Date());
 
   return {
-    ...rates,
+    loanId,
     currentInterestRatePercent: String(config.interestRatePercent),
     currentTdsRatePercent: String(config.tdsRatePercent),
     interestBasis: config.interestBasis,

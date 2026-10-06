@@ -6,6 +6,7 @@ import { xirr, xmirr } from "../../common/finance/xirr.js";
 import { getPortfolioCashFlows } from "../loan/loan.irr.js";
 import type { LoanClassification } from "../ledger/dpd.js";
 import { getLoanSnapshots } from "../ledger/snapshot.service.js";
+import { getCurrentRates } from "../interest/interest.repository.js";
 
 function toNumber(value: string | null): number {
     return value === null ? 0 : Number(value);
@@ -95,7 +96,7 @@ export async function getPortfolioSummary() {
  */
 export async function getOverallReturns() {
     const loanRows = await db
-        .select({ id: loans.id, interestRate: loans.interestRate })
+        .select({ id: loans.id })
         .from(loans)
         .where(isNull(loans.deletedAt));
 
@@ -104,13 +105,17 @@ export async function getOverallReturns() {
     }
 
     const loanIds = loanRows.map((l) => l.id);
-    const [cashFlows, snapshots] = await Promise.all([getPortfolioCashFlows(loanIds), getLoanSnapshots(loanIds)]);
+    const [cashFlows, snapshots, rates] = await Promise.all([
+        getPortfolioCashFlows(loanIds),
+        getLoanSnapshots(loanIds),
+        getCurrentRates(loanIds),
+    ]);
 
     let weightedRateSum = 0;
     let totalDisbursed = 0;
     for (const loan of loanRows) {
         const disbursed = snapshots.get(loan.id)!.totalDisbursed;
-        weightedRateSum += disbursed * (toNumber(loan.interestRate) / 100);
+        weightedRateSum += disbursed * (Number(rates.get(loan.id)?.interestRate ?? 0) / 100);
         totalDisbursed += disbursed;
     }
     const blendedRate = totalDisbursed > 0 ? weightedRateSum / totalDisbursed : 0;

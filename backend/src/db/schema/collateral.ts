@@ -86,12 +86,8 @@ export const collaterals = pgTable("collaterals", {
         length: 100,
     }),
 
-    /* ── LTV ── */
-
-    ltvRatio: numeric("ltv_ratio", {
-        precision: 5,
-        scale: 2,
-    }),
+    /* LTV is not stored: it is the loan's ledger principal over
+       estimatedValue, computed whenever it is read. */
 
     /* ── Status ── */
 
@@ -158,47 +154,5 @@ export const collateralInsurance = pgTable("collateral_insurance", {
 
     insuranceExpiryIdx: index("insurance_expiry_idx")
         .on(table.expiryDate),
-
-}));
-
-/* ============================================================
-   CHARGE RECORDS (CERSAI / ROC)
-============================================================ */
-
-export const chargeRecords = pgTable("charge_records", {
-
-    id: uuid("id")
-        .defaultRandom()
-        .primaryKey(),
-
-    collateralId: uuid("collateral_id")
-        .references(() => collaterals.id, {
-            onDelete: "cascade",
-        })
-        .notNull(),
-
-    chargeType: varchar("charge_type", {
-        length: 50,
-    }).notNull(),
-
-    registrationNumber: varchar("registration_number", {
-        length: 100,
-    }),
-
-    registrationDate: date("registration_date"),
-
-    satisfactionDate: date("satisfaction_date"),
-
-    status: entityStatusEnum("status")
-        .default("ACTIVE"),
-
-    remarks: text("remarks"),
-
-    ...timestamps,
-
-}, (table) => ({
-
-    chargeCollateralIdx: index("charge_collateral_idx")
-        .on(table.collateralId),
 
 }));
