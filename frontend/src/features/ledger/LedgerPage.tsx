@@ -40,11 +40,7 @@ export function LedgerPage() {
     enabled: !!loanId,
   });
 
-  /**
-   * DPD is keyed to the loan's repayment obligations, not to the ledger's own
-   * rows, so it is fetched separately rather than riding along with the
-   * ledger read.
-   */
+  /** The month-by-month DPD grid, computed from this same ledger. */
   const {
     data: dpd,
     isLoading: isDpdLoading,
@@ -55,8 +51,15 @@ export function LedgerPage() {
     enabled: !!loanId,
   });
 
+  /**
+   * A new entry moves every figure about the loan — its balance, its DPD and
+   * the loan-level figures read off the same ledger — so refresh them all,
+   * including the lists that show this loan.
+   */
   function refetch() {
-    queryClient.invalidateQueries({ queryKey: ["ledger", loanId] });
+    for (const queryKey of [["ledger", loanId], ["ledger-dpd", loanId], ["loan", loanId], ["loans"], ["lookup"], ["dashboard-summary"]]) {
+      queryClient.invalidateQueries({ queryKey });
+    }
   }
 
   const stats = data

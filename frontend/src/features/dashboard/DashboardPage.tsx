@@ -7,51 +7,44 @@ import { LoadingState, ErrorState } from "../../components/ui/States";
 import { HorizontalBarChart, type BarDatum } from "../../components/charts/HorizontalBarChart";
 import { Meter } from "../../components/charts/Meter";
 import { StatusLegend } from "../../components/charts/StatusLegend";
-import { LOAN_STATUS_ROLE, COLLECTION_STATUS_ROLE } from "../../components/charts/palette";
+import { CLASSIFICATION_ROLE } from "../../components/charts/palette";
 import { formatCurrency, formatNumber, formatPercent } from "../../lib/format";
 import { getDashboardSummary } from "./api";
 
-const AT_RISK_STATUSES = new Set(["OVERDUE", "NPA", "WRITTEN_OFF"]);
-
+/**
+ * Portfolio overview. Every money figure is the sum of each loan's ledger
+ * snapshot, so the dashboard always adds up to the Loans list.
+ */
 export function DashboardPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: getDashboardSummary,
   });
 
-  const portfolioBars: BarDatum[] =
-    data?.portfolio.byStatus.map((row) => ({
-      key: row.status,
-      label: row.status.replace(/_/g, " "),
-      value: row.outstandingPrincipal,
-      displayValue: formatCurrency(row.outstandingPrincipal),
+  const totals = data?.portfolio.totals;
+
+  const classificationBars: BarDatum[] =
+    data?.portfolio.byClassification.map((row) => ({
+      key: row.classification,
+      label: row.classification,
+      value: row.principalOutstanding,
+      displayValue: formatCurrency(row.principalOutstanding),
       detail: `${row.loanCount} loan${row.loanCount === 1 ? "" : "s"}`,
-      role: LOAN_STATUS_ROLE[row.status] ?? "warning",
+      role: CLASSIFICATION_ROLE[row.classification] ?? "warning",
     })) ?? [];
 
-  const collectionsBars: BarDatum[] =
-    data?.collections.byStatus.map((row) => ({
-      key: row.status,
-      label: row.status.replace(/_/g, " "),
-      value: row.overdueAmount,
-      displayValue: formatCurrency(row.overdueAmount),
-      detail: `${row.caseCount} case${row.caseCount === 1 ? "" : "s"}`,
-      role: COLLECTION_STATUS_ROLE[row.status] ?? "warning",
-    })) ?? [];
-
+  // Portfolio at Risk: principal on loans with any DPD at all (SMA-0 and worse).
   const atRiskOutstanding =
-    data?.portfolio.byStatus
-      .filter((row) => AT_RISK_STATUSES.has(row.status))
-      .reduce((sum, row) => sum + row.outstandingPrincipal, 0) ?? 0;
+    data?.portfolio.byClassification
+      .filter((row) => row.classification !== "STD")
+      .reduce((sum, row) => sum + row.principalOutstanding, 0) ?? 0;
 
-  const atRiskPct =
-    data && data.portfolio.totals.totalOutstanding > 0
-      ? (atRiskOutstanding / data.portfolio.totals.totalOutstanding) * 100
-      : 0;
+  const atRiskPct = totals && totals.totalOutstanding > 0 ? (atRiskOutstanding / totals.totalOutstanding) * 100 : 0;
+  const overdueLoansPct = totals && totals.totalLoans > 0 ? (totals.loansOverdue / totals.totalLoans) * 100 : 0;
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="Portfolio and collections overview." />
+      <PageHeader title="Dashboard" description="Portfolio overview, from every loan's ledger." />
 
       <div className="mb-6 flex gap-3">
         <Link to="/borrowers/new">
@@ -65,68 +58,52 @@ export function DashboardPage() {
       {isLoading && <LoadingState label="Loading dashboard..." />}
       {isError && <ErrorState message={error instanceof Error ? error.message : "Failed to load dashboard."} />}
 
-      {data && (
+      {data && totals && (
         <div className="flex flex-col gap-8">
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Portfolio</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Total Loans" value={formatNumber(data.portfolio.totals.totalLoans)} />
-              <StatCard label="Total Sanctioned" value={formatCurrency(data.portfolio.totals.totalSanctioned)} />
-              <StatCard label="Total Disbursed" value={formatCurrency(data.portfolio.totals.totalDisbursed)} />
-              <StatCard label="Outstanding" value={formatCurrency(data.portfolio.totals.totalOutstanding)} />
+              <StatCard label="Total Loans" value={formatNumber(totals.totalLoans)} />
+              <StatCard label="Total Sanctioned" value={formatCurrency(totals.totalSanctioned)} />
+              <StatCard label="Total Disbursed" value={formatCurrency(totals.totalDisbursed)} />
+              <StatCard label="Total Received" value={formatCurrency(totals.totalReceived)} />
+              <StatCard label="Principal Outstanding" value={formatCurrency(totals.totalOutstanding)} />
+              <StatCard label="Interest Due" value={formatCurrency(totals.totalInterestDue)} />
+              <StatCard label="Total Payable" value={formatCurrency(totals.totalPayable)} />
+              <StatCard
+                label="Overdue"
+                value={formatCurrency(totals.totalOverdue)}
+                sub={`${formatNumber(totals.loansOverdue)} loan${totals.loansOverdue === 1 ? "" : "s"} past due`}
+              />
               <StatCard label="Overall IRR" value={formatPercent(data.returns.overallIrr)} />
               <StatCard label="Overall MIRR" value={formatPercent(data.returns.overallMirr)} />
             </div>
+          </section>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Asset Quality</h2>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <Card className="p-4 lg:col-span-2">
                 <div className="mb-3 flex items-center justify-between">
-                  <div className="text-sm font-medium text-slate-600">Outstanding by Status</div>
-                  <StatusLegend roles={["good", "warning", "critical"]} />
+                  <div className="text-sm font-medium text-slate-600">Principal Outstanding by Classification</div>
+                  <StatusLegend roles={["good", "warning", "serious", "critical"]} />
                 </div>
-                <HorizontalBarChart data={portfolioBars} />
+                <HorizontalBarChart data={classificationBars} />
               </Card>
 
               <Card className="flex flex-col justify-center gap-4 p-4">
                 <Meter
                   label="Portfolio at Risk"
                   pct={atRiskPct}
-                  sub={`${formatCurrency(atRiskOutstanding)} across Overdue, NPA & Written-Off loans`}
+                  sub={`${formatCurrency(atRiskOutstanding)} principal on loans past due (SMA-0 to NPA)`}
                 />
                 <Meter
-                  label="Overdue Installments"
-                  pct={
-                    data.portfolio.totals.totalLoans > 0
-                      ? (data.collections.overdueInstallments.count / data.portfolio.totals.totalLoans) * 100
-                      : 0
-                  }
-                  sub={`${formatNumber(data.collections.overdueInstallments.count)} installments · ${formatCurrency(data.collections.overdueInstallments.totalAmount)}`}
+                  label="Loans Past Due"
+                  pct={overdueLoansPct}
+                  sub={`${formatNumber(totals.loansOverdue)} of ${formatNumber(totals.totalLoans)} loans · ${formatCurrency(totals.totalOverdue)} overdue`}
                 />
               </Card>
             </div>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Collections</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Open Cases" value={formatNumber(data.collections.openCases)} />
-              <StatCard label="Total Overdue" value={formatCurrency(data.collections.totalOverdueAmount)} />
-              <StatCard label="Upcoming Follow-ups" value={formatNumber(data.collections.upcomingFollowUps)} />
-              <StatCard
-                label="Overdue Installments"
-                value={formatNumber(data.collections.overdueInstallments.count)}
-                sub={formatCurrency(data.collections.overdueInstallments.totalAmount)}
-              />
-            </div>
-
-            <Card className="mt-4 p-4">
-              <div className="mb-3 text-sm font-medium text-slate-600">Overdue Amount by Case Status</div>
-              {collectionsBars.length > 0 ? (
-                <HorizontalBarChart data={collectionsBars} />
-              ) : (
-                <span className="text-sm text-slate-400">No open collection cases.</span>
-              )}
-            </Card>
           </section>
         </div>
       )}

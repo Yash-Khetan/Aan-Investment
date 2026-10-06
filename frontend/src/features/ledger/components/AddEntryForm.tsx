@@ -5,8 +5,10 @@ import { SelectField, TextField, TextAreaField } from "../../../components/ui/Fi
 import { ErrorState } from "../../../components/ui/States";
 import { createEntry } from "../api";
 
+/** Today in the user's own calendar — toISOString() would give yesterday's date before 05:30 IST. */
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function AddEntryForm({ loanId, onAdded }: { loanId: string; onAdded: () => void }) {

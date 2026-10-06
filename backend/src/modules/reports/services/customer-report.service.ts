@@ -1,13 +1,23 @@
-import { and, count, eq, sum, type SQL } from "drizzle-orm";
+import { and, eq, isNull, type SQL } from "drizzle-orm";
 
 import { db } from "../../../db";
 import { borrowers, loans } from "../../../db/schema";
+import { getLoanSnapshots } from "../../ledger/snapshot.service";
 
 import { buildDateRangeConditions } from "../utils/query.util";
 import type { CustomerReportRow, ReportFilters } from "../types/report.types";
 
+function round2(n: number): number {
+    return Math.round(n * 100) / 100;
+}
+
+/**
+ * One row per live borrower, with the loans in scope summed from their
+ * ledger snapshots — so a customer's total is exactly the sum of their loans
+ * on the Loans list.
+ */
 export async function getCustomerReport(filters: ReportFilters): Promise<CustomerReportRow[]> {
-    const loanConditions: SQL[] = [eq(loans.borrowerId, borrowers.id)];
+    const loanConditions: SQL[] = [eq(loans.borrowerId, borrowers.id), isNull(loans.deletedAt)];
 
     if (filters.loanStatus) {
         loanConditions.push(eq(loans.status, filters.loanStatus));
@@ -17,7 +27,7 @@ export async function getCustomerReport(filters: ReportFilters): Promise<Custome
         ...buildDateRangeConditions(loans.createdAt, filters.startDate, filters.endDate),
     );
 
-    const borrowerConditions: SQL[] = [];
+    const borrowerConditions: SQL[] = [isNull(borrowers.deletedAt)];
 
     if (filters.customerId) {
         borrowerConditions.push(eq(borrowers.id, filters.customerId));
@@ -29,17 +39,34 @@ export async function getCustomerReport(filters: ReportFilters): Promise<Custome
             customerName: borrowers.name,
             phone: borrowers.phone,
             email: borrowers.email,
-            totalLoans: count(loans.id),
-            outstandingAmount: sum(loans.outstandingPrincipal),
+            loanId: loans.id,
         })
         .from(borrowers)
         .leftJoin(loans, and(...loanConditions))
-        .where(borrowerConditions.length > 0 ? and(...borrowerConditions) : undefined)
-        .groupBy(borrowers.id, borrowers.name, borrowers.phone, borrowers.email)
+        .where(and(...borrowerConditions))
         .orderBy(borrowers.name);
 
-    return rows.map((row) => ({
-        ...row,
-        outstandingAmount: row.outstandingAmount ?? "0",
-    }));
+    const loanIds = rows.flatMap((r) => (r.loanId ? [r.loanId] : []));
+    const snapshots = await getLoanSnapshots(loanIds);
+
+    const byCustomer = new Map<string, CustomerReportRow>();
+    for (const { loanId, ...customer } of rows) {
+        const entry = byCustomer.get(customer.customerId) ?? {
+            ...customer,
+            totalLoans: 0,
+            outstandingAmount: 0,
+            totalPayable: 0,
+            amountOverdue: 0,
+        };
+        if (loanId) {
+            const s = snapshots.get(loanId)!;
+            entry.totalLoans += 1;
+            entry.outstandingAmount = round2(entry.outstandingAmount + s.principalOutstanding);
+            entry.totalPayable = round2(entry.totalPayable + s.totalPayable);
+            entry.amountOverdue = round2(entry.amountOverdue + s.amountOverdue);
+        }
+        byCustomer.set(customer.customerId, entry);
+    }
+
+    return [...byCustomer.values()];
 }

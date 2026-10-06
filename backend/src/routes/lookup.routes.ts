@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { borrowers, loans } from "../db/schema/index.js";
 import { authenticate } from "../modules/auth/auth.middleware";
+import { getLoanSnapshots } from "../modules/ledger/snapshot.service";
 
 /**
  * Minimal, read-only lookup endpoints for the frontend. None of the six
@@ -20,6 +21,7 @@ export const lookupRouter = Router();
 
 lookupRouter.use(authenticate);
 
+/** Live loans, each with its principal outstanding per its ledger — the same figure the Loans list shows. */
 lookupRouter.get("/loans", async (_req, res, next) => {
     try {
         const rows = await db
@@ -28,13 +30,20 @@ lookupRouter.get("/loans", async (_req, res, next) => {
                 loanAccountNumber: loans.loanAccountNumber,
                 customerName: borrowers.name,
                 status: loans.status,
-                outstandingPrincipal: loans.outstandingPrincipal,
             })
             .from(loans)
             .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+            .where(isNull(loans.deletedAt))
             .orderBy(loans.loanAccountNumber);
 
-        res.status(200).json(rows);
+        const snapshots = await getLoanSnapshots(rows.map((r) => r.id));
+
+        res.status(200).json(
+            rows.map((r) => ({
+                ...r,
+                outstandingPrincipal: snapshots.get(r.id)!.principalOutstanding.toFixed(2),
+            })),
+        );
     } catch (error) {
         next(error);
     }
@@ -49,6 +58,7 @@ lookupRouter.get("/borrowers", async (_req, res, next) => {
                 name: borrowers.name,
             })
             .from(borrowers)
+            .where(isNull(borrowers.deletedAt))
             .orderBy(borrowers.name);
 
         res.status(200).json(rows);

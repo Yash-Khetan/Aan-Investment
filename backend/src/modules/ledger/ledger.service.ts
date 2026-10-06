@@ -4,7 +4,6 @@ import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
 import {
   getEntriesForLoan,
-  getEntriesForLoans,
   getEntriesUpTo,
   getExistingAccrualMonths,
   getJournalInterestEntriesFromMonth,
@@ -17,7 +16,6 @@ import {
   type LedgerEntryRow,
 } from "./ledger.repository";
 import {
-  BalanceBifurcation,
   CreateLedgerEntryInput,
   LedgerBalanceEvent,
   MonthAccrualConfig,
@@ -319,27 +317,6 @@ export async function getSettings(loanId: string) {
     interestBasis: config.interestBasis,
     includeOpeningClosingDays: config.includeOpeningClosingDays,
   };
-}
-
-/**
- * What each loan's current ledger balance is made of — principal plus each
- * month's unpaid net interest — for the Loans list. Self-heals each loan's
- * missing month-end journals first, so a ledger nobody has opened lately
- * still shows last month's interest. Loans with no ledger entries are absent.
- */
-export async function getClosingBifurcations(loanIds: string[]): Promise<Map<string, BalanceBifurcation>> {
-  await Promise.all(loanIds.map((id) => syncMissingMonthEndJournals(id)));
-
-  const byLoan = new Map<string, LedgerEntryRow[]>();
-  for (const row of await getEntriesForLoans(loanIds)) {
-    const rows = byLoan.get(row.loanId);
-    if (rows) rows.push(row);
-    else byLoan.set(row.loanId, [row]);
-  }
-
-  const result = new Map<string, BalanceBifurcation>();
-  for (const [loanId, rows] of byLoan) result.set(loanId, allocateLedger(rows).closing);
-  return result;
 }
 
 /**

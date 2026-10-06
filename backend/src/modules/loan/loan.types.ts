@@ -6,8 +6,9 @@ import type {
     updateLoanSchema,
     listLoansQuerySchema,
 } from "./loan.validators";
-import type { LoanOverdueMetrics } from "./loan.metrics";
 import type { BalanceBifurcation } from "../ledger/ledger.types";
+import type { LoanClassification } from "../ledger/dpd";
+import type { LoanSnapshot } from "../ledger/snapshot";
 
 /** Row as stored/returned by the database. */
 export type Loan = typeof loans.$inferSelect;
@@ -26,6 +27,20 @@ export type ListLoansQuery = z.infer<typeof listLoansQuerySchema>;
 /** Loan row enriched with the borrower's display name for list/detail views. */
 export type LoanWithBorrower = Loan & { borrowerName: string | null };
 
-/** Loan row further enriched with derived overdue/DPD/classification fields. */
+/** The loan-level figures every list and detail view shows, all from the loan's ledger snapshot. */
+export interface LoanOverdueMetrics {
+    amountOverdue: number;
+    dpd: number;
+    classification: LoanClassification;
+    nextDueDate: string | null;
+}
+
+/**
+ * Loan row enriched with its ledger-derived figures. `outstandingPrincipal`
+ * is overwritten with the ledger's principal; `snapshot` carries the full set.
+ */
 export type LoanWithMetrics = LoanWithBorrower &
-    LoanOverdueMetrics & { balanceBifurcation: BalanceBifurcation | null };
+    LoanOverdueMetrics & {
+        balanceBifurcation: BalanceBifurcation | null;
+        snapshot: LoanSnapshot;
+    };

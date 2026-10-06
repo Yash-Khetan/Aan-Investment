@@ -53,11 +53,18 @@ export interface ReportFilters {
    REPORT ROW SHAPES
 ============================================================ */
 
+/** Every money figure on the register comes from the loan's ledger snapshot. */
 export interface LoanRegisterRow {
     loanNumber: string;
     customerName: string;
     loanAmount: string;
-    outstandingAmount: string;
+    disbursedAmount: number;
+    outstandingAmount: number;
+    interestDue: number;
+    totalPayable: number;
+    amountOverdue: number;
+    dpd: number;
+    classification: string;
     interestRate: string;
     status: LoanStatus | null;
     createdDate: string | null;
@@ -69,7 +76,9 @@ export interface CustomerReportRow {
     phone: string | null;
     email: string | null;
     totalLoans: number;
-    outstandingAmount: string;
+    outstandingAmount: number;
+    totalPayable: number;
+    amountOverdue: number;
 }
 
 export interface CollateralReportRow {
@@ -103,9 +112,12 @@ export interface PortfolioSummaryRow {
     totalLoans: number;
     activeLoans: number;
     closedLoans: number;
-    rejectedLoans: number;
+    npaLoans: number;
     totalPortfolioValue: string;
-    outstandingAmount: string;
+    totalDisbursed: number;
+    outstandingAmount: number;
+    totalPayable: number;
+    totalOverdue: number;
     averageLoanSize: string;
     averageInterestRate: string;
 }

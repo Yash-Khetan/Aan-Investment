@@ -108,3 +108,32 @@ export interface DpdGrid {
   } | null;
   worstDpd: number;
 }
+
+/* ------------------------------------------------------------------ */
+/* Loan snapshot - every money figure about a loan as at one date,     */
+/* read off its ledger. The backend computes it once (ledger/          */
+/* snapshot.ts); every screen shows these figures, never its own.      */
+/* ------------------------------------------------------------------ */
+
+export interface LoanSnapshot {
+  asOf: string;
+  hasEntries: boolean;
+  bifurcation: BalanceBifurcation;
+  principalOutstanding: number;
+  /** Interest posted (net of TDS) and not yet received. */
+  interestOutstanding: number;
+  /** Principal plus unpaid interest - always equals the ledger balance. */
+  totalPayable: number;
+  closingBalance: number;
+  amountOverdue: number;
+  dpd: number;
+  classification: DpdClassification;
+  oldestOverdueDueDate: string | null;
+  nextDueDate: string | null;
+  totalDisbursed: number;
+  totalReceived: number;
+  totalInterest: number;
+  totalTds: number;
+  firstDisbursementDate: string | null;
+  lastReceiptDate: string | null;
+}

@@ -1,150 +1,101 @@
-import { and, count, gte, inArray, isNull, lt, lte, sql, sum } from "drizzle-orm";
+import { isNull } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
-import { collectionCases, installments, loans } from "../../db/schema/index.js";
+import { loans } from "../../db/schema/index.js";
 import { xirr, xmirr } from "../../common/finance/xirr.js";
 import { getPortfolioCashFlows } from "../loan/loan.irr.js";
-import { getOutstandingPrincipal } from "../loan/loan.metrics.js";
+import type { LoanClassification } from "../ledger/dpd.js";
+import { getLoanSnapshots } from "../ledger/snapshot.service.js";
 
 function toNumber(value: string | null): number {
     return value === null ? 0 : Number(value);
 }
 
-function todayISODate(): string {
-    return new Date().toISOString().slice(0, 10);
+function round2(n: number): number {
+    return Math.round(n * 100) / 100;
 }
 
+const CLASSIFICATIONS: LoanClassification[] = ["STD", "SMA-0", "SMA-1", "SMA-2", "NPA"];
+
+/**
+ * Portfolio totals and the delinquency split, every money figure summed from
+ * each loan's ledger snapshot — the same figures the Loans list shows per
+ * loan, so the dashboard always adds up to the list.
+ */
 export async function getPortfolioSummary() {
     const loanRows = await db
-        .select({
-            id: loans.id,
-            status: loans.status,
-            sanctionedAmount: loans.sanctionedAmount,
-            disbursedAmount: loans.disbursedAmount,
-        })
+        .select({ id: loans.id, sanctionedAmount: loans.sanctionedAmount })
         .from(loans)
         .where(isNull(loans.deletedAt));
 
-    // Computed, not the raw loans.outstandingPrincipal column — nothing updates
-    // it when a payment is recorded, so it drifts stale (see loan.metrics.ts).
-    const outstandingByLoan = await getOutstandingPrincipal(loanRows.map((l) => l.id));
+    const snapshots = await getLoanSnapshots(loanRows.map((l) => l.id));
 
-    const byStatusMap = new Map<
-        string,
-        { loanCount: number; sanctionedAmount: number; disbursedAmount: number; outstandingPrincipal: number }
-    >();
+    const byClassification = new Map(
+        CLASSIFICATIONS.map((c) => [
+            c,
+            { classification: c, loanCount: 0, principalOutstanding: 0, amountOverdue: 0 },
+        ]),
+    );
+
+    const totals = {
+        totalLoans: loanRows.length,
+        totalSanctioned: 0,
+        totalDisbursed: 0,
+        totalReceived: 0,
+        totalOutstanding: 0,
+        totalInterestDue: 0,
+        totalPayable: 0,
+        totalOverdue: 0,
+        loansOverdue: 0,
+    };
 
     for (const loan of loanRows) {
-        const status = loan.status ?? "UNKNOWN";
-        const row = byStatusMap.get(status) ?? {
-            loanCount: 0,
-            sanctionedAmount: 0,
-            disbursedAmount: 0,
-            outstandingPrincipal: 0,
-        };
-        row.loanCount += 1;
-        row.sanctionedAmount += toNumber(loan.sanctionedAmount);
-        row.disbursedAmount += toNumber(loan.disbursedAmount);
-        row.outstandingPrincipal += outstandingByLoan.get(loan.id) ?? 0;
-        byStatusMap.set(status, row);
+        const s = snapshots.get(loan.id)!;
+        totals.totalSanctioned += toNumber(loan.sanctionedAmount);
+        totals.totalDisbursed += s.totalDisbursed;
+        totals.totalReceived += s.totalReceived;
+        totals.totalOutstanding += s.principalOutstanding;
+        totals.totalInterestDue += s.interestOutstanding;
+        totals.totalPayable += s.totalPayable;
+        totals.totalOverdue += s.amountOverdue;
+        if (s.dpd > 0) totals.loansOverdue += 1;
+
+        const bucket = byClassification.get(s.classification)!;
+        bucket.loanCount += 1;
+        bucket.principalOutstanding += s.principalOutstanding;
+        bucket.amountOverdue += s.amountOverdue;
     }
 
-    const byStatus = [...byStatusMap.entries()].map(([status, row]) => ({ status, ...row }));
-
-    const totals = byStatus.reduce(
-        (acc, row) => {
-            acc.totalLoans += row.loanCount;
-            acc.totalSanctioned += row.sanctionedAmount;
-            acc.totalDisbursed += row.disbursedAmount;
-            acc.totalOutstanding += row.outstandingPrincipal;
-            return acc;
-        },
-        { totalLoans: 0, totalSanctioned: 0, totalDisbursed: 0, totalOutstanding: 0 },
-    );
-
-    return { totals, byStatus };
-}
-
-export async function getCollectionsSummary() {
-    const today = todayISODate();
-    const followUpWindowEnd = new Date();
-    followUpWindowEnd.setDate(followUpWindowEnd.getDate() + 7);
-    const followUpWindowEndISO = followUpWindowEnd.toISOString().slice(0, 10);
-
-    const byStatus = await db
-        .select({
-            status: collectionCases.status,
-            caseCount: count(),
-            overdueAmount: sum(collectionCases.overdueAmount),
-        })
-        .from(collectionCases)
-        .where(isNull(collectionCases.deletedAt))
-        .groupBy(collectionCases.status);
-
-    const [upcomingFollowUps] = await db
-        .select({ count: count() })
-        .from(collectionCases)
-        .where(
-            and(
-                isNull(collectionCases.deletedAt),
-                gte(collectionCases.nextFollowUpDate, today),
-                lte(collectionCases.nextFollowUpDate, followUpWindowEndISO),
-                sql`${collectionCases.status} <> 'CLOSED'`,
-            ),
-        );
-
-    const [overdueInstallmentsRow] = await db
-        .select({
-            count: count(),
-            overdueAmount: sum(sql`${installments.totalAmount} - ${installments.paidTotal}`),
-        })
-        .from(installments)
-        .where(
-            and(
-                isNull(installments.deletedAt),
-                inArray(installments.status, ["PENDING", "PARTIAL"]),
-                lt(installments.dueDate, today),
-            ),
-        );
-
-    const openCases = byStatus.reduce(
-        (acc, row) => (row.status === "CLOSED" ? acc : acc + row.caseCount),
-        0,
-    );
-    const totalOverdueAmount = byStatus.reduce((acc, row) => acc + toNumber(row.overdueAmount), 0);
-
     return {
-        openCases,
-        totalOverdueAmount,
-        byStatus: byStatus.map((row) => ({
-            status: row.status,
-            caseCount: row.caseCount,
-            overdueAmount: toNumber(row.overdueAmount),
-        })),
-        upcomingFollowUps: upcomingFollowUps?.count ?? 0,
-        overdueInstallments: {
-            count: overdueInstallmentsRow?.count ?? 0,
-            totalAmount: toNumber(overdueInstallmentsRow?.overdueAmount ?? null),
+        totals: {
+            ...totals,
+            totalSanctioned: round2(totals.totalSanctioned),
+            totalDisbursed: round2(totals.totalDisbursed),
+            totalReceived: round2(totals.totalReceived),
+            totalOutstanding: round2(totals.totalOutstanding),
+            totalInterestDue: round2(totals.totalInterestDue),
+            totalPayable: round2(totals.totalPayable),
+            totalOverdue: round2(totals.totalOverdue),
         },
+        byClassification: [...byClassification.values()].map((b) => ({
+            ...b,
+            principalOutstanding: round2(b.principalOutstanding),
+            amountOverdue: round2(b.amountOverdue),
+        })),
     };
 }
 
 /**
- * Portfolio-wide money-weighted return. IRR is solved from the combined,
- * realized cash-flow series across every non-deleted loan (disbursements
- * out, SUCCESS payments in, plus each loan's current outstanding principal
- * as a final notional inflow — see `loan.irr.ts` for why). MIRR needs a
- * finance/reinvestment rate; per product decision, that's the portfolio's
+ * Portfolio-wide money-weighted return. IRR is solved from the combined
+ * ledger cash flows of every non-deleted loan (see `loan.irr.ts`). MIRR needs
+ * a finance/reinvestment rate; per product decision, that's the portfolio's
  * disbursement-weighted-average interest rate applied uniformly, standing in
- * for "each loan's own rate" at the aggregate level.
+ * for "each loan's own rate" at the aggregate level. The weights are each
+ * loan's ledger disbursements.
  */
 export async function getOverallReturns() {
     const loanRows = await db
-        .select({
-            id: loans.id,
-            interestRate: loans.interestRate,
-            disbursedAmount: loans.disbursedAmount,
-        })
+        .select({ id: loans.id, interestRate: loans.interestRate })
         .from(loans)
         .where(isNull(loans.deletedAt));
 
@@ -153,12 +104,12 @@ export async function getOverallReturns() {
     }
 
     const loanIds = loanRows.map((l) => l.id);
-    const cashFlows = await getPortfolioCashFlows(loanIds);
+    const [cashFlows, snapshots] = await Promise.all([getPortfolioCashFlows(loanIds), getLoanSnapshots(loanIds)]);
 
     let weightedRateSum = 0;
     let totalDisbursed = 0;
     for (const loan of loanRows) {
-        const disbursed = toNumber(loan.disbursedAmount);
+        const disbursed = snapshots.get(loan.id)!.totalDisbursed;
         weightedRateSum += disbursed * (toNumber(loan.interestRate) / 100);
         totalDisbursed += disbursed;
     }

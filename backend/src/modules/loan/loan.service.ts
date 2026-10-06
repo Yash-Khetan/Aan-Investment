@@ -14,10 +14,9 @@ import type { PaginationMeta } from "../../common/http/apiResponse";
 import { db } from "../../db/index";
 import * as loanRepository from "./loan.repository";
 import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators";
-import { EMPTY_METRICS, getOutstandingPrincipal, getOverdueMetrics } from "./loan.metrics";
 import { getLoanIrrs } from "./loan.irr";
 import { syncRepaymentSchedule } from "../repayment/repayment.service";
-import { getClosingBifurcations } from "../ledger/ledger.service";
+import { getLoanSnapshots } from "../ledger/snapshot.service";
 import {
     createInterestConfigRevision,
     createInterestRule,
@@ -335,27 +334,29 @@ export const createLoan = async (
 };
 
 /**
- * Attach derived overdue/DPD/classification/next-due-date fields to each
- * loan, and overwrite `outstandingPrincipal` with the computed value (see
- * `loan.metrics.ts` — the stored column isn't kept in sync with payments).
- * `balanceBifurcation` is the loan's current ledger balance split into
- * principal and each month's unpaid interest — null while the ledger is empty.
+ * Attach each loan's money figures, all read off its ledger through the one
+ * loan snapshot (ledger/snapshot.ts): outstanding principal, amount overdue,
+ * DPD, classification, next due date and the balance bifurcation. The
+ * stored `outstandingPrincipal` column is overwritten with the ledger's
+ * figure — the column is never kept in sync with the money that moves.
  */
 const enrichWithMetrics = async (
     loans: LoanWithBorrower[],
 ): Promise<LoanWithMetrics[]> => {
-    const loanIds = loans.map((l) => l.id);
-    const [metrics, outstanding, bifurcations] = await Promise.all([
-        getOverdueMetrics(loanIds),
-        getOutstandingPrincipal(loanIds),
-        getClosingBifurcations(loanIds),
-    ]);
-    return loans.map((loan) => ({
-        ...loan,
-        ...(metrics.get(loan.id) ?? EMPTY_METRICS),
-        outstandingPrincipal: (outstanding.get(loan.id) ?? 0).toFixed(2),
-        balanceBifurcation: bifurcations.get(loan.id) ?? null,
-    }));
+    const snapshots = await getLoanSnapshots(loans.map((l) => l.id));
+    return loans.map((loan) => {
+        const snapshot = snapshots.get(loan.id)!;
+        return {
+            ...loan,
+            outstandingPrincipal: snapshot.principalOutstanding.toFixed(2),
+            amountOverdue: snapshot.amountOverdue,
+            dpd: snapshot.dpd,
+            classification: snapshot.classification,
+            nextDueDate: snapshot.nextDueDate,
+            balanceBifurcation: snapshot.hasEntries ? snapshot.bifurcation : null,
+            snapshot,
+        };
+    });
 };
 
 export const getLoanById = async (

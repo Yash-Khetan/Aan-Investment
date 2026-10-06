@@ -57,13 +57,13 @@ export function LoanSummaryCard({ loan }: { loan: Loan }) {
 
           <SummaryGroup title="Amounts">
             <DetailField label="Sanctioned Amount" value={formatCurrency(loan.sanctionedAmount)} />
-            <DetailField label="Disbursed" value={formatCurrency(loan.disbursedAmount)} />
+            <DetailField label="Disbursed" value={formatCurrency(loan.snapshot.totalDisbursed)} />
             <DetailField label="IRR (to date)" value={formatPercent(loan.irr)} />
           </SummaryGroup>
 
           <SummaryGroup title="Schedule & Dates">
             <DetailField label="Sanction Date" value={formatDate(loan.sanctionDate)} />
-            <DetailField label="First Disbursement" value={formatDate(loan.firstDisbursementDate)} />
+            <DetailField label="First Disbursement" value={formatDate(loan.snapshot.firstDisbursementDate)} />
             <DetailField label="Maturity Date" value={formatDate(loan.maturityDate)} />
             <DetailField label="Tenure (months)" value={loan.tenureMonths} />
             <DetailField label="Next Due Date" value={formatDate(loan.nextDueDate)} />
@@ -96,7 +96,9 @@ export function LoanSummaryCard({ loan }: { loan: Loan }) {
       <SummaryGroup title="Loan">
         <DetailField label="Interest Rate" value={`${Number(loan.interestRate).toFixed(2)}%`} />
         <DetailField label="Interest Basis" value={optionLabel(INTEREST_BASIS_OPTIONS, config?.interestBasis)} />
-        <DetailField label="Outstanding" value={formatCurrency(loan.outstandingPrincipal)} />
+        <DetailField label="Principal Outstanding" value={formatCurrency(loan.snapshot.principalOutstanding)} />
+        <DetailField label="Interest Due" value={formatCurrency(loan.snapshot.interestOutstanding)} />
+        <DetailField label="Total Payable" value={formatCurrency(loan.snapshot.totalPayable)} />
         <DetailField label="Amount Overdue" value={formatCurrency(loan.amountOverdue)} />
       </SummaryGroup>
     </SummaryCard>

@@ -59,10 +59,13 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
         <DetailField label="TDS Rate" value={`${Number(loan.tdsRatePercent ?? 0).toFixed(2)}%`} />
       </DetailSection>
 
-      <DetailSection title="Amounts">
+      <DetailSection title="Amounts (from the ledger)">
         <DetailField label="Sanctioned" value={formatCurrency(loan.sanctionedAmount)} />
-        <DetailField label="Disbursed" value={formatCurrency(loan.disbursedAmount)} />
-        <DetailField label="Outstanding" value={formatCurrency(loan.outstandingPrincipal)} />
+        <DetailField label="Disbursed" value={formatCurrency(loan.snapshot.totalDisbursed)} />
+        <DetailField label="Received" value={formatCurrency(loan.snapshot.totalReceived)} />
+        <DetailField label="Principal Outstanding" value={formatCurrency(loan.snapshot.principalOutstanding)} />
+        <DetailField label="Interest Due" value={formatCurrency(loan.snapshot.interestOutstanding)} />
+        <DetailField label="Total Payable" value={formatCurrency(loan.snapshot.totalPayable)} />
         <DetailField label="Amount Overdue" value={formatCurrency(loan.amountOverdue)} />
         <DetailField label="IRR (to date)" value={formatPercent(loan.irr)} />
       </DetailSection>
@@ -71,7 +74,7 @@ export function LoanDetailView({ loanId }: { loanId: string }) {
         <DetailField label="DPD" value={loan.dpd} />
         <DetailField label="Next Due Date" value={formatDate(loan.nextDueDate)} />
         <DetailField label="Sanction Date" value={formatDate(loan.sanctionDate)} />
-        <DetailField label="First Disbursement" value={formatDate(loan.firstDisbursementDate)} />
+        <DetailField label="First Disbursement" value={formatDate(loan.snapshot.firstDisbursementDate)} />
         <DetailField label="Maturity Date" value={formatDate(loan.maturityDate)} />
         <DetailField label="Tenure (months)" value={loan.tenureMonths} />
       </DetailSection>

@@ -282,28 +282,18 @@ silently dropping filters, these are handled explicitly:
   guessing that "branch" means "relationship manager." If a `branches` table is
   added later, wire the filter into each `services/*.service.ts` file and relax the
   validator's rejection in `validators/report-filters.validator.ts`.
-- **`rejectedLoans` in Portfolio Summary**: `loan_status` has no `REJECTED` value
-  (only `PENDING, ACTIVE, OVERDUE, NPA, CLOSED, WRITTEN_OFF`). The query is written
-  to always evaluate to `0` for this field (via a safe `::text` cast so Postgres
-  doesn't throw on the unknown enum literal) rather than mapping it onto an existing
-  status that doesn't mean "rejected." Once the enum gains a `REJECTED` value, this
-  starts working with no code change.
 - **`forcedSaleValue` in Collateral Report**: there is no Forced Sale Value column on
   `collaterals` (only `estimated_value`, i.e. market value). This field is always
   `null` rather than estimating it via an invented haircut percentage.
 - **`insuranceStatus` in Collateral Report**: derived, not stored — `NOT_INSURED` (no
   insurance record), `INACTIVE` (latest policy's `status = INACTIVE`), `EXPIRED`
   (`expiryDate` in the past), or `ACTIVE` otherwise.
-- **`outstandingAmount`** (Loan Register, Customer Report, Portfolio Summary) reflects
-  `loans.outstanding_principal`, the ledger's maintained running balance — not a
-  live recomputation from `installments`/`payment_allocations`. If the Loans module
-  does not keep this column in sync with payments, these figures will be stale. A
-  more granular, always-accurate value can be derived per loan as
-  `sum(installments.total_amount) - sum(installments.paid_total)` over the loan's
-  current (`is_current = true`) `repayment_schedules` row, but that was not adopted
-  here to avoid a much heavier join across `loan-register`/`customer-report`/
-  `portfolio-summary` — worth revisiting once the Loans/Payments modules confirm
-  whether they keep `outstanding_principal` synced.
+- **Money figures** (Loan Register, Customer Report, Portfolio Summary, Collateral
+  Report LTV) come from each loan's ledger snapshot (`ledger/snapshot.ts`) — the same
+  figures the Loans list and Ledger page show. Nothing reads the stored
+  `loans.outstanding_principal` column. NPA in the Portfolio Summary is the ledger's
+  DPD classification, not the manually set loan status. Deleted loans and borrowers
+  are excluded.
 
 ## 10. Logging
 

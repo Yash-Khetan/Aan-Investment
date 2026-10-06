@@ -1,5 +1,5 @@
 import type { CalculationMethod, InterestBasis, InterestConfig } from "../interest/types";
-import type { BalanceBifurcation } from "../ledger/types";
+import type { BalanceBifurcation, LoanSnapshot } from "../ledger/types";
 
 export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
 
@@ -206,16 +206,19 @@ export interface Loan {
    * legacy loan that has never had one.
    */
   interestConfig?: InterestConfig | null;
-  /** Sum of (expected - paid) across unpaid installments past due, on the current repayment schedule. */
+  /* The figures below all come from the loan's ledger snapshot - the same on every screen. */
+  /** Unpaid interest already past due. */
   amountOverdue: number;
-  /** Days since the oldest unpaid overdue installment's due date; 0 when nothing is overdue. */
+  /** Days past due, counting part-payments proportionally (as the Ledger's DPD grid). */
   dpd: number;
   /** RBI-style NBFC delinquency bucket derived from dpd: STD, SMA-0, SMA-1, SMA-2, or NPA. */
   classification: string;
-  /** Earliest due date among unpaid installments (overdue or upcoming); null if none. */
+  /** Oldest unpaid month's due date, or the coming month-end; null once nothing is owed. */
   nextDueDate: string | null;
   /** The loan's current Ledger balance split into principal and each month's unpaid interest. Null while the ledger is empty. */
   balanceBifurcation: BalanceBifurcation | null;
+  /** Every money figure about the loan, read off its ledger. */
+  snapshot: LoanSnapshot;
   /**
    * Annualized IRR from this loan's realized cash flows (disbursements out, actual
    * payments in) plus its current outstanding principal as a final notional inflow.

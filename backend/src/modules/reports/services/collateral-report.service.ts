@@ -3,6 +3,8 @@ import { and, desc, eq, type SQL } from "drizzle-orm";
 import { db } from "../../../db";
 import { collaterals, collateralInsurance, loans, borrowers } from "../../../db/schema";
 
+import { getLoanSnapshots } from "../../ledger/snapshot.service";
+import { calculateLtv } from "../../collateral/utils/ltv.util";
 import { buildDateRangeConditions } from "../utils/query.util";
 import type {
     CollateralReportRow,
@@ -67,7 +69,8 @@ export async function getCollateralReport(
             collateralType: collaterals.securityType,
             loanNumber: loans.loanAccountNumber,
             marketValue: collaterals.estimatedValue,
-            ltv: collaterals.ltvRatio,
+            loanId: collaterals.loanId,
+            storedLtv: collaterals.ltvRatio,
             insuranceStatus: latestInsurance.status,
             insuranceExpiryDate: latestInsurance.expiryDate,
         })
@@ -78,12 +81,25 @@ export async function getCollateralReport(
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(collaterals.createdAt));
 
+    // LTV as of now, against the loan's ledger principal — the stored ratio is
+    // only what it was when the collateral was last written.
+    const snapshots = await getLoanSnapshots([...new Set(rows.map((r) => r.loanId))]);
+    const liveLtv = (row: (typeof rows)[number]): string | null => {
+        if (!row.marketValue) return row.storedLtv;
+        try {
+            const principal = Math.max(snapshots.get(row.loanId)!.principalOutstanding, 0);
+            return String(calculateLtv(principal, row.marketValue));
+        } catch {
+            return row.storedLtv;
+        }
+    };
+
     return rows.map((row) => ({
         collateralType: row.collateralType,
         loanNumber: row.loanNumber,
         marketValue: row.marketValue,
         forcedSaleValue: null,
-        ltv: row.ltv,
+        ltv: liveLtv(row),
         insuranceStatus: resolveInsuranceStatus(row.insuranceStatus, row.insuranceExpiryDate),
     }));
 }
