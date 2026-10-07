@@ -1,10 +1,11 @@
-import { getDailyRateFraction, supportsDailyRate } from "../interest/dailyRate";
+import { BadRequestError, NotFoundError } from "../../common/errors";
+import { firstSystemAccrualMonth } from "../kpi-ledger/sheet";
+import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
 import {
   getEntriesForLoan,
-  getEntriesForLoans,
   getEntriesUpTo,
   getExistingAccrualMonths,
   getJournalInterestEntriesFromMonth,
@@ -13,11 +14,11 @@ import {
   insertJournalPair,
   getEntryById,
   updateEntryAmountAndRate,
-  getLoanRates,
+  getHistoryCutoff,
+  getLoanStatus,
   type LedgerEntryRow,
 } from "./ledger.repository";
 import {
-  BalanceBifurcation,
   CreateLedgerEntryInput,
   LedgerBalanceEvent,
   MonthAccrualConfig,
@@ -25,12 +26,9 @@ import {
 import { allocateLedger } from "./allocation";
 
 /**
- * The day-count this ledger has always accrued at, and still does whenever a
- * loan has no interest configuration to read one from — or has one whose basis
- * has no daily-rate concept at all (FULL_MONTH, CUSTOM), which the month-end
- * daily walk below cannot express. Journal rows posted before the basis was
- * snapshotted per row also read back as this, so their amounts reproduce
- * unchanged.
+ * What a Journal row posted before the basis was snapshotted per row reads
+ * back as — the day-count this ledger accrued at then — so such rows
+ * reproduce their amounts unchanged on recompute.
  */
 const LEDGER_FALLBACK_BASIS: InterestBasis = "ACTUAL_365";
 
@@ -107,8 +105,8 @@ export async function assembleMonthBalanceEvents(
 
 /**
  * The interest configuration a given month must accrue under: the
- * interest_configs revision in effect on that month's end date, falling back
- * to the loan's own rates when the loan has no configuration at all.
+ * interest_configs revision in effect on that month's end date. Every loan
+ * is created with one, so a loan without any is a defect, not a default.
  *
  * Resolving per month — rather than always reading the loan's current values —
  * is what gives a configuration change its effective point. A month that
@@ -119,20 +117,14 @@ export async function resolveAccrualConfig(loanId: string, monthEnd: Date): Prom
   const config = await getInterestConfigEffectiveOn(loanId, toIsoDate(monthEnd));
 
   if (!config) {
-    const rates = await getLoanRates(loanId);
-    return {
-      interestRatePercent: Number(rates.defaultInterestRatePercent),
-      tdsRatePercent: Number(rates.defaultTdsRatePercent),
-      interestBasis: LEDGER_FALLBACK_BASIS,
-      includeOpeningClosingDays: LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
-    };
+    throw new NotFoundError(`Loan ${loanId} has no interest configuration.`);
   }
 
   return {
     interestRatePercent: Number(config.annualRate),
     tdsRatePercent: Number(config.tdsRatePercent),
-    interestBasis: supportsDailyRate(config.interestBasis) ? config.interestBasis : LEDGER_FALLBACK_BASIS,
-    includeOpeningClosingDays: config.includeOpeningClosingDays ?? LEDGER_FALLBACK_INCLUDE_OPENING_CLOSING_DAYS,
+    interestBasis: config.interestBasis,
+    includeOpeningClosingDays: config.includeOpeningClosingDays,
   };
 }
 
@@ -199,6 +191,10 @@ export async function generateMonthEndJournalPair(loanId: string, monthStart: Da
  * of order or in parallel). Silent — a failure here must never block a
  * ledger read.
  *
+ * Months covered by imported history are never generated: the sheet's own
+ * Interest journals stand for them, and the ledger takes over from the month
+ * after the last one. A CLOSED loan accrues nothing.
+ *
  * Each generated month resolves its own configuration, so back-filling a
  * stretch that spans a configuration change gives every month the values
  * that were in effect for it rather than today's.
@@ -207,12 +203,13 @@ export async function syncMissingMonthEndJournals(loanId: string): Promise<void>
   try {
     const earliest = await getEarliestEntryDate(loanId);
     if (!earliest) return;
+    if ((await getLoanStatus(loanId)) === "CLOSED") return;
 
     const existingMonths = new Set(await getExistingAccrualMonths(loanId));
+    const { lastInterestMonth } = await getHistoryCutoff(loanId);
 
     const today = new Date();
-    const earliestDate = parseIsoDate(earliest);
-    let cursor = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+    let cursor = parseIsoDate(firstSystemAccrualMonth(`${earliest.slice(0, 7)}-01`, lastInterestMonth));
     const lastElapsedMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 
     while (cursor.getTime() <= lastElapsedMonthStart.getTime()) {
@@ -289,6 +286,15 @@ export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promi
 }
 
 export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Promise<LedgerEntryRow> {
+  // Imported history is the record up to its last row; nothing is added by hand inside it.
+  const { lastEntryDate } = await getHistoryCutoff(input.loanId);
+  if (lastEntryDate && input.entryDate <= lastEntryDate) {
+    throw new BadRequestError(
+      `This loan's imported history runs to ${lastEntryDate}. Entries on or before that date come from the imported sheet; record this one with a later date.`,
+      { field: "entryDate" },
+    );
+  }
+
   const created = await insertPaymentOrReceipt({
     loanId: input.loanId,
     entryDate: input.entryDate,
@@ -309,37 +315,15 @@ export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Pro
  * write path back to them.
  */
 export async function getSettings(loanId: string) {
-  const rates = await getLoanRates(loanId);
   const config = await resolveAccrualConfig(loanId, new Date());
 
   return {
-    ...rates,
+    loanId,
     currentInterestRatePercent: String(config.interestRatePercent),
     currentTdsRatePercent: String(config.tdsRatePercent),
     interestBasis: config.interestBasis,
     includeOpeningClosingDays: config.includeOpeningClosingDays,
   };
-}
-
-/**
- * What each loan's current ledger balance is made of — principal plus each
- * month's unpaid net interest — for the Loans list. Self-heals each loan's
- * missing month-end journals first, so a ledger nobody has opened lately
- * still shows last month's interest. Loans with no ledger entries are absent.
- */
-export async function getClosingBifurcations(loanIds: string[]): Promise<Map<string, BalanceBifurcation>> {
-  await Promise.all(loanIds.map((id) => syncMissingMonthEndJournals(id)));
-
-  const byLoan = new Map<string, LedgerEntryRow[]>();
-  for (const row of await getEntriesForLoans(loanIds)) {
-    const rows = byLoan.get(row.loanId);
-    if (rows) rows.push(row);
-    else byLoan.set(row.loanId, [row]);
-  }
-
-  const result = new Map<string, BalanceBifurcation>();
-  for (const [loanId, rows] of byLoan) result.set(loanId, allocateLedger(rows).closing);
-  return result;
 }
 
 /**
@@ -353,12 +337,16 @@ export async function getLoanLedger(loanId: string) {
   const rows = await getEntriesForLoan(loanId);
   const allocation = allocateLedger(rows);
 
+  // Entries dated after today are scheduled: they sort after every posted
+  // entry, so posted balances are untouched by them, and theirs is projected.
+  const today = toIsoDate(new Date());
   let balance = 0;
   const entries = rows.map((row) => {
     balance += row.debit ? Number(row.debit) : 0;
     balance -= row.credit ? Number(row.credit) : 0;
     return {
       ...row,
+      isScheduled: row.entryDate > today,
       balance,
       bifurcation: allocation.bifurcationAfter.get(row.id)!,
       allocation: allocation.receipts.get(row.id) ?? null,

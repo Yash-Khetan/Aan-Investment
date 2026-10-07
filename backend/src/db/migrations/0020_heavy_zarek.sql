@@ -1,1 +1,0 @@
-ALTER TABLE "kpi_ledger_rows" ADD COLUMN "source_meta" text;

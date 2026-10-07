@@ -6,8 +6,11 @@ export function LoanSelect({
   value,
   onChange,
   required,
+  placeholder = "Select a loan",
 }: {
   label?: string;
+  /** Text of the empty option — e.g. "All loans" when the select is a filter. */
+  placeholder?: string;
   value: string;
   onChange: (loanId: string) => void;
   required?: boolean;
@@ -16,7 +19,7 @@ export function LoanSelect({
 
   return (
     <SelectField label={label} value={value} onChange={(e) => onChange(e.target.value)} required={required}>
-      <option value="">{isLoading ? "Loading loans..." : "Select a loan"}</option>
+      <option value="">{isLoading ? "Loading loans..." : placeholder}</option>
       {data?.map((loan) => (
         <option key={loan.id} value={loan.id}>
           {loan.loanAccountNumber} — {loan.customerName} ({loan.status})

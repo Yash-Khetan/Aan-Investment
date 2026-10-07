@@ -21,6 +21,8 @@ import {
   SectionTitle,
 } from "./borrowerFormShared";
 
+export type BorrowerFormSection = "basic" | "identity" | "contact" | "address";
+
 /**
  * Fields for a non-individual borrower (company, LLP, partnership firm, …) —
  * exactly the Commercial sheet of the CIBIL workbook, nothing more. Rendered in
@@ -30,15 +32,20 @@ export function CommercialBorrowerFields({
   form,
   onChange,
   showStatus,
+  section,
 }: {
   form: BorrowerFormState;
   onChange: (patch: Partial<BorrowerFormState>) => void;
   showStatus?: boolean;
+  /** Render only this part of the form (one step of a stepped form). Omitted: every part. */
+  section?: BorrowerFormSection;
 }) {
+  const show = (part: BorrowerFormSection) => !section || section === part;
   return (
     <>
+      {show("basic") && (
       <Card className="p-4">
-        <SectionTitle>Basic Details</SectionTitle>
+        {!section && <SectionTitle>Basic Details</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Account Number"
@@ -126,9 +133,11 @@ export function CommercialBorrowerFields({
           )}
         </div>
       </Card>
+      )}
 
+      {show("identity") && (
       <Card className="p-4">
-        <SectionTitle>Identity</SectionTitle>
+        {!section && <SectionTitle>Identity</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <IdentityFieldGroup
             heading="PAN"
@@ -140,9 +149,11 @@ export function CommercialBorrowerFields({
           />
         </div>
       </Card>
+      )}
 
+      {show("contact") && (
       <Card className="p-4">
-        <SectionTitle>Contact</SectionTitle>
+        {!section && <SectionTitle>Contact</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Email ID"
@@ -162,9 +173,11 @@ export function CommercialBorrowerFields({
           />
         </div>
       </Card>
+      )}
 
+      {show("address") && (
       <Card className="p-4">
-        <SectionTitle>Registered Address</SectionTitle>
+        {!section && <SectionTitle>Registered Address</SectionTitle>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextField
             label="Address Line 1"
@@ -178,6 +191,7 @@ export function CommercialBorrowerFields({
           <TextField label="Pin Code" value={form.pincode} onChange={(e) => onChange({ pincode: e.target.value })} required />
         </div>
       </Card>
+      )}
     </>
   );
 }

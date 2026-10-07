@@ -58,6 +58,5 @@ function createExportHandler(reportName: ReportName) {
 export const exportLoanRegister = createExportHandler("loan-register");
 export const exportCustomerReport = createExportHandler("customer-report");
 export const exportCollateralReport = createExportHandler("collateral-report");
-export const exportCollectionsReport = createExportHandler("collections-report");
 export const exportDocumentReport = createExportHandler("document-report");
 export const exportPortfolioSummary = createExportHandler("portfolio-summary");

@@ -15,6 +15,7 @@ import {
 
 import { calculateLtv } from "../utils/ltv.util";
 import { collateralLogger } from "../utils/logger";
+import { getLoanSnapshot } from "../../ledger/snapshot.service";
 import {
     CollateralNotFoundError,
     LoanNotFoundError,
@@ -55,7 +56,25 @@ function toInsuranceRecord(row: InsuranceRow): InsuranceRecord {
     };
 }
 
-function toCollateralRecord(row: CollateralRow, insurance: InsuranceRow | null): CollateralRecord {
+/**
+ * LTV as of now: the loan's ledger principal over this collateral's value.
+ * Never stored — computed on every read. Null when there is no valuation to
+ * divide by.
+ */
+function liveLtv(row: CollateralRow, loanOutstanding: number): string | null {
+    if (!row.estimatedValue) return null;
+    try {
+        return String(calculateLtv(loanOutstanding, row.estimatedValue));
+    } catch {
+        return null;
+    }
+}
+
+function toCollateralRecord(
+    row: CollateralRow,
+    insurance: InsuranceRow | null,
+    loanOutstanding: number,
+): CollateralRecord {
     return {
         id: row.id,
         loanId: row.loanId,
@@ -77,7 +96,7 @@ function toCollateralRecord(row: CollateralRow, insurance: InsuranceRow | null):
         mortgageDate: row.mortgageDate,
         mortgageDeedNumber: row.mortgageDeedNumber,
 
-        ltvRatio: row.ltvRatio,
+        ltvRatio: liveLtv(row, loanOutstanding),
 
         status: row.status,
         remarks: row.remarks,
@@ -87,6 +106,12 @@ function toCollateralRecord(row: CollateralRow, insurance: InsuranceRow | null):
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
+}
+
+/** The loan's principal outstanding per its ledger — what every LTV is measured against. Never negative. */
+async function loanOutstanding(loanId: string): Promise<number> {
+    const snapshot = await getLoanSnapshot(loanId);
+    return Math.max(snapshot.principalOutstanding, 0);
 }
 
 /**
@@ -108,8 +133,6 @@ export class CollateralService {
             await this.assertNoDuplicate(input.loanId, input.securityType, input.surveyNumber);
         }
 
-        const ltvRatio = this.tryCalculateLtv(loan.outstandingPrincipal ?? "0", input.estimatedValue);
-
         try {
             const [row] = await db
                 .insert(collaterals)
@@ -129,14 +152,14 @@ export class CollateralService {
                     mortgageType: input.mortgageType,
                     mortgageDate: input.mortgageDate,
                     mortgageDeedNumber: input.mortgageDeedNumber,
-                    ltvRatio: ltvRatio !== null ? String(ltvRatio) : undefined,
                     status: input.status ?? DEFAULT_COLLATERAL_STATUS,
                     remarks: input.remarks,
                 })
                 .returning();
+            if (!row) throw new Error("The database returned no row for this write.");
 
             collateralLogger.success("CREATE", row.id);
-            return toCollateralRecord(row, null);
+            return toCollateralRecord(row, null, await loanOutstanding(row.loanId));
         } catch (error) {
             collateralLogger.failure("CREATE", input.loanId, error);
             throw new CollateralPersistenceError(
@@ -164,12 +187,6 @@ export class CollateralService {
         if (input.mortgageDate !== undefined) assertValidDate(input.mortgageDate, "mortgageDate");
         if (input.ownerId !== undefined) assertValidUuid(input.ownerId, "ownerId");
 
-        let ltvRatio: number | null | undefined;
-        if (input.estimatedValue !== undefined) {
-            const loan = await this.getActiveLoanRowOrThrow(existing.loanId);
-            ltvRatio = this.tryCalculateLtv(loan.outstandingPrincipal ?? "0", input.estimatedValue);
-        }
-
         try {
             const [row] = await db
                 .update(collaterals)
@@ -188,17 +205,17 @@ export class CollateralService {
                     mortgageType: input.mortgageType,
                     mortgageDate: input.mortgageDate,
                     mortgageDeedNumber: input.mortgageDeedNumber,
-                    ltvRatio: ltvRatio !== undefined && ltvRatio !== null ? String(ltvRatio) : undefined,
                     status: input.status,
                     remarks: input.remarks,
                     updatedAt: new Date(),
                 })
                 .where(eq(collaterals.id, id))
                 .returning();
+            if (!row) throw new Error("The database returned no row for this write.");
 
             collateralLogger.success("UPDATE", id);
             const insurance = await this.getActiveInsuranceForCollateral(id);
-            return toCollateralRecord(row, insurance);
+            return toCollateralRecord(row, insurance, await loanOutstanding(row.loanId));
         } catch (error) {
             collateralLogger.failure("UPDATE", id, error);
             throw new CollateralPersistenceError(
@@ -234,7 +251,7 @@ export class CollateralService {
         const insurance = await this.getActiveInsuranceForCollateral(id);
 
         collateralLogger.success("GET", id);
-        return toCollateralRecord(row, insurance);
+        return toCollateralRecord(row, insurance, await loanOutstanding(row.loanId));
     }
 
     static async getLoanCollaterals(loanId: string): Promise<CollateralRecord[]> {
@@ -273,7 +290,10 @@ export class CollateralService {
         }
 
         collateralLogger.success("LIST", loanId);
-        return rows.map((row) => toCollateralRecord(row, latestInsuranceByCollateralId.get(row.id) ?? null));
+        const outstanding = await loanOutstanding(loanId);
+        return rows.map((row) =>
+            toCollateralRecord(row, latestInsuranceByCollateralId.get(row.id) ?? null, outstanding),
+        );
     }
 
     static async updateValuation(id: string, input: UpdateValuationInput): Promise<CollateralRecord> {
@@ -285,8 +305,6 @@ export class CollateralService {
 
         const existing = await this.getActiveCollateralRowOrThrow(id);
         const loan = await this.getActiveLoanRowOrThrow(existing.loanId);
-        const ltvRatio = this.tryCalculateLtv(loan.outstandingPrincipal ?? "0", input.estimatedValue);
-
         try {
             const [row] = await db
                 .update(collaterals)
@@ -294,15 +312,15 @@ export class CollateralService {
                     estimatedValue: String(input.estimatedValue),
                     valuationDate: input.valuationDate,
                     valuationBy: input.valuationBy,
-                    ltvRatio: ltvRatio !== null ? String(ltvRatio) : undefined,
                     updatedAt: new Date(),
                 })
                 .where(eq(collaterals.id, id))
                 .returning();
+            if (!row) throw new Error("The database returned no row for this write.");
 
             collateralLogger.success("VALUATION_UPDATE", id);
             const insurance = await this.getActiveInsuranceForCollateral(id);
-            return toCollateralRecord(row, insurance);
+            return toCollateralRecord(row, insurance, await loanOutstanding(row.loanId));
         } catch (error) {
             collateralLogger.failure("VALUATION_UPDATE", id, error);
             throw new CollateralPersistenceError(
@@ -320,7 +338,7 @@ export class CollateralService {
         const existingInsurance = await this.getActiveInsuranceForCollateral(collateralId);
 
         try {
-            let row: InsuranceRow;
+            let row: InsuranceRow | undefined;
 
             if (existingInsurance) {
                 [row] = await db
@@ -352,6 +370,8 @@ export class CollateralService {
                     .returning();
             }
 
+            if (!row) throw new Error("The database returned no row for this write.");
+
             collateralLogger.success("INSURANCE_UPDATE", collateralId);
             return toInsuranceRecord(row);
         } catch (error) {
@@ -363,6 +383,7 @@ export class CollateralService {
         }
     }
 
+    /** The collateral's LTV as of now. Read-only: LTV is never stored. */
     static async calculateLTV(collateralId: string): Promise<LtvResult> {
         assertValidUuid(collateralId, "id");
         const collateral = await this.getActiveCollateralRowOrThrow(collateralId);
@@ -374,13 +395,8 @@ export class CollateralService {
             );
         }
 
-        const outstanding = loan.outstandingPrincipal ?? "0";
+        const outstanding = String(await loanOutstanding(loan.id));
         const ltvPercentage = calculateLtv(outstanding, collateral.estimatedValue);
-
-        await db
-            .update(collaterals)
-            .set({ ltvRatio: String(ltvPercentage), updatedAt: new Date() })
-            .where(eq(collaterals.id, collateralId));
 
         collateralLogger.success("LTV_CALCULATED", collateralId);
 
@@ -397,14 +413,6 @@ export class CollateralService {
         const candidateTime = candidate.createdAt?.getTime() ?? 0;
         const currentTime = current.createdAt?.getTime() ?? 0;
         return candidateTime > currentTime;
-    }
-
-    private static tryCalculateLtv(loanOutstanding: string, marketValue: number | string): number | null {
-        try {
-            return calculateLtv(loanOutstanding, marketValue);
-        } catch {
-            return null;
-        }
     }
 
     private static async assertNoDuplicate(

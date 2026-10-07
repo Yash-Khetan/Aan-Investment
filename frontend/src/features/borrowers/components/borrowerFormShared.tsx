@@ -29,7 +29,7 @@ export const CLASS_OF_ACTIVITY_PATTERN = "^[0-9]{5}$";
 export const CLASS_OF_ACTIVITY_TITLE = "Enter the 5-digit class-of-activity code from the handbook of instructions";
 
 export function SectionTitle({ children }: { children: string }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-slate-500">{children}</h2>;
 }
 
 /** Placeholder row that makes a required <select> start empty instead of silently defaulting. */

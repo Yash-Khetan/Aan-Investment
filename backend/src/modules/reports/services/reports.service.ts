@@ -5,7 +5,6 @@ import { buildCsv, buildExcel } from "../utils/export.util";
 import { getLoanRegister } from "./loan-register.service";
 import { getCustomerReport } from "./customer-report.service";
 import { getCollateralReport } from "./collateral-report.service";
-import { getCollectionsReport } from "./collections-report.service";
 import { getDocumentReport } from "./document-report.service";
 import { getPortfolioSummary } from "./portfolio-summary.service";
 
@@ -13,7 +12,6 @@ import {
     LOAN_REGISTER_COLUMNS,
     CUSTOMER_REPORT_COLUMNS,
     COLLATERAL_REPORT_COLUMNS,
-    COLLECTIONS_REPORT_COLUMNS,
     DOCUMENT_REPORT_COLUMNS,
     PORTFOLIO_SUMMARY_COLUMNS,
     REPORT_TITLES,
@@ -47,7 +45,6 @@ const REPORT_DEFINITIONS: Record<ReportName, ReportDefinition> = {
     "loan-register": defineReport(getLoanRegister, LOAN_REGISTER_COLUMNS),
     "customer-report": defineReport(getCustomerReport, CUSTOMER_REPORT_COLUMNS),
     "collateral-report": defineReport(getCollateralReport, COLLATERAL_REPORT_COLUMNS),
-    "collections-report": defineReport(getCollectionsReport, COLLECTIONS_REPORT_COLUMNS),
     "document-report": defineReport(getDocumentReport, DOCUMENT_REPORT_COLUMNS),
     "portfolio-summary": defineReport(
         async (filters) => [await getPortfolioSummary(filters)],
@@ -96,7 +93,6 @@ export const ReportsService = {
     getLoanRegister: (filters: ReportFilters) => getLoanRegister(filters),
     getCustomerReport: (filters: ReportFilters) => getCustomerReport(filters),
     getCollateralReport: (filters: ReportFilters) => getCollateralReport(filters),
-    getCollectionsReport: (filters: ReportFilters) => getCollectionsReport(filters),
     getDocumentReport: (filters: ReportFilters) => getDocumentReport(filters),
     getPortfolioSummary: (filters: ReportFilters) => getPortfolioSummary(filters),
 

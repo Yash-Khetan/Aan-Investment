@@ -13,11 +13,7 @@ import { verifyDbConnection, closeDb } from "./db";
 
 import { authRouter, userRouter } from "./modules/auth";
 import { devResetPasswordRouter } from "./dev/resetPasswordPage";
-import { interestRouter } from "./modules/interest/interest.routes";
-import { repaymentRouter } from "./modules/repayment/repayment.routes";
-import { accountingExportRouter } from "./modules/accounting-export";
 import { collateralRouter } from "./modules/collateral";
-import { collectionsRouter } from "./modules/collections";
 import { documentRouter } from "./modules/document-vault";
 import { ocrRouter } from "./modules/ocr/ocr.routes";
 import { reportsRouter } from "./modules/reports";
@@ -26,8 +22,6 @@ import { lookupRouter } from "./routes/lookup.routes.js";
 import apiRouter from "./routes/index";
 
 
-import { paymentRouter } from "./modules/payment/payment.routes";
-import { accountingRouter } from "./modules/accounting/accounting.routes";
 import { ledgerRouter } from "./modules/ledger/ledger.routes";
 import { kpiLedgerRouter } from "./modules/kpi-ledger/kpi-ledger.routes";
 
@@ -75,7 +69,8 @@ function createApp(): Application {
     app.use(apiRateLimiter);
 
     // Body parsers.
-    app.use(express.json());
+    // Imported ledger sheets run to thousands of rows; 100kb (the default) is a few hundred.
+    app.use(express.json({ limit: "5mb" }));
     app.use(express.urlencoded({ extended: true }));
 
     // (5) Cookie parser — populates req.cookies (the refresh endpoint reads the
@@ -95,20 +90,13 @@ function createApp(): Application {
     app.use("/auth", authRouter); //  /auth/login, /logout, /refresh, /forgot-password, /reset-password
     app.use("/users", userRouter); //  /users/me (protected)
 
-    app.use("/interest-rules", interestRouter); //  POST /, GET /:loanId, POST /:loanId/calculate
-    app.use("/repayment-schedules", repaymentRouter); //  POST /, GET /:loanId
-
-    app.use("/payments", paymentRouter); //  POST /
-    app.use("/accounting-entries", accountingRouter); //  POST /disbursement, POST /write-off, GET /:loanId
-    app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, PATCH /:loanId/entries/:entryId/rate
-    app.use("/kpi-ledger", kpiLedgerRouter); //  POST /:loanId/rows, GET /:loanId?page=&limit=, PATCH/DELETE /:loanId/rows/:rowId — "Get KPI" history
+    app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, GET /:loanId/settings, GET /:loanId/dpd — the only way money enters a loan
+    app.use("/kpi-ledger", kpiLedgerRouter); //  a loan's imported history: preview / post / list / remove imports, read imported rows
 
     app.use("/documents", documentRouter);
     app.use("/ocr", ocrRouter); //  POST /extract
     app.use("/collateral", collateralRouter);
-    app.use("/collections", collectionsRouter);
     app.use("/reports", reportsRouter);
-    app.use("/accounting", accountingExportRouter);
     app.use("/dashboard", dashboardRouter);
     app.use("/lookup", lookupRouter);
     app.use("/api/v1", apiRouter); //  /api/v1/borrowers, /api/v1/loans

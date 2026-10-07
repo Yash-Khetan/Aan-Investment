@@ -10,7 +10,9 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
             throw new MissingFileError("No file was provided in the request.");
         }
 
-        const { entityType, entityId, documentType, name, remarks, uploadedBy } = req.body;
+        const { entityType, entityId, documentType, name, remarks } = req.body;
+        // The uploader is whoever is signed in — never a value the client sends.
+        const uploadedBy = req.user?.id;
 
         const metadata = await DocumentService.upload({
             entityType,
@@ -59,6 +61,27 @@ export async function listDocuments(req: Request, res: Response): Promise<void> 
         const { entityType, entityId } = req.params;
         const metadata = await DocumentService.list(String(entityType), String(entityId));
         res.status(200).json(metadata);
+    } catch (error) {
+        mapErrorToHttpResponse(res, error);
+    }
+}
+
+/** GET /documents?borrowerId=&loanId=&documentType=&search=&page=&limit= — the cross-entity "All documents" view. */
+export async function searchDocuments(req: Request, res: Response): Promise<void> {
+    try {
+        const str = (v: unknown): string | undefined => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined);
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+
+        const result = await DocumentService.search({
+            borrowerId: str(req.query.borrowerId),
+            loanId: str(req.query.loanId),
+            documentType: str(req.query.documentType),
+            search: str(req.query.search),
+            page,
+            limit,
+        });
+        res.status(200).json(result);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
     }

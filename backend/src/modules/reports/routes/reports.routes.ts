@@ -35,12 +35,6 @@ reportsRouter.get(
 );
 
 reportsRouter.get(
-    "/collections-report",
-    validateQuery(reportFiltersSchema),
-    reportsController.getCollectionsReport,
-);
-
-reportsRouter.get(
     "/document-report",
     validateQuery(reportFiltersSchema),
     reportsController.getDocumentReport,
@@ -72,12 +66,6 @@ reportsRouter.get(
     "/export/collateral-report",
     validateQuery(exportQuerySchema),
     exportController.exportCollateralReport,
-);
-
-reportsRouter.get(
-    "/export/collections-report",
-    validateQuery(exportQuerySchema),
-    exportController.exportCollectionsReport,
 );
 
 reportsRouter.get(

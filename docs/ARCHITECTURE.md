@@ -1,5 +1,11 @@
 # Aan Investment LMS — System Architecture & Working Structure
 
+> **Out of date.** On branch `feat/ledger-single-source` the ledger (`ledger_entries`)
+> became the only record of loan money. The Payments, Repayment, Disbursements,
+> Collections and Accounting modules, and their tables, were removed; every loan figure
+> is now read off the ledger through `modules/ledger/snapshot.ts`. Sections 6–9 below
+> still describe the old engines. This document is rewritten when that work completes.
+
 > Complete technical reference for the Loan Management System built for
 > **Aan Finance & Investment Private Limited** (NBFC, secured & structured lending).
 > Accurate as of the `integrations` branch, July 2026.

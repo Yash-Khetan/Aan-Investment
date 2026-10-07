@@ -67,6 +67,7 @@ export class UserRepository {
      */
     async create(input: CreateUserInput): Promise<UserRecord> {
         const [row] = await this.db.insert(users).values(input).returning();
+        if (!row) throw new Error("The database returned no row for this write.");
         return row;
     }
 
@@ -251,6 +252,7 @@ export class SessionRepository {
                 userAgent: input.userAgent ?? null,
             })
             .returning();
+        if (!row) throw new Error("The database returned no row for this write.");
         return row;
     }
 
@@ -311,6 +313,7 @@ export class PasswordResetRepository {
                 expiresAt: input.expiresAt,
             })
             .returning();
+        if (!row) throw new Error("The database returned no row for this write.");
         return row;
     }
 

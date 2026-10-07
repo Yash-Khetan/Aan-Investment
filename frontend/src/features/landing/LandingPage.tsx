@@ -14,7 +14,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-white">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Aan Finance &amp; Investment Pvt. Ltd.</div>
+          <div className="text-xs font-semibold text-slate-400">Aan Finance &amp; Investment Pvt. Ltd.</div>
           <div className="text-lg font-semibold text-slate-900">Aan Investment LMS</div>
         </div>
         {/* <Link
@@ -51,7 +51,7 @@ export function LandingPage() {
         </section>
 
         {/* <section className="border-t border-slate-100 py-16">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">What's inside</h2>
+          <h2 className="mb-2 text-sm font-semibold text-slate-400">What's inside</h2>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {MODULES.map((m) => (
               <div key={m.name} className="rounded-lg border border-slate-200 p-5">

@@ -2,22 +2,23 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/Layout";
-import { Card } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
 import { LoadingState, ErrorState } from "../../components/ui/States";
 import { FormErrors } from "../../components/ui/FormErrors";
-import { BorrowerMasterFields } from "./components/BorrowerMasterFields";
+import { StepForm } from "../../components/ui/StepForm";
+import { borrowerFormSteps } from "./components/borrowerFormSteps";
 import { RelatedPersonsEditor } from "./components/RelatedPersonsEditor";
 import { getBorrower, updateBorrower } from "./api";
-import { listDocuments } from "../documents/api";
 import { BorrowerDocumentsProvider } from "./BorrowerDocumentsContext";
-import { UploadDocumentForm } from "../documents/components/UploadDocumentForm";
-import { DocumentCard } from "../documents/components/DocumentCard";
 import { useAuth } from "../auth/AuthContext";
 import { useAutosaveDraft, loadDraft, clearDraft } from "../../hooks/useAutosaveDraft";
 import { EMPTY_BORROWER_FORM, borrowerToFormState, formStateToUpdateInput } from "./types";
 import type { BorrowerFormState } from "./types";
 
+/**
+ * Edit a borrower, step by step — any step can be opened directly. Identity
+ * scans upload as soon as they are picked. Related persons are saved one at
+ * a time as they are changed, so they sit below the form rather than in it.
+ */
 export function EditBorrowerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -27,17 +28,10 @@ export function EditBorrowerPage() {
 
   const [form, setForm] = useState<BorrowerFormState>(EMPTY_BORROWER_FORM);
   const [loaded, setLoaded] = useState(false);
-  const [showUploadForm, setShowUploadForm] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["borrower", id],
     queryFn: () => getBorrower(id!),
-    enabled: !!id,
-  });
-
-  const { data: documents } = useQuery({
-    queryKey: ["documents", "BORROWER", id],
-    queryFn: () => listDocuments("BORROWER", id!),
     enabled: !!id,
   });
 
@@ -58,7 +52,8 @@ export function EditBorrowerPage() {
       clearDraft(draftKey);
       queryClient.invalidateQueries({ queryKey: ["borrowers"] });
       queryClient.invalidateQueries({ queryKey: ["borrower", id] });
-      navigate("/borrowers");
+      queryClient.invalidateQueries({ queryKey: ["lookup"] });
+      navigate(`/borrowers/${id}`);
     },
   });
 
@@ -66,73 +61,38 @@ export function EditBorrowerPage() {
     setForm((f) => ({ ...f, ...p }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    mutation.mutate();
-  }
-
   return (
     <div>
-      <PageHeader title="Edit Borrower" description="Update borrower master data." />
+      <PageHeader
+        back={id ? { to: `/borrowers/${id}`, label: data ? `Back to ${data.name}` : "Back to borrower" } : undefined}
+        title={data ? `Edit ${data.name}` : "Edit borrower"}
+        description="Open any step to change it, then save."
+      />
 
       {isLoading && <LoadingState label="Loading borrower..." />}
-      {isError && <ErrorState message={error instanceof Error ? error.message : "Failed to load borrower."} />}
+      {isError && <ErrorState message={error instanceof Error ? error.message : "Could not load the borrower."} />}
 
       {data && loaded && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          {/* The borrower already exists, so identity uploads fire immediately -
-              nothing is ever held pending here. */}
-          <BorrowerDocumentsProvider
-            borrowerId={id}
-            borrower={data}
-            pendingFiles={{}}
-            setPendingFile={() => {}}
-          >
-            <BorrowerMasterFields form={form} onChange={patch} showStatus />
-          </BorrowerDocumentsProvider>
-
-          {mutation.isError && <FormErrors error={mutation.error} />}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate("/borrowers")}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+        // The borrower already exists, so identity uploads fire immediately -
+        // nothing is ever held pending here.
+        <BorrowerDocumentsProvider borrowerId={id} borrower={data} pendingFiles={{}} setPendingFile={() => {}}>
+          <StepForm
+            steps={borrowerFormSteps(form, patch, { showStatus: true })}
+            onSubmit={() => mutation.mutate()}
+            submitLabel="Save changes"
+            isSubmitting={mutation.isPending}
+            onCancel={() => navigate(`/borrowers/${id}`)}
+            freeNavigation
+            footer={mutation.isError && <FormErrors error={mutation.error} />}
+          />
+        </BorrowerDocumentsProvider>
       )}
 
-      {/* Related persons save individually against their own endpoints, so this
-          sits outside the borrower form rather than inside its submit. It is a
-          commercial-sheet block, so consumers never see it. */}
+      {/* A commercial-sheet block — consumers have no related persons. */}
       {id && data && loaded && form.borrowerType === "COMMERCIAL" && (
-        <div className="mt-6">
+        <div className="mt-8">
           <RelatedPersonsEditor borrowerId={id} />
         </div>
-      )}
-
-      {id && (
-        <Card className="mt-6 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Documents</h2>
-            <Button type="button" variant="secondary" onClick={() => setShowUploadForm((s) => !s)}>
-              {showUploadForm ? "Cancel" : "+ Upload"}
-            </Button>
-          </div>
-
-          {showUploadForm && (
-            <UploadDocumentForm entityType="BORROWER" entityId={id} onDone={() => setShowUploadForm(false)} />
-          )}
-
-          {documents && documents.length === 0 && <p className="text-sm text-slate-400">No documents uploaded yet.</p>}
-          <div className="flex flex-col gap-3">
-            {documents?.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} entityType="BORROWER" entityId={id} />
-            ))}
-          </div>
-        </Card>
       )}
     </div>
   );

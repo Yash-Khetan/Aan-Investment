@@ -1,4 +1,4 @@
-import type { LoanClassification } from "../loan/loan.metrics";
+import type { LoanClassification } from "./dpd";
 import type { InterestBasis } from "../interest/interest.types";
 
 export type LedgerVchType = "PAYMENT" | "RECEIPT" | "JOURNAL_INTEREST" | "JOURNAL_TDS";

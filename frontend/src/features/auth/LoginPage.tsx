@@ -35,9 +35,9 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Aan Investment</div>
-          <div className="text-lg font-semibold text-slate-900">Sign in to LMS</div>
+        <div className="mb-6">
+          <div className="text-sm font-medium text-slate-500">Aan Finance loan book</div>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Sign in</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

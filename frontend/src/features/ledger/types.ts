@@ -16,6 +16,13 @@ export interface LedgerEntry {
   /** Day-count basis this entry was accrued under. Null on rows posted before it was snapshotted. */
   interestBasis: string | null;
   includeOpeningClosingDays: boolean | null;
+  /** MANUAL: recorded on the Ledger tab. SYSTEM: the ledger's own month-end interest/TDS. IMPORT: from an imported sheet. */
+  source: "MANUAL" | "SYSTEM" | "IMPORT";
+  /** The voucher type and number the imported sheet printed. Null unless imported. */
+  sourceVchType: string | null;
+  sourceVchNo: string | null;
+  /** Dated after today: shown, but counted in no figure until its date arrives. */
+  isScheduled: boolean;
   /** Computed cumulative running balance, attached server-side — never independently stored. */
   balance: number;
   /** What `balance` is made of right after this entry: principal plus each month's unpaid net interest. */
@@ -47,9 +54,6 @@ export interface ReceiptAllocation {
  */
 export interface LedgerSettings {
   loanId: string;
-  /** The loan row's own rates. */
-  defaultInterestRatePercent: string;
-  defaultTdsRatePercent: string;
   /** The rates and day-count actually in effect today, from the current interest configuration. */
   currentInterestRatePercent: string;
   currentTdsRatePercent: string;
@@ -107,4 +111,33 @@ export interface DpdGrid {
     oldestOverdueDueDate: string | null;
   } | null;
   worstDpd: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Loan snapshot - every money figure about a loan as at one date,     */
+/* read off its ledger. The backend computes it once (ledger/          */
+/* snapshot.ts); every screen shows these figures, never its own.      */
+/* ------------------------------------------------------------------ */
+
+export interface LoanSnapshot {
+  asOf: string;
+  hasEntries: boolean;
+  bifurcation: BalanceBifurcation;
+  principalOutstanding: number;
+  /** Interest posted (net of TDS) and not yet received. */
+  interestOutstanding: number;
+  /** Principal plus unpaid interest - always equals the ledger balance. */
+  totalPayable: number;
+  closingBalance: number;
+  amountOverdue: number;
+  dpd: number;
+  classification: DpdClassification;
+  oldestOverdueDueDate: string | null;
+  nextDueDate: string | null;
+  totalDisbursed: number;
+  totalReceived: number;
+  totalInterest: number;
+  totalTds: number;
+  firstDisbursementDate: string | null;
+  lastReceiptDate: string | null;
 }

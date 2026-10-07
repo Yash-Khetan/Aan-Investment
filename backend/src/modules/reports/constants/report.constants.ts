@@ -3,20 +3,19 @@ import type {
     LoanRegisterRow,
     CustomerReportRow,
     CollateralReportRow,
-    CollectionsReportRow,
     DocumentReportRow,
     PortfolioSummaryRow,
+    ReportName,
 } from "../types/report.types";
 
 /* ============================================================
    REPORT DISPLAY NAMES
 ============================================================ */
 
-export const REPORT_TITLES: Record<string, string> = {
+export const REPORT_TITLES: Record<ReportName, string> = {
     "loan-register": "Loan Register",
     "customer-report": "Customer Report",
     "collateral-report": "Collateral Report",
-    "collections-report": "Collections Report",
     "document-report": "Document Report",
     "portfolio-summary": "Portfolio Summary Report",
 };
@@ -30,8 +29,14 @@ export const REPORT_TITLES: Record<string, string> = {
 export const LOAN_REGISTER_COLUMNS: ReportColumn<LoanRegisterRow>[] = [
     { key: "loanNumber", label: "Loan Number" },
     { key: "customerName", label: "Customer Name" },
-    { key: "loanAmount", label: "Loan Amount" },
-    { key: "outstandingAmount", label: "Outstanding Amount" },
+    { key: "loanAmount", label: "Sanctioned Amount" },
+    { key: "disbursedAmount", label: "Disbursed" },
+    { key: "outstandingAmount", label: "Principal Outstanding" },
+    { key: "interestDue", label: "Interest Due" },
+    { key: "totalPayable", label: "Total Payable" },
+    { key: "amountOverdue", label: "Amount Overdue" },
+    { key: "dpd", label: "DPD" },
+    { key: "classification", label: "Classification" },
     { key: "interestRate", label: "Interest Rate" },
     { key: "status", label: "Status" },
     { key: "createdDate", label: "Created Date" },
@@ -43,7 +48,9 @@ export const CUSTOMER_REPORT_COLUMNS: ReportColumn<CustomerReportRow>[] = [
     { key: "phone", label: "Phone" },
     { key: "email", label: "Email" },
     { key: "totalLoans", label: "Total Loans" },
-    { key: "outstandingAmount", label: "Outstanding Amount" },
+    { key: "outstandingAmount", label: "Principal Outstanding" },
+    { key: "totalPayable", label: "Total Payable" },
+    { key: "amountOverdue", label: "Amount Overdue" },
 ];
 
 export const COLLATERAL_REPORT_COLUMNS: ReportColumn<CollateralReportRow>[] = [
@@ -53,15 +60,6 @@ export const COLLATERAL_REPORT_COLUMNS: ReportColumn<CollateralReportRow>[] = [
     { key: "forcedSaleValue", label: "Forced Sale Value" },
     { key: "ltv", label: "LTV" },
     { key: "insuranceStatus", label: "Insurance Status" },
-];
-
-export const COLLECTIONS_REPORT_COLUMNS: ReportColumn<CollectionsReportRow>[] = [
-    { key: "loanNumber", label: "Loan Number" },
-    { key: "customerName", label: "Customer Name" },
-    { key: "collectionStatus", label: "Collection Status" },
-    { key: "promiseToPay", label: "Promise To Pay" },
-    { key: "nextFollowUp", label: "Next Follow-up" },
-    { key: "assignedUser", label: "Assigned User" },
 ];
 
 export const DOCUMENT_REPORT_COLUMNS: ReportColumn<DocumentReportRow>[] = [
@@ -77,9 +75,12 @@ export const PORTFOLIO_SUMMARY_COLUMNS: ReportColumn<PortfolioSummaryRow>[] = [
     { key: "totalLoans", label: "Total Loans" },
     { key: "activeLoans", label: "Active Loans" },
     { key: "closedLoans", label: "Closed Loans" },
-    { key: "rejectedLoans", label: "Rejected Loans" },
-    { key: "totalPortfolioValue", label: "Total Portfolio Value" },
-    { key: "outstandingAmount", label: "Outstanding Amount" },
+    { key: "npaLoans", label: "NPA Loans" },
+    { key: "totalPortfolioValue", label: "Total Sanctioned" },
+    { key: "totalDisbursed", label: "Total Disbursed" },
+    { key: "outstandingAmount", label: "Principal Outstanding" },
+    { key: "totalPayable", label: "Total Payable" },
+    { key: "totalOverdue", label: "Total Overdue" },
     { key: "averageLoanSize", label: "Average Loan Size" },
     { key: "averageInterestRate", label: "Average Interest Rate" },
 ];

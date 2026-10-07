@@ -49,7 +49,7 @@ export function IdentityFieldGroup({
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <div className="mb-2 text-xs font-semibold text-slate-500">
         {heading}
         {required && <span className="text-red-500"> *</span>}
       </div>

@@ -34,7 +34,7 @@
 //     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
 //       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
 //         <div className="mb-6 text-center">
-//           <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Aan Investment</div>
+//           <div className="text-xs font-semibold text-slate-400">Aan Investment</div>
 //           <div className="text-lg font-semibold text-slate-900">Create your account</div>
 //         </div>
 

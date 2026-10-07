@@ -1,6 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../../../db";
-import { documents } from "../../../db/schema";
+import { borrowers, documents, loans } from "../../../db/schema";
 import {
     assertValidEntityType,
     assertValidEntityId,
@@ -20,6 +20,9 @@ import type {
     DownloadResult,
     SignedUrlResult,
     EntityType,
+    DocumentSearchInput,
+    DocumentSearchResult,
+    DocumentClassification,
 } from "../types/document.types";
 
 type DocumentRow = typeof documents.$inferSelect;
@@ -85,6 +88,7 @@ export class DocumentService {
                     remarks: input.remarks,
                 })
                 .returning();
+            if (!row) throw new Error("The database returned no row for this write.");
 
             documentLogger.success("UPLOAD", row.id);
             return toDocumentMetadata(row);
@@ -138,6 +142,84 @@ export class DocumentService {
 
         documentLogger.success("LIST", `${entityType}/${entityId}`);
         return rows.map(toDocumentMetadata);
+    }
+
+    /**
+     * Every live document of every borrower and loan, newest first, each
+     * labelled with the borrower (and loan) it belongs to — the Documents
+     * tab's "All documents" view. Filtering by borrower returns the
+     * borrower's own documents and those of every loan they hold.
+     */
+    static async search(input: DocumentSearchInput): Promise<DocumentSearchResult> {
+        if (input.borrowerId) assertValidEntityId(input.borrowerId);
+        if (input.loanId) assertValidEntityId(input.loanId);
+        const documentType = input.documentType;
+        if (documentType) assertValidDocumentType(documentType);
+
+        const conditions: SQL[] = [
+            isNull(documents.deletedAt),
+            isNull(borrowers.deletedAt),
+            // Only documents of a borrower or loan that still exists resolve a borrower.
+            sql`${borrowers.id} is not null`,
+        ];
+        if (input.borrowerId) conditions.push(eq(borrowers.id, input.borrowerId));
+        if (input.loanId) conditions.push(and(eq(documents.ownerType, "LOAN"), eq(documents.ownerId, input.loanId))!);
+        // Validated above.
+        if (documentType) conditions.push(eq(documents.documentType, documentType as DocumentClassification));
+        if (input.search) {
+            const term = `%${input.search}%`;
+            conditions.push(
+                or(
+                    ilike(documents.name, term),
+                    ilike(documents.fileName, term),
+                    ilike(borrowers.name, term),
+                    ilike(loans.loanAccountNumber, term),
+                )!,
+            );
+        }
+
+        const where = and(...conditions);
+        const loanJoin = and(eq(documents.ownerType, "LOAN"), eq(loans.id, documents.ownerId), isNull(loans.deletedAt));
+        const borrowerJoin = or(
+            and(eq(documents.ownerType, "BORROWER"), eq(borrowers.id, documents.ownerId)),
+            eq(borrowers.id, loans.borrowerId),
+        );
+
+        const rows = await db
+            .select({
+                document: documents,
+                borrowerId: borrowers.id,
+                borrowerName: borrowers.name,
+                loanId: loans.id,
+                loanAccountNumber: loans.loanAccountNumber,
+            })
+            .from(documents)
+            .leftJoin(loans, loanJoin)
+            .leftJoin(borrowers, borrowerJoin)
+            .where(where)
+            .orderBy(desc(documents.createdAt))
+            .limit(input.limit)
+            .offset((input.page - 1) * input.limit);
+
+        const [countRow] = await db
+            .select({ total: sql<number>`count(*)::int` })
+            .from(documents)
+            .leftJoin(loans, loanJoin)
+            .leftJoin(borrowers, borrowerJoin)
+            .where(where);
+
+        return {
+            rows: rows.map((r) => ({
+                ...toDocumentMetadata(r.document),
+                borrowerId: r.borrowerId,
+                borrowerName: r.borrowerName,
+                loanId: r.loanId,
+                loanAccountNumber: r.loanAccountNumber,
+            })),
+            total: countRow?.total ?? 0,
+            page: input.page,
+            limit: input.limit,
+        };
     }
 
     static async generateSignedUrl(

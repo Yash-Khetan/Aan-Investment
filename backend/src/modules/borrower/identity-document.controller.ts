@@ -24,7 +24,7 @@ export async function uploadIdentityDocument(req: Request, res: Response): Promi
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
-    });
+    }, req.user?.id);
 
     res.status(201).json({ success: true, data: result });
 }

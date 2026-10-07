@@ -18,7 +18,6 @@ export const SORTABLE_COLUMNS = {
     sanctionDate: loans.sanctionDate,
     maturityDate: loans.maturityDate,
     sanctionedAmount: loans.sanctionedAmount,
-    outstandingPrincipal: loans.outstandingPrincipal,
     loanAccountNumber: loans.loanAccountNumber,
     status: loans.status,
 } as const;

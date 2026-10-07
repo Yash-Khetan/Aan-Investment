@@ -1,7 +1,6 @@
 import type {
     loanStatusEnum,
     securityTypeEnum,
-    collectionStatusEnum,
     documentOwnerEnum,
 } from "../../../db/schema";
 
@@ -11,7 +10,6 @@ import type {
 
 export type LoanStatus = (typeof loanStatusEnum.enumValues)[number];
 export type SecurityType = (typeof securityTypeEnum.enumValues)[number];
-export type CollectionStatus = (typeof collectionStatusEnum.enumValues)[number];
 export type DocumentOwnerType = (typeof documentOwnerEnum.enumValues)[number];
 
 export type InsuranceStatus = "NOT_INSURED" | "ACTIVE" | "EXPIRED" | "INACTIVE";
@@ -24,7 +22,6 @@ export const REPORT_NAMES = [
     "loan-register",
     "customer-report",
     "collateral-report",
-    "collections-report",
     "document-report",
     "portfolio-summary",
 ] as const;
@@ -46,18 +43,24 @@ export interface ReportFilters {
     startDate?: string;
     endDate?: string;
     collateralType?: SecurityType;
-    collectionStatus?: CollectionStatus;
 }
 
 /* ============================================================
    REPORT ROW SHAPES
 ============================================================ */
 
+/** Every money figure on the register comes from the loan's ledger snapshot. */
 export interface LoanRegisterRow {
     loanNumber: string;
     customerName: string;
     loanAmount: string;
-    outstandingAmount: string;
+    disbursedAmount: number;
+    outstandingAmount: number;
+    interestDue: number;
+    totalPayable: number;
+    amountOverdue: number;
+    dpd: number;
+    classification: string;
     interestRate: string;
     status: LoanStatus | null;
     createdDate: string | null;
@@ -69,7 +72,9 @@ export interface CustomerReportRow {
     phone: string | null;
     email: string | null;
     totalLoans: number;
-    outstandingAmount: string;
+    outstandingAmount: number;
+    totalPayable: number;
+    amountOverdue: number;
 }
 
 export interface CollateralReportRow {
@@ -79,15 +84,6 @@ export interface CollateralReportRow {
     forcedSaleValue: null;
     ltv: string | null;
     insuranceStatus: InsuranceStatus;
-}
-
-export interface CollectionsReportRow {
-    loanNumber: string;
-    customerName: string;
-    collectionStatus: CollectionStatus | null;
-    promiseToPay: string | null;
-    nextFollowUp: string | null;
-    assignedUser: string | null;
 }
 
 export interface DocumentReportRow {
@@ -103,9 +99,12 @@ export interface PortfolioSummaryRow {
     totalLoans: number;
     activeLoans: number;
     closedLoans: number;
-    rejectedLoans: number;
+    npaLoans: number;
     totalPortfolioValue: string;
-    outstandingAmount: string;
+    totalDisbursed: number;
+    outstandingAmount: number;
+    totalPayable: number;
+    totalOverdue: number;
     averageLoanSize: string;
     averageInterestRate: string;
 }
@@ -114,7 +113,6 @@ export type ReportRow =
     | LoanRegisterRow
     | CustomerReportRow
     | CollateralReportRow
-    | CollectionsReportRow
     | DocumentReportRow
     | PortfolioSummaryRow;
 

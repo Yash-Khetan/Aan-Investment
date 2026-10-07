@@ -1,5 +1,15 @@
 import { apiRequest, downloadFile, getAccessToken, API_BASE_URL, ApiError } from "../../lib/api";
-import type { DocumentMetadata } from "./types";
+import type { DocumentMetadata, DocumentSearchFilters, DocumentSearchResult } from "./types";
+
+/** Every document across borrowers and loans, filtered — the "All documents" view. */
+export function searchDocuments(filters: DocumentSearchFilters): Promise<DocumentSearchResult> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const query = params.toString();
+  return apiRequest<DocumentSearchResult>(`/documents${query ? `?${query}` : ""}`);
+}
 
 export function listDocuments(entityType: string, entityId: string): Promise<DocumentMetadata[]> {
   return apiRequest<DocumentMetadata[]>(`/documents/entity/${entityType}/${entityId}`);

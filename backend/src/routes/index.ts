@@ -3,7 +3,6 @@ import { Router } from "express";
 import { borrowerRoutes, promoterRoutes } from "../modules/borrower";
 import { loanRoutes } from "../modules/loan";
 import { guarantorRoutes } from "../modules/guarantor";
-import { disbursementRoutes } from "../modules/disbursement";
 
 /**
  * API v1 router. Each business module mounts its own sub-router here.
@@ -19,11 +18,11 @@ apiRouter.get("/health", (_req, res) => {
 // first, mirroring how guarantors hang off a loan.
 apiRouter.use("/borrowers/:borrowerId/promoters", promoterRoutes);
 apiRouter.use("/borrowers", borrowerRoutes);
-// Guarantors and disbursements are managed only through the loan they belong
-// to — mounted before the general "/loans" router so their nested paths are
-// matched first.
+// Guarantors are managed only through the loan they belong to — mounted
+// before the general "/loans" router so the nested path is matched first.
+// Disbursements are not a route of their own: they are Payment entries on the
+// loan's ledger (/ledger/:loanId/entries), the only way money enters a loan.
 apiRouter.use("/loans/:loanId/guarantors", guarantorRoutes);
-apiRouter.use("/loans/:loanId/disbursements", disbursementRoutes);
 apiRouter.use("/loans", loanRoutes);
 
 export default apiRouter;

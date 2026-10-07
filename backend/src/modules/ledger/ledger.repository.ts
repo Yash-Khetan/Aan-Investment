@@ -1,8 +1,11 @@
-import { eq, and, asc, lte, gte, inArray, isNotNull } from "drizzle-orm";
-import { db, ledgerEntries, loans } from "../../db";
+import { eq, and, asc, lte, gte, inArray, isNotNull, max } from "drizzle-orm";
+import { db, ledgerEntries, ledgerImports, loans } from "../../db";
 import { NotFoundError } from "../../common/errors";
 
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
+
+/** Either the top-level `db` or a transaction handle — for callers outside this module. */
+export type LedgerDbOrTx = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
 
 /** Either the top-level `db` or a transaction handle from `db.transaction(...)` — both support the same query builder surface used here. */
 type DbOrTx = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
@@ -52,9 +55,11 @@ export async function getExistingAccrualMonths(loanId: string): Promise<string[]
 }
 
 /**
- * Every already-posted Journal Interest entry whose accrual month is on or
- * after `fromMonth`, oldest first — used to cascade-recompute months whose
- * balance changed because a backdated Payment/Receipt landed before them.
+ * Every Journal Interest entry the ledger posted itself (source SYSTEM) whose
+ * accrual month is on or after `fromMonth`, oldest first — the months to
+ * cascade-recompute when a backdated entry or an import changes the balance
+ * before them. Imported journals are the sheet's own figures and are never
+ * returned here, so they are never recalculated.
  */
 export async function getJournalInterestEntriesFromMonth(loanId: string, fromMonth: string): Promise<LedgerEntryRow[]> {
   return db
@@ -64,6 +69,7 @@ export async function getJournalInterestEntriesFromMonth(loanId: string, fromMon
       and(
         eq(ledgerEntries.loanId, loanId),
         eq(ledgerEntries.vchType, "JOURNAL_INTEREST"),
+        eq(ledgerEntries.source, "SYSTEM"),
         isNotNull(ledgerEntries.accrualMonth),
         gte(ledgerEntries.accrualMonth, fromMonth)
       )
@@ -87,7 +93,7 @@ export async function getEarliestEntryDate(loanId: string): Promise<string | nul
  * incrementing integer, restarting at 1 for every loan account. Runs inside the
  * caller's transaction so a concurrent insert can't race to the same number.
  */
-async function getNextVchNo(loanId: string, tx: DbOrTx): Promise<string> {
+export async function getNextVchNo(loanId: string, tx: DbOrTx): Promise<string> {
   const rows = await tx
     .select({ vchNo: ledgerEntries.vchNo })
     .from(ledgerEntries)
@@ -118,6 +124,7 @@ export async function insertPaymentOrReceipt(input: {
         credit: input.vchType === "RECEIPT" ? String(input.amount) : null,
         narration: input.narration,
         isSystemGenerated: false,
+        source: "MANUAL",
       })
       .returning();
 
@@ -163,6 +170,7 @@ export async function insertJournalPair(input: {
         interestBasis: input.interestBasis as any,
         includeOpeningClosingDays: input.includeOpeningClosingDays,
         isSystemGenerated: true,
+        source: "SYSTEM",
       })
       .returning();
 
@@ -187,6 +195,7 @@ export async function insertJournalPair(input: {
         includeOpeningClosingDays: input.includeOpeningClosingDays,
         pairedEntryId: interestEntry.id,
         isSystemGenerated: true,
+        source: "SYSTEM",
       })
       .returning();
 
@@ -236,44 +245,13 @@ export async function updateEntryAmountAndRate(
 }
 
 /* ============================================================
-   RATES — READ ONLY, FROM THE LOAN ROW
+   LOAN READS
 
    There is no ledger settings table, and no write path from here
-   back onto the loan. The Loan module owns the configuration; the
-   ledger only reads it. These loan-row rates are the fallback for
-   a loan that has no interest configuration yet — otherwise the
-   effective-dated revision is what a month accrues at. See
+   back onto the loan. The rates a month accrues at come from the
+   loan's effective-dated interest configuration — see
    ledger.service.ts's resolveAccrualConfig.
 ============================================================ */
-
-export interface LoanLedgerRates {
-  loanId: string;
-  defaultInterestRatePercent: string;
-  defaultTdsRatePercent: string;
-}
-
-export async function getLoanRates(loanId: string): Promise<LoanLedgerRates> {
-  const rows = await db
-    .select({
-      id: loans.id,
-      interestRate: loans.interestRate,
-      tdsRatePercent: loans.tdsRatePercent,
-    })
-    .from(loans)
-    .where(eq(loans.id, loanId))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) {
-    throw new NotFoundError(`Loan ${loanId} not found.`);
-  }
-
-  return {
-    loanId: row.id,
-    defaultInterestRatePercent: row.interestRate,
-    defaultTdsRatePercent: row.tdsRatePercent,
-  };
-}
 
 /** The loan's maturity date — the far edge of its DPD grid. Null when the loan has none recorded. */
 export async function getLoanMaturityDate(loanId: string): Promise<string | null> {
@@ -289,4 +267,35 @@ export async function getLoanMaturityDate(loanId: string): Promise<string | null
   }
 
   return row.maturityDate ?? null;
+}
+
+/**
+ * Where a loan's imported history ends, across every import posted to it:
+ * the last imported row's date (manual entries must be dated after it) and
+ * the month of the last imported Interest journal (the ledger posts its own
+ * month-end interest only after it). Both null when nothing was imported.
+ */
+export async function getHistoryCutoff(
+  loanId: string
+): Promise<{ lastEntryDate: string | null; lastInterestMonth: string | null }> {
+  const [row] = await db
+    .select({
+      lastEntryDate: max(ledgerImports.lastEntryDate),
+      lastInterestMonth: max(ledgerImports.lastInterestMonth),
+    })
+    .from(ledgerImports)
+    .where(eq(ledgerImports.loanId, loanId));
+
+  return { lastEntryDate: row?.lastEntryDate ?? null, lastInterestMonth: row?.lastInterestMonth ?? null };
+}
+
+/** The loan's lifecycle status. Throws when the loan does not exist. */
+export async function getLoanStatus(loanId: string): Promise<string | null> {
+  const [row] = await db.select({ status: loans.status }).from(loans).where(eq(loans.id, loanId)).limit(1);
+  if (!row) throw new NotFoundError(`Loan ${loanId} not found.`);
+  return row.status;
+}
+
+export async function setLoanStatus(loanId: string, status: "ACTIVE" | "CLOSED"): Promise<void> {
+  await db.update(loans).set({ status, updatedAt: new Date() }).where(eq(loans.id, loanId));
 }

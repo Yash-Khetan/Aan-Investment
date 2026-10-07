@@ -4,7 +4,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { formatDate } from "../../../lib/format";
 import { deleteDocument, downloadDocument } from "../api";
-import type { DocumentMetadata, EntityType } from "../types";
+import type { DocumentMetadata } from "../types";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "—";
@@ -13,20 +13,12 @@ function formatBytes(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DocumentCard({
-  doc,
-  entityType,
-  entityId,
-}: {
-  doc: DocumentMetadata;
-  entityType: EntityType;
-  entityId: string;
-}) {
+export function DocumentCard({ doc }: { doc: DocumentMetadata }) {
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteDocument(doc.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", entityType, entityId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
 
   return (

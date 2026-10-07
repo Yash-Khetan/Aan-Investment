@@ -11,6 +11,7 @@ import {
 import { timestamps } from "./shared";
 import { loans } from "./loan";
 import { users } from "./auth";
+import { ledgerImports } from "./ledger";
 
 /* ============================================================
    KPI LEDGER ROWS
@@ -51,6 +52,18 @@ export const kpiLedgerRows = pgTable("kpi_ledger_rows", {
     /** Position within this loan's KPI history (0-based) — the stable sort key for pagination. */
     rowIndex: integer("row_index")
         .notNull(),
+
+    /** The import these rows were posted to the ledger by. Rows go with it when it is removed. */
+    importId: uuid("import_id")
+        .references(() => ledgerImports.id, {
+            onDelete: "cascade",
+        }),
+
+    /** The workbook sheet the row came from. */
+    sheetName: varchar("sheet_name", { length: 255 }),
+
+    /** The sheet's own Dr/Cr marker beside the particulars, kept verbatim. */
+    drCr: varchar("dr_cr", { length: 10 }),
 
     /** Raw date cell text from the sheet, e.g. "05-May-25". Kept verbatim. */
     entryDate: text("entry_date"),

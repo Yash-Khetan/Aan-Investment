@@ -26,7 +26,7 @@ export function UploadDocumentForm({
       return uploadDocument({ entityType, entityId, documentType, name: name || undefined, file });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
       onDone();
     },
   });

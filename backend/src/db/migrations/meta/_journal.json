@@ -5,162 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783582450647,
-      "tag": "0000_cultured_catseye",
+      "when": 1791307635880,
+      "tag": "0000_baseline",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1783587737648,
-      "tag": "0001_groovy_krista_starr",
+      "when": 1791310424507,
+      "tag": "0001_identity_scans_in_documents_and_scheduled_entries",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1783665942642,
-      "tag": "0002_perpetual_famine",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1783952479159,
-      "tag": "0003_far_hemingway",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784123307005,
-      "tag": "0004_material_switch",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1784723307005,
-      "tag": "0005_guarantor_loan_relationship",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784809707005,
-      "tag": "0006_add_aadhaar_and_kyc_document_types",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1785434458203,
-      "tag": "0007_strange_wrecking_crew",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1785434968704,
-      "tag": "0008_glamorous_robin_chapel",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1785504358114,
-      "tag": "0009_cold_agent_zero",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1785506239787,
-      "tag": "0010_great_vertigo",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1785575444581,
-      "tag": "0011_borrower_type_cibil_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1785584704703,
-      "tag": "0012_cibil_loan_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1785585645541,
-      "tag": "0013_verify_no_drift",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1787145379525,
-      "tag": "0014_confused_diamondback",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1787409308745,
-      "tag": "0015_thankful_shinko_yamashiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1787413411984,
-      "tag": "0016_exotic_purifiers",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1787413411985,
-      "tag": "0017_loan_keyed_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1788618903319,
-      "tag": "0018_loan_owned_interest_config",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1788978633878,
-      "tag": "0019_minor_doctor_octopus",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1788980765189,
-      "tag": "0020_heavy_zarek",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1789046733980,
-      "tag": "0021_loan_dpd_history",
-      "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1789130136724,
-      "tag": "0022_drop_loan_dpd_history",
+      "when": 1791314258751,
+      "tag": "0002_ledger_imports",
       "breakpoints": true
     }
   ]

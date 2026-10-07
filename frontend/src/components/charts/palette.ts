@@ -29,20 +29,11 @@ export const CHART_INK = {
   surface: "#fcfcfb",
 } as const;
 
-/** Loan status -> severity role. Not a generic categorical mapping — this genuinely
- * encodes portfolio health, which is what the status palette is for. */
-export const LOAN_STATUS_ROLE: Record<string, StatusRole> = {
-  ACTIVE: "good",
-  CLOSED: "good",
-  PENDING: "warning",
-  OVERDUE: "warning",
+/** DPD classification -> severity role. Encodes portfolio health, which is what the status palette is for. */
+export const CLASSIFICATION_ROLE: Record<string, StatusRole> = {
+  STD: "good",
+  "SMA-0": "warning",
+  "SMA-1": "warning",
+  "SMA-2": "serious",
   NPA: "critical",
-  WRITTEN_OFF: "critical",
-};
-
-export const COLLECTION_STATUS_ROLE: Record<string, StatusRole> = {
-  OPEN: "warning",
-  FOLLOW_UP: "warning",
-  PROMISE_TO_PAY: "warning",
-  CLOSED: "good",
 };

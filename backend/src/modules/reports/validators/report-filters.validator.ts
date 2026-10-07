@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
     loanStatusEnum,
     securityTypeEnum,
-    collectionStatusEnum,
 } from "../../../db/schema";
 
 import { MAX_DATE_RANGE_DAYS } from "../constants/report.constants";
@@ -65,7 +64,6 @@ const baseFiltersShape = {
     startDate: z.string().date("startDate must be an ISO date (YYYY-MM-DD)").optional(),
     endDate: z.string().date("endDate must be an ISO date (YYYY-MM-DD)").optional(),
     collateralType: z.enum(securityTypeEnum.enumValues).optional(),
-    collectionStatus: z.enum(collectionStatusEnum.enumValues).optional(),
 };
 
 export const reportFiltersSchema = z

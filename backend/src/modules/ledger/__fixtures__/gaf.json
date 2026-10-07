@@ -1,0 +1,972 @@
+{
+ "ledgerA": [
+  {
+   "date": "2025-05-07",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 2000000
+  },
+  {
+   "date": "2025-05-12",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 4000000
+  },
+  {
+   "date": "2025-05-13",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 6000000
+  },
+  {
+   "date": "2025-05-13",
+   "type": "PAYMENT",
+   "debit": 2500000,
+   "credit": null,
+   "balance": 8500000
+  },
+  {
+   "date": "2025-05-14",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 10500000
+  },
+  {
+   "date": "2025-05-20",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 12500000
+  },
+  {
+   "date": "2025-05-20",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 14500000
+  },
+  {
+   "date": "2025-05-21",
+   "type": "PAYMENT",
+   "debit": 2500000,
+   "credit": null,
+   "balance": 17000000
+  },
+  {
+   "date": "2025-05-21",
+   "type": "PAYMENT",
+   "debit": 3000000,
+   "credit": null,
+   "balance": 20000000
+  },
+  {
+   "date": "2025-05-27",
+   "type": "PAYMENT",
+   "debit": 2400000,
+   "credit": null,
+   "balance": 22400000
+  },
+  {
+   "date": "2025-05-29",
+   "type": "PAYMENT",
+   "debit": 2600000,
+   "credit": null,
+   "balance": 25000000
+  },
+  {
+   "date": "2025-05-30",
+   "type": "PAYMENT",
+   "debit": 2300000,
+   "credit": null,
+   "balance": 27300000
+  },
+  {
+   "date": "2025-05-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 182440,
+   "credit": null,
+   "balance": 27482440
+  },
+  {
+   "date": "2025-05-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 18244,
+   "balance": 27464196
+  },
+  {
+   "date": "2025-06-02",
+   "type": "PAYMENT",
+   "debit": 1410000,
+   "credit": null,
+   "balance": 28874196
+  },
+  {
+   "date": "2025-06-03",
+   "type": "PAYMENT",
+   "debit": 1900000,
+   "credit": null,
+   "balance": 30774196
+  },
+  {
+   "date": "2025-06-05",
+   "type": "PAYMENT",
+   "debit": 1930000,
+   "credit": null,
+   "balance": 32704196
+  },
+  {
+   "date": "2025-06-06",
+   "type": "PAYMENT",
+   "debit": 2850000,
+   "credit": null,
+   "balance": 35554196
+  },
+  {
+   "date": "2025-06-16",
+   "type": "PAYMENT",
+   "debit": 3250000,
+   "credit": null,
+   "balance": 38804196
+  },
+  {
+   "date": "2025-06-19",
+   "type": "PAYMENT",
+   "debit": 1175000,
+   "credit": null,
+   "balance": 39979196
+  },
+  {
+   "date": "2025-06-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 627000,
+   "credit": null,
+   "balance": 40606196
+  },
+  {
+   "date": "2025-06-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 62700,
+   "balance": 40543496
+  },
+  {
+   "date": "2025-07-10",
+   "type": "PAYMENT",
+   "debit": 1200000,
+   "credit": null,
+   "balance": 41743496
+  },
+  {
+   "date": "2025-07-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 42461258
+  },
+  {
+   "date": "2025-07-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 42389482
+  },
+  {
+   "date": "2025-08-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43107244
+  },
+  {
+   "date": "2025-08-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 43035468
+  },
+  {
+   "date": "2025-09-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43753230
+  },
+  {
+   "date": "2025-09-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 43681454
+  },
+  {
+   "date": "2025-10-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 164196,
+   "balance": 43517258
+  },
+  {
+   "date": "2025-10-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 564300,
+   "balance": 42952958
+  },
+  {
+   "date": "2025-10-30",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 644986,
+   "balance": 42307972
+  },
+  {
+   "date": "2025-10-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43025734
+  },
+  {
+   "date": "2025-10-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 42953958
+  },
+  {
+   "date": "2025-11-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43671720
+  },
+  {
+   "date": "2025-11-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 43599944
+  },
+  {
+   "date": "2025-12-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645986,
+   "balance": 42953958
+  },
+  {
+   "date": "2025-12-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 1000,
+   "balance": 42952958
+  },
+  {
+   "date": "2025-12-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43670720
+  },
+  {
+   "date": "2025-12-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 43598944
+  },
+  {
+   "date": "2025-12-31",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645986,
+   "balance": 42952958
+  },
+  {
+   "date": "2026-01-30",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645986,
+   "balance": 42306972
+  },
+  {
+   "date": "2026-01-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43024734
+  },
+  {
+   "date": "2026-01-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 42952958
+  },
+  {
+   "date": "2026-02-28",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43670720
+  },
+  {
+   "date": "2026-02-28",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 43598944
+  },
+  {
+   "date": "2026-02-28",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645986,
+   "balance": 42952958
+  },
+  {
+   "date": "2026-03-26",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645986,
+   "balance": 42306972
+  },
+  {
+   "date": "2026-03-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 43024734
+  },
+  {
+   "date": "2026-03-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 42952958
+  },
+  {
+   "date": "2026-04-02",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 44952958
+  },
+  {
+   "date": "2026-04-04",
+   "type": "PAYMENT",
+   "debit": 2500000,
+   "credit": null,
+   "balance": 47452958
+  },
+  {
+   "date": "2026-04-06",
+   "type": "PAYMENT",
+   "debit": 3000000,
+   "credit": null,
+   "balance": 50452958
+  },
+  {
+   "date": "2026-04-07",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 52452958
+  },
+  {
+   "date": "2026-04-13",
+   "type": "PAYMENT",
+   "debit": 1966000,
+   "credit": null,
+   "balance": 54418958
+  },
+  {
+   "date": "2026-04-28",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645987,
+   "balance": 53772971
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 717762,
+   "credit": null,
+   "balance": 54490733
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 71776,
+   "balance": 54418957
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 156736,
+   "credit": null,
+   "balance": 54575693
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 15673,
+   "balance": 54560020
+  },
+  {
+   "date": "2026-05-20",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645987,
+   "balance": 53914033
+  },
+  {
+   "date": "2026-05-20",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 645987,
+   "balance": 53268046
+  },
+  {
+   "date": "2026-05-21",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 787049,
+   "balance": 52480997
+  },
+  {
+   "date": "2026-05-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 918418,
+   "credit": null,
+   "balance": 53399415
+  },
+  {
+   "date": "2026-05-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 91842,
+   "balance": 53307573
+  },
+  {
+   "date": "2026-06-02",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 826576,
+   "balance": 52480997
+  },
+  {
+   "date": "2026-06-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 918418,
+   "credit": null,
+   "balance": 53399415
+  },
+  {
+   "date": "2026-06-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 91842,
+   "balance": 53307573
+  },
+  {
+   "date": "2026-07-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 826576,
+   "balance": 52480997
+  },
+  {
+   "date": "2026-07-04",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 12628750,
+   "balance": 39852247
+  },
+  {
+   "date": "2026-07-27",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 550000,
+   "balance": 39302247
+  },
+  {
+   "date": "2026-08-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 7500000,
+   "balance": 31802247
+  },
+  {
+   "date": "2026-08-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 7666000,
+   "balance": 24136247
+  },
+  {
+   "date": "2026-08-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 9437250,
+   "balance": 14698997
+  },
+  {
+   "date": "2026-08-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 7500000,
+   "balance": 7198997
+  },
+  {
+   "date": "2026-08-04",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 5083000,
+   "balance": 2115997
+  },
+  {
+   "date": "2026-08-06",
+   "type": "JOURNAL_INTEREST",
+   "debit": 977010,
+   "credit": null,
+   "balance": 3093007
+  },
+  {
+   "date": "2026-08-06",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 97701,
+   "balance": 2995306
+  },
+  {
+   "date": "2026-08-06",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 2018296,
+   "balance": 977010
+  },
+  {
+   "date": "2026-08-06",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 977010,
+   "balance": 0
+  }
+ ],
+ "ledgerB": [
+  {
+   "date": "2025-05-05",
+   "type": "PAYMENT",
+   "debit": 2000000,
+   "credit": null,
+   "balance": 2000000
+  },
+  {
+   "date": "2025-05-06",
+   "type": "PAYMENT",
+   "debit": 1600000,
+   "credit": null,
+   "balance": 3600000
+  },
+  {
+   "date": "2025-05-06",
+   "type": "PAYMENT",
+   "debit": 1500000,
+   "credit": null,
+   "balance": 5100000
+  },
+  {
+   "date": "2025-05-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 74510,
+   "credit": null,
+   "balance": 5174510
+  },
+  {
+   "date": "2025-05-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 7451,
+   "balance": 5167059
+  },
+  {
+   "date": "2025-06-20",
+   "type": "PAYMENT",
+   "debit": 1700000,
+   "credit": null,
+   "balance": 6867059
+  },
+  {
+   "date": "2025-06-27",
+   "type": "PAYMENT",
+   "debit": 2100000,
+   "credit": null,
+   "balance": 8967059
+  },
+  {
+   "date": "2025-06-30",
+   "type": "PAYMENT",
+   "debit": 2400000,
+   "credit": null,
+   "balance": 11367059
+  },
+  {
+   "date": "2025-06-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 102590,
+   "credit": null,
+   "balance": 11469649
+  },
+  {
+   "date": "2025-06-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 10259,
+   "balance": 11459390
+  },
+  {
+   "date": "2025-07-10",
+   "type": "PAYMENT",
+   "debit": 1100000,
+   "credit": null,
+   "balance": 12559390
+  },
+  {
+   "date": "2025-07-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 12776390
+  },
+  {
+   "date": "2025-07-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 12754690
+  },
+  {
+   "date": "2025-08-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 12971690
+  },
+  {
+   "date": "2025-08-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 12949990
+  },
+  {
+   "date": "2025-09-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13166990
+  },
+  {
+   "date": "2025-09-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 13145290
+  },
+  {
+   "date": "2025-10-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 67059,
+   "balance": 13078231
+  },
+  {
+   "date": "2025-10-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 92331,
+   "balance": 12985900
+  },
+  {
+   "date": "2025-10-30",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12790600
+  },
+  {
+   "date": "2025-10-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13007600
+  },
+  {
+   "date": "2025-10-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 12985900
+  },
+  {
+   "date": "2025-11-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13202900
+  },
+  {
+   "date": "2025-11-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 13181200
+  },
+  {
+   "date": "2025-12-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12985900
+  },
+  {
+   "date": "2025-12-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13202900
+  },
+  {
+   "date": "2025-12-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 13181200
+  },
+  {
+   "date": "2025-12-31",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12985900
+  },
+  {
+   "date": "2026-01-30",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12790600
+  },
+  {
+   "date": "2026-01-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13007600
+  },
+  {
+   "date": "2026-01-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 12985900
+  },
+  {
+   "date": "2026-02-28",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13202900
+  },
+  {
+   "date": "2026-02-28",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 13181200
+  },
+  {
+   "date": "2026-02-28",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12985900
+  },
+  {
+   "date": "2026-03-26",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12790600
+  },
+  {
+   "date": "2026-03-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13007600
+  },
+  {
+   "date": "2026-03-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 12985900
+  },
+  {
+   "date": "2026-04-13",
+   "type": "PAYMENT",
+   "debit": 199000,
+   "credit": null,
+   "balance": 13184900
+  },
+  {
+   "date": "2026-04-28",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12989600
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 217000,
+   "credit": null,
+   "balance": 13206600
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 21700,
+   "balance": 13184900
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 1973,
+   "credit": null,
+   "balance": 13186873
+  },
+  {
+   "date": "2026-04-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 197,
+   "balance": 13186676
+  },
+  {
+   "date": "2026-05-20",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12991376
+  },
+  {
+   "date": "2026-05-20",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 195300,
+   "balance": 12796076
+  },
+  {
+   "date": "2026-05-21",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 197076,
+   "balance": 12599000
+  },
+  {
+   "date": "2026-05-31",
+   "type": "JOURNAL_INTEREST",
+   "debit": 220480,
+   "credit": null,
+   "balance": 12819480
+  },
+  {
+   "date": "2026-05-31",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 22048,
+   "balance": 12797432
+  },
+  {
+   "date": "2026-06-02",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 198432,
+   "balance": 12599000
+  },
+  {
+   "date": "2026-06-30",
+   "type": "JOURNAL_INTEREST",
+   "debit": 220480,
+   "credit": null,
+   "balance": 12819480
+  },
+  {
+   "date": "2026-06-30",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 22048,
+   "balance": 12797432
+  },
+  {
+   "date": "2026-07-01",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 198432,
+   "balance": 12599000
+  },
+  {
+   "date": "2026-07-03",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 3100000,
+   "balance": 9499000
+  },
+  {
+   "date": "2026-07-27",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 9450000,
+   "balance": 49000
+  },
+  {
+   "date": "2026-08-06",
+   "type": "JOURNAL_INTEREST",
+   "debit": 191110,
+   "credit": null,
+   "balance": 240110
+  },
+  {
+   "date": "2026-08-06",
+   "type": "JOURNAL_TDS",
+   "debit": null,
+   "credit": 19111,
+   "balance": 220999
+  },
+  {
+   "date": "2026-08-06",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 29889,
+   "balance": 191110
+  },
+  {
+   "date": "2026-08-06",
+   "type": "RECEIPT",
+   "debit": null,
+   "credit": 191110,
+   "balance": 0
+  }
+ ]
+}

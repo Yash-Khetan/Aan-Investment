@@ -12,9 +12,8 @@ import { exportReport, getReport } from "./api";
 import { REPORT_LABELS, REPORT_NAMES, type ReportFilters, type ReportName, type ReportRow } from "./types";
 import { REPORT_COLUMNS } from "./columns";
 
-const LOAN_STATUSES = ["PENDING", "ACTIVE", "OVERDUE", "NPA", "CLOSED", "WRITTEN_OFF"];
+const LOAN_STATUSES = ["PENDING", "ACTIVE", "CLOSED", "WRITTEN_OFF"];
 const COLLATERAL_TYPES = ["PROPERTY", "MORTGAGE", "HYPOTHECATION_OF_RECEIVABLES", "PERSONAL_GUARANTEE", "CORPORATE_GUARANTEE", "OTHERS", "NONE"];
-const COLLECTION_STATUSES = ["OPEN", "PROMISE_TO_PAY", "FOLLOW_UP", "CLOSED"];
 
 function renderCell(row: ReportRow, key: string, type: string) {
   const value = row[key];
@@ -40,6 +39,7 @@ export function ReportsPage() {
   const tableColumns: Column<ReportRow>[] = columns.map((col) => ({
     key: col.key,
     header: col.header,
+    align: col.type === "currency" || col.type === "number" ? "right" : "left",
     render: (row) => renderCell(row, col.key, col.type),
   }));
 
@@ -57,7 +57,7 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="Reports" description="Read-only MIS reports. View as JSON, or export to CSV / Excel." />
+      <PageHeader title="Reports" description="Pick a report and filters, then export it to CSV or Excel if you need a copy." />
 
       <Card className="mb-6 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -78,7 +78,7 @@ export function ReportsPage() {
             value={filters.loanStatus ?? ""}
             onChange={(e) => setFilters((f) => ({ ...f, loanStatus: e.target.value || undefined }))}
           >
-            <option value="">Any</option>
+            <option value="">Any status</option>
             {LOAN_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -94,21 +94,6 @@ export function ReportsPage() {
             >
               <option value="">Any</option>
               {COLLATERAL_TYPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </SelectField>
-          )}
-
-          {report === "collections-report" && (
-            <SelectField
-              label="Collection Status"
-              value={filters.collectionStatus ?? ""}
-              onChange={(e) => setFilters((f) => ({ ...f, collectionStatus: e.target.value || undefined }))}
-            >
-              <option value="">Any</option>
-              {COLLECTION_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
