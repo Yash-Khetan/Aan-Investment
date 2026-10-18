@@ -24,6 +24,7 @@ import apiRouter from "./routes/index";
 
 import { ledgerRouter } from "./modules/ledger/ledger.routes";
 import { kpiLedgerRouter } from "./modules/kpi-ledger/kpi-ledger.routes";
+import { notificationRouter, initNotificationScheduler } from "./modules/notifications";
 
 
 /**
@@ -100,6 +101,7 @@ function createApp(): Application {
     app.use("/dashboard", dashboardRouter);
     app.use("/lookup", lookupRouter);
     app.use("/api/v1", apiRouter); //  /api/v1/borrowers, /api/v1/loans
+    app.use("/admin/notifications", notificationRouter); // Notifications audit, manual dispatch, and sweeps
 
     // TEMPORARY: renders the page the forgot-password email links to, until a
     // real front-end owns it. Never mounted in production — there the reset URL
@@ -126,6 +128,8 @@ let shuttingDown = false;
 async function bootstrap(): Promise<void> {
     await verifyDbConnection();
     logger.info("Database connection verified.");
+
+    initNotificationScheduler();
 
     const app = createApp();
 

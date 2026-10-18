@@ -5,8 +5,11 @@
  */
 
 export { notificationService } from "./services/notification.service";
+export { notificationRouter } from "./notification.routes";
+export { initNotificationScheduler, runDailyNotificationSweep } from "./services/scheduler.service";
 
 export { renderEmailLayout, emailButton } from "./templates/email-layout";
+export * from "./templates/external-templates";
 export type { EmailLayoutOptions } from "./templates/email-layout";
 
 export type {

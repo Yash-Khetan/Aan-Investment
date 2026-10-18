@@ -4,6 +4,14 @@ export type NotificationChannel = "EMAIL" | "SMS" | "WHATSAPP";
 /** Outcome recorded for every dispatch. Mirrors the `notification_status` DB enum. */
 export type NotificationStatus = "SUCCESS" | "FAILED";
 
+export type NotificationTriggerType =
+    | "SCHEDULED_EMI"
+    | "SCHEDULED_OVERDUE"
+    | "DISBURSEMENT"
+    | "PAYMENT_RECEIPT"
+    | "MANUAL"
+    | "AUTH";
+
 /**
  * Identifies who a notification is for and how it should appear in their
  * notification list.
@@ -13,8 +21,13 @@ export type NotificationStatus = "SUCCESS" | "FAILED";
  * rendered body, which may contain single-use tokens or reset links.
  */
 export interface NotificationRecordMeta {
-    userId: string;
+    userId?: string;
+    borrowerId?: string;
+    loanId?: string;
+    recipient?: string;
     title: string;
     message?: string;
+    triggerType?: NotificationTriggerType;
     link?: string;
 }
+

@@ -20,6 +20,7 @@ import { CreateLoanPage } from "./features/loans/CreateLoanPage";
 import { EditLoanPage } from "./features/loans/EditLoanPage";
 import { UsersPage } from "./features/admin/UsersPage";
 import { CreateUserPage } from "./features/admin/CreateUserPage";
+import { NotificationsPage } from "./features/notifications/NotificationsPage";
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/collateral" element={<Navigate to="/loans" replace />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route element={<AdminRoute />}>
+            <Route path="/admin/notifications" element={<NotificationsPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/users/new" element={<CreateUserPage />} />
           </Route>

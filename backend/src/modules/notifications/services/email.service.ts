@@ -59,6 +59,21 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
         throw new EmailDeliveryError("Email must include either an `html` or `text` body.");
     }
 
+    if (process.env.NOTIFICATION_SIMULATION_MODE === "true") {
+        logger.info("[NOTIFICATION SIMULATION] Email dispatched successfully", {
+            channel: "EMAIL",
+            to,
+            subject,
+            preview: text || "HTML content",
+        });
+        return {
+            success: true,
+            messageId: `sim-email-${Date.now()}`,
+            accepted: Array.isArray(to) ? to : [to],
+            rejected: [],
+        };
+    }
+
     const from = config.notifications.email.from;
     if (!from) {
         throw new ProviderConfigError(

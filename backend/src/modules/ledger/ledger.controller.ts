@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { getLoanLedger, recordPaymentOrReceipt, getSettings } from "./ledger.service";
 import { getDpdGrid } from "./dpd.service";
 import { syncLoanStatusWithLedger } from "./loanStatus";
+import { notifyPaymentReceipt } from "../notifications/services/event-notifications";
 
 export const getLedger: RequestHandler = async (req, res, next) => {
   try {
@@ -25,6 +26,17 @@ export const createEntry: RequestHandler = async (req, res, next) => {
     const entry = await recordPaymentOrReceipt({ loanId, ...body });
     // A receipt that clears the loan closes it; a disbursement on a closed loan reopens it.
     await syncLoanStatusWithLedger(loanId);
+
+    // Fire payment receipt notification asynchronously to borrower
+    if (body.vchType === "RECEIPT") {
+      notifyPaymentReceipt({
+        loanId,
+        amount: body.amount,
+        paymentDate: body.entryDate,
+        receiptNumber: entry.id.slice(0, 8).toUpperCase(),
+      }).catch(() => {});
+    }
+
     res.status(201).json({ success: true, data: entry });
   } catch (err) {
     next(err);

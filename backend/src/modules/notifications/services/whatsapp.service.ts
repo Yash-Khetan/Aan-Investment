@@ -32,6 +32,19 @@ export async function sendWhatsapp(phoneNumber: string, message: string): Promis
     assertValidPhoneNumber(rawNumber);
     assertNonEmptyMessage(message, "WhatsApp");
 
+    if (process.env.NOTIFICATION_SIMULATION_MODE === "true") {
+        logger.info("[NOTIFICATION SIMULATION] WhatsApp message dispatched successfully", {
+            channel: "WHATSAPP",
+            to: rawNumber,
+            messagePreview: message.slice(0, 100),
+        });
+        return {
+            success: true,
+            sid: `sim-wa-${Date.now()}`,
+            status: "delivered",
+        };
+    }
+
     const fromNumber = config.notifications.twilio.whatsappFrom;
     if (!fromNumber) {
         throw new ProviderConfigError(

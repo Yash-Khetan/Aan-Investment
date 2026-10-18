@@ -15,12 +15,15 @@ const NAV_ITEMS = [
   { to: "/reports", label: "Reports" },
 ];
 
-const ADMIN_NAV_ITEM = { to: "/admin/users", label: "Users" };
+const ADMIN_NAV_ITEMS = [
+  { to: "/admin/notifications", label: "Notifications" },
+  { to: "/admin/users", label: "Users" },
+];
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const navItems = user?.roles.includes("ADMIN") ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
+  const navItems = user?.roles.includes("ADMIN") ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS;
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   async function handleLogout() {
