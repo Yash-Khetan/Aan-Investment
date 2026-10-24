@@ -188,6 +188,25 @@ export const ledgerEntries = pgTable("ledger_entries", {
     sourceVchNo: varchar("source_vch_no", { length: 100 }),
 
     /**
+     * When this row was locked, and null while it is not. A locked row is the
+     * record of what a source outside this app already stated: it is read-only
+     * for good — no edit, no deletion — and the only thing that takes it away
+     * is removing the whole import it came in with.
+     *
+     * Every row an import posts is locked as it is inserted, so the lock is a
+     * persisted fact rather than something recomputed per request: it survives
+     * a refresh, a new session and a restart. Nothing else is locked — a
+     * month-end Journal pair is left unlocked because the ledger recalculates
+     * its own months (see recomputeMonthsFrom); it is protected by being
+     * system-managed, not by this column.
+     *
+     * Locking changes no figure. It records that a row may not be changed; the
+     * date, amount and side it already carries are what every calculation
+     * reads, before and after.
+     */
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+
+    /**
      * A Payment/Receipt dated after the day it was entered is SCHEDULED: shown
      * on the ledger, but counted in no figure until its date arrives (every
      * figure is computed as at today). This records when the audit trail logged

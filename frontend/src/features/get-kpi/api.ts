@@ -15,15 +15,21 @@ export async function previewImport(loanId: string, sheet: ImportSheetPayload): 
   return res.data;
 }
 
-/** Post the sheet into the loan's ledger. Refused unless its preview is clean. */
+/**
+ * Post the sheet into the loan's ledger. Refused unless its preview is clean.
+ * Every entry it posts is locked — `lockedEntryCount` is how many.
+ */
 export async function postImport(
   loanId: string,
   sheet: ImportSheetPayload,
-): Promise<{ importId: string; loanStatus: string | null }> {
-  const res = await apiRequest<Envelope<{ importId: string; loanStatus: string | null }>>(`/kpi-ledger/${loanId}/imports`, {
-    method: "POST",
-    body: JSON.stringify(sheet),
-  });
+): Promise<{ importId: string; lockedEntryCount: number; loanStatus: string | null }> {
+  const res = await apiRequest<Envelope<{ importId: string; lockedEntryCount: number; loanStatus: string | null }>>(
+    `/kpi-ledger/${loanId}/imports`,
+    {
+      method: "POST",
+      body: JSON.stringify(sheet),
+    },
+  );
   return res.data;
 }
 

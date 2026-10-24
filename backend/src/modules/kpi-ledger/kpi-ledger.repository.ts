@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, isNull, lt, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db, kpiLedgerRows, ledgerEntries, ledgerImports, loans, users } from "../../db";
 import { NotFoundError } from "../../common/errors";
-import { getNextVchNo } from "../ledger/ledger.repository";
+import { getNextVchNo, type LedgerDbOrTx as DbOrTx } from "../ledger/ledger.repository";
 import type { AnalyzedRow, SheetAnalysis } from "./sheet";
 import type { ImportSheetInput, KpiLedgerRow, LedgerImportSummary } from "./kpi-ledger.types";
 
@@ -23,6 +23,9 @@ function toApiRow(row: typeof kpiLedgerRows.$inferSelect): KpiLedgerRow {
 }
 
 const notDeleted = (loanId: string) => and(eq(kpiLedgerRows.loanId, loanId), isNull(kpiLedgerRows.deletedAt));
+
+/** The database's own clock, so a row's `locked_at` and its `created_at` can never disagree. */
+const dbNow = sql`now()`;
 
 export async function assertLoanExists(loanId: string): Promise<void> {
   const [row] = await db
@@ -76,18 +79,88 @@ export async function findConflicts(loanId: string, analysis: SheetAnalysis): Pr
   return rows.map(describeEntry);
 }
 
+/** A date range as it reads in a message about an import. */
+const describeRange = (from: string, to: string) => (from === to ? from : `${from} to ${to}`);
+
+/**
+ * Imports already posted to this loan that the sheet would duplicate,
+ * described for the user. Posting needs this empty.
+ *
+ * Every row an import posts is locked, so nothing an import has already
+ * posted can be overwritten or quietly replaced — a second upload of the same
+ * history is refused outright rather than landing a second copy of it:
+ *
+ *   - any posted import whose date range overlaps this sheet's;
+ *   - any posted import of the same file and sheet name, whatever its dates
+ *     (the same workbook re-uploaded after a few rows were appended to it
+ *     overlaps too, but this names it for what it is).
+ *
+ * This looks at `ledger_imports`, where `findConflicts` looks at the entries.
+ * The two are complementary: an import whose entries were somehow removed
+ * still blocks a re-upload here, and entries from any other source still
+ * block one there.
+ */
+export async function findDuplicateImports(
+  loanId: string,
+  analysis: SheetAnalysis,
+  sheet: ImportSheetInput,
+): Promise<string[]> {
+  if (!analysis.firstEntryDate || !analysis.lastEntryDate) return [];
+
+  const overlaps = and(
+    lte(ledgerImports.firstEntryDate, analysis.lastEntryDate),
+    gte(ledgerImports.lastEntryDate, analysis.firstEntryDate),
+  )!;
+
+  const sameSheet =
+    sheet.fileName && sheet.sheetName
+      ? and(eq(ledgerImports.fileName, sheet.fileName), eq(ledgerImports.sheetName, sheet.sheetName))!
+      : null;
+
+  const rows = await db
+    .select({
+      fileName: ledgerImports.fileName,
+      sheetName: ledgerImports.sheetName,
+      rowCount: ledgerImports.rowCount,
+      firstEntryDate: ledgerImports.firstEntryDate,
+      lastEntryDate: ledgerImports.lastEntryDate,
+      importedAt: ledgerImports.createdAt,
+      isSameSheet: sameSheet ? sql<boolean>`(${sameSheet})` : sql<boolean>`false`,
+    })
+    .from(ledgerImports)
+    .where(and(eq(ledgerImports.loanId, loanId), sameSheet ? or(overlaps, sameSheet) : overlaps))
+    .orderBy(asc(ledgerImports.firstEntryDate))
+    .limit(10);
+
+  return rows.map((imp) => {
+    const what = imp.isSameSheet
+      ? `${imp.sheetName} in ${imp.fileName} has already been imported`
+      : `An import${imp.fileName ? ` of ${imp.sheetName} in ${imp.fileName}` : ""} already covers ${describeRange(imp.firstEntryDate, imp.lastEntryDate)}`;
+    const when = imp.importedAt ? ` on ${imp.importedAt.toISOString().slice(0, 10)}` : "";
+    return `${what}${when} — ${imp.rowCount} rows, which are locked. Remove that import first, or import a sheet that starts after ${imp.lastEntryDate}.`;
+  });
+}
+
 /**
  * Posts an analysed sheet in one transaction: the import record, the sheet's
  * rows exactly as sent, and one ledger entry per postable row with the sheet's
  * date and amount, in the sheet's order. Our own voucher numbers continue the
  * loan's sequence; the sheet's are kept beside them.
+ *
+ * Every ledger entry it posts is LOCKED as it is inserted — `locked_at` set by
+ * the database's own clock, in the same transaction as the row itself. There
+ * is no window in which an imported row exists unlocked, and no second pass
+ * that could be interrupted and leave one that way. Returns the import's id
+ * and how many entries it locked.
  */
 export async function insertImport(input: {
   loanId: string;
   sheet: ImportSheetInput;
   analysis: SheetAnalysis;
   importedBy: string;
-}): Promise<string> {
+  /** Runs inside the import's own transaction — see kpi-ledger.service.ts. */
+  onPosted?: (posted: { importId: string; lockedEntryCount: number }, tx: DbOrTx) => Promise<void>;
+}): Promise<{ importId: string; lockedEntryCount: number }> {
   const { loanId, sheet, analysis } = input;
 
   return db.transaction(async (tx) => {
@@ -155,10 +228,16 @@ export async function insertImport(input: {
         importId,
         sourceVchType: r.sourceVchType,
         sourceVchNo: r.sourceVchNo,
+        // Imported, therefore locked — in the same statement that posts it.
+        lockedAt: dbNow,
       });
     }
 
-    return importId;
+    const posted = { importId, lockedEntryCount: postable.length };
+    // The audit row goes in here, so a committed import is always a recorded one.
+    await input.onPosted?.(posted, tx);
+
+    return posted;
   });
 }
 
@@ -184,14 +263,29 @@ export async function listImports(loanId: string): Promise<LedgerImportSummary[]
   return rows;
 }
 
-/** Removes an import and — by cascade — every ledger entry and raw row it posted. Returns its first date. */
-export async function deleteImport(loanId: string, importId: string): Promise<string> {
-  const [row] = await db
-    .delete(ledgerImports)
-    .where(and(eq(ledgerImports.id, importId), eq(ledgerImports.loanId, loanId)))
-    .returning({ firstEntryDate: ledgerImports.firstEntryDate });
-  if (!row) throw new NotFoundError(`Import ${importId} not found for loan ${loanId}.`);
-  return row.firstEntryDate;
+/**
+ * Removes an import and — by cascade — every ledger entry and raw row it
+ * posted. This is the one path that takes locked entries out of a ledger:
+ * they go as a whole import, never one row at a time.
+ *
+ * `onDeleted` runs inside the same transaction (the audit row — see
+ * kpi-ledger.service.ts), so the removal and its trail entry commit together.
+ */
+export async function deleteImport(
+  loanId: string,
+  importId: string,
+  onDeleted?: (removed: typeof ledgerImports.$inferSelect, tx: DbOrTx) => Promise<void>,
+): Promise<typeof ledgerImports.$inferSelect> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .delete(ledgerImports)
+      .where(and(eq(ledgerImports.id, importId), eq(ledgerImports.loanId, loanId)))
+      .returning();
+    if (!row) throw new NotFoundError(`Import ${importId} not found for loan ${loanId}.`);
+
+    await onDeleted?.(row, tx);
+    return row;
+  });
 }
 
 /** Page through one loan's imported rows in sheet order. */

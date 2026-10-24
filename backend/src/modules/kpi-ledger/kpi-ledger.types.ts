@@ -35,6 +35,12 @@ export type ImportSheetInput = z.infer<typeof importSheetSchema>;
 export interface ImportPreview extends SheetAnalysis {
   /** Existing ledger entries the sheet would clash with. Posting needs this empty. */
   conflicts: string[];
+  /**
+   * Imports already posted to this loan that this sheet would duplicate —
+   * whole sentences, each naming the import and why it blocks this one. Their
+   * rows are locked, so a re-upload is refused rather than overwriting them.
+   */
+  duplicates: string[];
   canPost: boolean;
 }
 

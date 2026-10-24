@@ -21,6 +21,18 @@ export interface LedgerEntry {
   /** The voucher type and number the imported sheet printed. Null unless imported. */
   sourceVchType: string | null;
   sourceVchNo: string | null;
+  /** When the entry was locked, and null while it is not. Every imported entry is locked as it is posted. */
+  lockedAt: string | null;
+  /** Imported from a ledger sheet, so read-only for good. Only removing the whole import takes it out. */
+  isLocked: boolean;
+  /**
+   * May be edited or removed: a Payment or Receipt recorded by hand. Decided
+   * server-side (modules/ledger/entryRules.ts) and sent with the row, so the
+   * Edit button and the API can never disagree about it.
+   */
+  isEditable: boolean;
+  /** Why the entry cannot be changed, to show the user. Null when it can. */
+  lockReason: string | null;
   /** Dated after today: shown, but counted in no figure until its date arrives. */
   isScheduled: boolean;
   /** Computed cumulative running balance, attached server-side — never independently stored. */
@@ -71,6 +83,19 @@ export interface CreateEntryInput {
   vchType: "PAYMENT" | "RECEIPT";
   amount: number;
   narration?: string;
+}
+
+/**
+ * An edit to a hand-recorded Payment or Receipt. Only these four fields may
+ * change; everything else on an entry is derived or system-managed, and the
+ * backend accepts no other key. Send only what changed.
+ */
+export interface UpdateEntryInput {
+  entryDate?: string;
+  vchType?: "PAYMENT" | "RECEIPT";
+  amount?: number;
+  /** Empty or null clears the narration. */
+  narration?: string | null;
 }
 
 /* ------------------------------------------------------------------ */

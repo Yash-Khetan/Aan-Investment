@@ -1,29 +1,37 @@
-import { BadRequestError, NotFoundError } from "../../common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../../common/errors";
+import { AUDIT_ENTITY, recordAudit } from "../audit";
 import { firstSystemAccrualMonth } from "../kpi-ledger/sheet";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
 import { getInterestConfigEffectiveOn } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
 import {
+  deleteManualEntry,
   getEntriesForLoan,
   getEntriesUpTo,
   getExistingAccrualMonths,
   getJournalInterestEntriesFromMonth,
   getEarliestEntryDate,
+  getLoanEntryById,
+  inLedgerTransaction,
   insertPaymentOrReceipt,
   insertJournalPair,
   getEntryById,
   updateEntryAmountAndRate,
+  updateManualEntry,
   getHistoryCutoff,
   getLoanStatus,
   type LedgerEntryRow,
 } from "./ledger.repository";
 import {
   CreateLedgerEntryInput,
+  DeleteLedgerEntryInput,
   LedgerBalanceEvent,
   MonthAccrualConfig,
+  UpdateLedgerEntryInput,
 } from "./ledger.types";
 import { allocateLedger } from "./allocation";
+import { describeEntry, diffFields, entryFields, patchFields, toRowValues } from "./entryRules";
 
 /**
  * What a Journal row posted before the basis was snapshotted per row reads
@@ -285,15 +293,23 @@ export async function recomputeMonthsFrom(loanId: string, fromDate: Date): Promi
   }
 }
 
-export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Promise<LedgerEntryRow> {
-  // Imported history is the record up to its last row; nothing is added by hand inside it.
-  const { lastEntryDate } = await getHistoryCutoff(input.loanId);
-  if (lastEntryDate && input.entryDate <= lastEntryDate) {
+/**
+ * Imported history is the record up to its last row; nothing is added — or
+ * moved — by hand inside it. Applies to a new entry's date and to an edited
+ * one's new date alike.
+ */
+async function assertDateAfterImportedHistory(loanId: string, entryDate: string): Promise<void> {
+  const { lastEntryDate } = await getHistoryCutoff(loanId);
+  if (lastEntryDate && entryDate <= lastEntryDate) {
     throw new BadRequestError(
       `This loan's imported history runs to ${lastEntryDate}. Entries on or before that date come from the imported sheet; record this one with a later date.`,
       { field: "entryDate" },
     );
   }
+}
+
+export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Promise<LedgerEntryRow> {
+  await assertDateAfterImportedHistory(input.loanId, input.entryDate);
 
   const created = await insertPaymentOrReceipt({
     loanId: input.loanId,
@@ -306,6 +322,148 @@ export async function recordPaymentOrReceipt(input: CreateLedgerEntryInput): Pro
   await recomputeMonthsFrom(input.loanId, parseIsoDate(input.entryDate));
 
   return created;
+}
+
+/* ============================================================
+   EDITING AND REMOVING A HAND-RECORDED ENTRY
+
+   Only a MANUAL Payment/Receipt can be changed, and only its
+   date, side, amount and narration — entryRules.ts is the one
+   place that decides, and the repository's own WHERE clauses
+   are the floor under it.
+
+   An IMPORTED row is LOCKED: it is refused here, so a request
+   straight at the API is refused exactly as the UI's missing
+   Edit button implies. Nothing is written on the way to that
+   refusal.
+
+   What a permitted change moves, and what it must not:
+
+     - the row's own four columns, in one transaction with its
+       audit-trail entry;
+     - the ledger's own month-end Interest/TDS pairs from the
+       earlier of the old and new dates onward, through
+       recomputeMonthsFrom — each at the configuration IT was
+       posted under, read back off the row. Rates, bases,
+       day-count inclusivity and TDS snapshots are therefore
+       preserved exactly; only the balance each month accrued on
+       moves. Imported journals are never in that set.
+     - nothing else. Running balances, bifurcation, receipt
+       appropriation, DPD and every loan figure are computed on
+       read from these rows (allocation.ts, snapshot.ts,
+       dpd.service.ts), so they follow the edit with nothing
+       stored to go stale.
+
+   No journal is created here, and none is duplicated: the edit
+   paths only UPDATE existing pairs. A month that genuinely has
+   none is filled by the usual self-heal, which is idempotent
+   against `ledger_accrual_month_idx`.
+============================================================ */
+
+/** The entry, if it exists on that loan and may be changed. Throws the reason if not. */
+async function loadEditableEntry(loanId: string, entryId: string): Promise<LedgerEntryRow> {
+  const entry = await getLoanEntryById(loanId, entryId);
+  if (!entry) {
+    throw new NotFoundError(`Ledger entry ${entryId} was not found on loan ${loanId}.`);
+  }
+
+  const permissions = describeEntry(entry);
+  if (!permissions.isEditable) {
+    throw new ForbiddenError(permissions.lockReason!, {
+      entryId,
+      isLocked: permissions.isLocked,
+      source: entry.source,
+    });
+  }
+
+  return entry;
+}
+
+/**
+ * Applies an edit to one hand-recorded Payment/Receipt and brings everything
+ * that depends on it back into step. Returns the row unchanged — writing
+ * nothing — when the patch asks for nothing the row does not already say.
+ */
+export async function updateLedgerEntry(input: UpdateLedgerEntryInput): Promise<LedgerEntryRow> {
+  const entry = await loadEditableEntry(input.loanId, input.entryId);
+
+  const before = entryFields(entry);
+  const after = patchFields(before, input.patch);
+  const diff = diffFields(before, after);
+  if (!diff) return entry;
+
+  if (after.entryDate !== before.entryDate) {
+    await assertDateAfterImportedHistory(input.loanId, after.entryDate);
+  }
+
+  const updated = await inLedgerTransaction(async (tx) => {
+    const row = await updateManualEntry(input.entryId, toRowValues(after), tx);
+    // Matched nothing: the row stopped being editable between the check above
+    // and here — an import landing concurrently. The transaction is abandoned,
+    // so nothing is written and nothing is logged.
+    if (!row) {
+      throw new ForbiddenError("This entry was locked while the change was being made, so nothing was changed.", {
+        entryId: input.entryId,
+      });
+    }
+
+    await recordAudit(
+      {
+        actor: input.actor,
+        action: "UPDATE",
+        entityType: AUDIT_ENTITY.LEDGER_ENTRY,
+        entityId: input.entryId,
+        oldValues: { loanId: input.loanId, vchNo: entry.vchNo, ...diff.before },
+        newValues: diff.after,
+      },
+      tx,
+    );
+
+    return row;
+  });
+
+  // From the earlier of the two dates: moving an entry backwards changes the
+  // balance every month from its new date on, forwards from its old one.
+  const earliest = after.entryDate < before.entryDate ? after.entryDate : before.entryDate;
+  await recomputeMonthsFrom(input.loanId, parseIsoDate(earliest));
+
+  return updated;
+}
+
+/**
+ * Removes one hand-recorded Payment/Receipt, then recalculates the ledger's
+ * own month-end interest from its date onward. A locked (imported) row is
+ * refused: the only thing that removes imported rows is removing the import.
+ */
+export async function deleteLedgerEntry(input: DeleteLedgerEntryInput): Promise<LedgerEntryRow> {
+  const entry = await loadEditableEntry(input.loanId, input.entryId);
+  const fields = entryFields(entry);
+
+  const removed = await inLedgerTransaction(async (tx) => {
+    const row = await deleteManualEntry(input.entryId, tx);
+    if (!row) {
+      throw new ForbiddenError("This entry was locked while it was being removed, so nothing was removed.", {
+        entryId: input.entryId,
+      });
+    }
+
+    await recordAudit(
+      {
+        actor: input.actor,
+        action: "DELETE",
+        entityType: AUDIT_ENTITY.LEDGER_ENTRY,
+        entityId: input.entryId,
+        oldValues: { loanId: input.loanId, vchNo: entry.vchNo, ...fields },
+      },
+      tx,
+    );
+
+    return row;
+  });
+
+  await recomputeMonthsFrom(input.loanId, parseIsoDate(fields.entryDate));
+
+  return removed;
 }
 
 /**
@@ -328,8 +486,13 @@ export async function getSettings(loanId: string) {
 
 /**
  * Full ledger for a loan: self-heals missing month-end journals, then returns
- * entries with a computed running balance, what that balance is made of, and
- * — on Receipts — how the receipt was appropriated.
+ * entries with a computed running balance, what that balance is made of,
+ * — on Receipts — how the receipt was appropriated, and whether each row may
+ * be changed.
+ *
+ * The lock state travels with the row rather than being worked out again in
+ * the browser: the Edit button a user sees and the answer the edit route
+ * gives both come from entryRules.ts, so they cannot disagree.
  */
 export async function getLoanLedger(loanId: string) {
   await syncMissingMonthEndJournals(loanId);
@@ -346,6 +509,7 @@ export async function getLoanLedger(loanId: string) {
     balance -= row.credit ? Number(row.credit) : 0;
     return {
       ...row,
+      ...describeEntry(row),
       isScheduled: row.entryDate > today,
       balance,
       bifurcation: allocation.bifurcationAfter.get(row.id)!,

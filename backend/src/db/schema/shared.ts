@@ -462,3 +462,19 @@ export const ledgerEntrySourceEnum = pgEnum("ledger_entry_source", [
     "SYSTEM",
     "IMPORT",
 ]);
+
+/* ============================================================
+   AUDIT ACTION
+
+   What an `audit_logs` row records having happened to the entity
+   it names. CREATE/UPDATE/DELETE are data changes; LOGIN/LOGOUT
+   are session events.
+============================================================ */
+
+export const auditActionEnum = pgEnum("audit_action", [
+    "CREATE",
+    "UPDATE",
+    "DELETE",
+    "LOGIN",
+    "LOGOUT",
+]);

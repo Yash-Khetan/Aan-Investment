@@ -1,5 +1,7 @@
 import type { LoanClassification } from "./dpd";
 import type { InterestBasis } from "../interest/interest.types";
+import type { AuditActor } from "../audit";
+import type { EntryPatch } from "./entryRules";
 
 export type LedgerVchType = "PAYMENT" | "RECEIPT" | "JOURNAL_INTEREST" | "JOURNAL_TDS";
 
@@ -9,6 +11,23 @@ export interface CreateLedgerEntryInput {
   vchType: "PAYMENT" | "RECEIPT";
   amount: number;
   narration?: string;
+}
+
+/**
+ * An edit to one hand-recorded entry. `patch` carries only the fields being
+ * changed; `actor` is who is changing them, for the audit trail.
+ */
+export interface UpdateLedgerEntryInput {
+  loanId: string;
+  entryId: string;
+  patch: EntryPatch;
+  actor: AuditActor & { userId: string };
+}
+
+export interface DeleteLedgerEntryInput {
+  loanId: string;
+  entryId: string;
+  actor: AuditActor & { userId: string };
 }
 
 /**

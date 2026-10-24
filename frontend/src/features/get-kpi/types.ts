@@ -47,6 +47,12 @@ export interface ImportPreview {
   rows: AnalyzedRow[];
   problems: Array<{ index: number; message: string }>;
   conflicts: string[];
+  /**
+   * Imports already posted to this loan that this sheet would duplicate, each
+   * a whole sentence. Their entries are locked, so a re-upload is refused
+   * rather than overwriting them.
+   */
+  duplicates: string[];
   canPost: boolean;
   firstEntryDate: string | null;
   lastEntryDate: string | null;

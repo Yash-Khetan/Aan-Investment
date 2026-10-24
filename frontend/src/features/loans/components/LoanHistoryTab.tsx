@@ -100,7 +100,8 @@ export function LoanHistoryTab({ loan }: { loan: Loan }) {
     mutationFn: () => postImport(loan.id, toPayload(fileName, sheet!)),
     onSuccess: (result) => {
       setPosted(
-        `Posted ${sheet!.name} into the ledger.` + (result.loanStatus === "CLOSED" ? " The history pays the loan off, so it is now closed." : ""),
+        `Posted ${sheet!.name} into the ledger. Its ${result.lockedEntryCount} entries are locked — they keep exactly the figures the sheet stated, and cannot be edited or deleted.` +
+          (result.loanStatus === "CLOSED" ? " The history pays the loan off, so it is now closed." : ""),
       );
       setSheets([]);
       setChosen(null);
@@ -210,8 +211,14 @@ export function LoanHistoryTab({ loan }: { loan: Loan }) {
           {imports.data?.map((imp) => (
             <div key={imp.id} className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white px-5 py-4">
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900">
+                <div className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
                   {formatDate(imp.firstEntryDate)} to {formatDate(imp.lastEntryDate)}
+                  <span
+                    className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700"
+                    title="Every entry this import posted is read-only. Removing the import is the only way to take them out."
+                  >
+                    🔒 Locked
+                  </span>
                 </div>
                 <div className="mt-0.5 text-sm text-slate-600">
                   {imp.sheetName} in {imp.fileName}, {imp.rowCount} rows, closing balance {formatCurrency(Math.abs(Number(imp.closingBalance)), 2)}{" "}
@@ -275,7 +282,7 @@ function PreviewPanel({
   postError: string | null;
 }) {
   const closing = preview.closingBalance;
-  const blocked = preview.problems.length + preview.conflicts.length;
+  const blocked = preview.problems.length + preview.conflicts.length + preview.duplicates.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -297,13 +304,18 @@ function PreviewPanel({
       />
 
       {blocked === 0 ? (
-        <SuccessState message={`Every row reads, and every balance matches the sheet. ${sheetName} can be posted to ${loanNumber}.`} />
+        <SuccessState
+          message={`Every row reads, and every balance matches the sheet. ${sheetName} can be posted to ${loanNumber}. Its entries will be locked once posted.`}
+        />
       ) : (
         <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
           <p className="font-semibold">This sheet cannot be posted yet.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {preview.problems.map((p) => (
               <li key={`p${p.index}`}>{p.index >= 0 ? `Row ${p.index + 1}: ${p.message}` : p.message}</li>
+            ))}
+            {preview.duplicates.map((d) => (
+              <li key={d}>{d}</li>
             ))}
             {preview.conflicts.map((c) => (
               <li key={c}>The ledger already has {c.charAt(0).toLowerCase() + c.slice(1)} Remove it, or import a sheet that starts after it.</li>

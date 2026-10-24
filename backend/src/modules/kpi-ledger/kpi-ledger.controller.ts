@@ -1,7 +1,14 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import { UnauthorizedError } from "../../common/errors";
+import type { AuditActor } from "../audit";
 import { getImports, getLedgerPage, postImport, previewImport, removeImport } from "./kpi-ledger.service";
 import type { ImportSheetInput } from "./kpi-ledger.types";
+
+/** Who is making the change and from where — recorded on the import's audit trail entry. */
+function auditActor(req: Request): AuditActor & { userId: string } {
+  if (!req.user) throw new UnauthorizedError("Not authenticated");
+  return { userId: req.user.id, ipAddress: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
+}
 
 /** POST /:loanId/imports/preview — what posting this sheet would do. Writes nothing. */
 export const preview: RequestHandler = async (req, res, next) => {
@@ -13,12 +20,11 @@ export const preview: RequestHandler = async (req, res, next) => {
   }
 };
 
-/** POST /:loanId/imports — post the sheet into the loan's ledger. */
+/** POST /:loanId/imports — post the sheet into the loan's ledger, locking every entry it posts. */
 export const create: RequestHandler = async (req, res, next) => {
   try {
     const { loanId } = req.valid!.params as { loanId: string };
-    if (!req.user) throw new UnauthorizedError("Not authenticated");
-    const result = await postImport(loanId, req.valid!.body as ImportSheetInput, req.user.id);
+    const result = await postImport(loanId, req.valid!.body as ImportSheetInput, auditActor(req));
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     next(err);
@@ -39,7 +45,7 @@ export const list: RequestHandler = async (req, res, next) => {
 export const remove: RequestHandler = async (req, res, next) => {
   try {
     const { loanId, importId } = req.valid!.params as { loanId: string; importId: string };
-    res.json({ success: true, data: await removeImport(loanId, importId) });
+    res.json({ success: true, data: await removeImport(loanId, importId, auditActor(req)) });
   } catch (err) {
     next(err);
   }

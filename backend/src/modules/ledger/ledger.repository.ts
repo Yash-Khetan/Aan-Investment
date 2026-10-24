@@ -1,6 +1,15 @@
-import { eq, and, asc, lte, gte, inArray, isNotNull, max } from "drizzle-orm";
+import { eq, and, asc, isNull, lte, gte, inArray, isNotNull, max, sql } from "drizzle-orm";
 import { db, ledgerEntries, ledgerImports, loans } from "../../db";
 import { NotFoundError } from "../../common/errors";
+import { EDITABLE_VCH_TYPES, type EditableVchType } from "./entryRules";
+
+/**
+ * `created_at` and `locked_at` default to the database's own `now()`, so
+ * stamping an update with the Node process's `new Date()` would mix two
+ * clocks — see modules/borrower/promoter.repository.ts for the same note.
+ * Everything written here is stamped by the one clock.
+ */
+const dbNow = sql`now()`;
 
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 
@@ -9,6 +18,15 @@ export type LedgerDbOrTx = typeof db | Parameters<Parameters<(typeof db)["transa
 
 /** Either the top-level `db` or a transaction handle from `db.transaction(...)` — both support the same query builder surface used here. */
 type DbOrTx = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
+
+/**
+ * Runs `work` inside one transaction. This is how a service makes a ledger
+ * write and its audit-trail entry commit or roll back together, without
+ * reaching for `db` itself — `db` stays inside the repositories.
+ */
+export async function inLedgerTransaction<T>(work: (tx: LedgerDbOrTx) => Promise<T>): Promise<T> {
+  return db.transaction(work);
+}
 
 /** All entries for a loan, oldest first — entryDate then sequenceNo as the stable same-day tiebreak. */
 export async function getEntriesForLoan(loanId: string): Promise<LedgerEntryRow[]> {
@@ -215,6 +233,75 @@ export async function insertJournalPair(input: {
 export async function getEntryById(entryId: string): Promise<LedgerEntryRow | null> {
   const rows = await db.select().from(ledgerEntries).where(eq(ledgerEntries.id, entryId)).limit(1);
   return rows[0] ?? null;
+}
+
+/** One entry, only if it belongs to that loan — so an id from another loan reads as missing rather than as somebody else's row. */
+export async function getLoanEntryById(loanId: string, entryId: string): Promise<LedgerEntryRow | null> {
+  const rows = await db
+    .select()
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.id, entryId), eq(ledgerEntries.loanId, loanId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/* ============================================================
+   EDITING A HAND-RECORDED ENTRY
+
+   Both writes below carry the editability rules in their own
+   WHERE clause: locked rows, the ledger's own month-end journals
+   and anything that is not a hand-recorded Payment/Receipt match
+   nothing and so change nothing. The service checks the same
+   rules first, to answer with a reason rather than a silent
+   no-op — these clauses are the floor under that check, not a
+   substitute for it, so no future caller can reach past it.
+============================================================ */
+
+/** Matches only a row that may be edited: unlocked, hand-recorded, a Payment or Receipt. */
+const editableEntry = (entryId: string) =>
+  and(
+    eq(ledgerEntries.id, entryId),
+    isNull(ledgerEntries.lockedAt),
+    eq(ledgerEntries.source, "MANUAL"),
+    inArray(ledgerEntries.vchType, [...EDITABLE_VCH_TYPES]),
+  );
+
+/**
+ * Applies an edit to one hand-recorded Payment/Receipt. Returns null when the
+ * row is locked (or was never editable), having changed nothing.
+ *
+ * Only the four editable columns are set. `vchNo`, `source`, `sequenceNo` and
+ * every snapshot column are left exactly as they were, so an edited row keeps
+ * its place in the loan's voucher sequence and its same-day order.
+ */
+export async function updateManualEntry(
+  entryId: string,
+  values: { entryDate: string; vchType: EditableVchType; debit: string | null; credit: string | null; narration: string | null },
+  tx?: DbOrTx,
+): Promise<LedgerEntryRow | null> {
+  const executor = tx ?? db;
+  const [updated] = await executor
+    .update(ledgerEntries)
+    .set({ ...values, updatedAt: dbNow })
+    .where(editableEntry(entryId))
+    .returning();
+
+  return updated ?? null;
+}
+
+/**
+ * Removes one hand-recorded Payment/Receipt. Returns null when the row is
+ * locked (or was never editable), having removed nothing.
+ *
+ * Deliberately a hard delete. Every ledger read is the full set of rows for a
+ * loan — none of them filters `deleted_at` — so a soft-deleted entry would go
+ * on counting in every balance, which is the one thing a removal must not do.
+ */
+export async function deleteManualEntry(entryId: string, tx?: DbOrTx): Promise<LedgerEntryRow | null> {
+  const executor = tx ?? db;
+  const [deleted] = await executor.delete(ledgerEntries).where(editableEntry(entryId)).returning();
+
+  return deleted ?? null;
 }
 
 export async function updateEntryAmountAndRate(
