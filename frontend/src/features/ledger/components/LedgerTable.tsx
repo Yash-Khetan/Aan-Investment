@@ -79,7 +79,7 @@ function EntryStateBadge({ entry }: { entry: LedgerEntry }) {
           entry.isLocked ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-500"
         }`}
       >
-        {entry.isLocked ? "🔒 Locked" : "Automatic"}
+        {entry.isLocked ? "Locked" : "Automatic"}
       </span>
       {entry.lockReason && (
         <InfoPopover label={entry.isLocked ? "Why this entry is locked" : "Why this entry is not edited here"}>
