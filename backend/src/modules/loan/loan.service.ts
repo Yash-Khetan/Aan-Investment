@@ -16,6 +16,8 @@ import * as loanRepository from "./loan.repository";
 import { assertLoanInvariants, assertOtherSecurityType } from "./loan.validators";
 import { getLoanIrrs } from "./loan.irr";
 import { getLoanSnapshots } from "../ledger/snapshot.service";
+import { getLoanAccrual } from "../ledger/accrual.service";
+import type { InterestAccrual } from "../ledger/accrual";
 import {
     createInterestConfigRevision,
     getCurrentInterestConfig,
@@ -262,7 +264,13 @@ const enrichWithMetrics = async (
 
 export const getLoanById = async (
     id: string,
-): Promise<LoanWithMetrics & { irr: number | null; interestConfig: CurrentInterestConfig }> => {
+): Promise<
+    LoanWithMetrics & {
+        irr: number | null;
+        interestConfig: CurrentInterestConfig;
+        interestAccrual: InterestAccrual;
+    }
+> => {
     const loan = await loanRepository.findById(id);
     if (!loan) throw new NotFoundError(`Loan '${id}' not found`);
     const [enriched] = await enrichWithMetrics([loan]);
@@ -271,7 +279,11 @@ export const getLoanById = async (
     // rather than falling back to defaults. Null only for a loan that predates
     // having one at all.
     const interestConfig = await getCurrentInterestConfig(id);
-    return { ...enriched!, irr: irrs.get(id) ?? null, interestConfig };
+    // Interest accrued through today, including the month in progress that no
+    // Journal row shows yet. Read-only, and attached to the detail response
+    // only — the Loans list keeps the columns it has.
+    const interestAccrual = await getLoanAccrual(id);
+    return { ...enriched!, irr: irrs.get(id) ?? null, interestConfig, interestAccrual };
 };
 
 export const listLoans = async (

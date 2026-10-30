@@ -1,5 +1,5 @@
 import type { InterestBasis, InterestConfig } from "./interestConfig";
-import type { BalanceBifurcation, LoanSnapshot } from "../ledger/types";
+import type { BalanceBifurcation, InterestAccrual, LoanSnapshot } from "../ledger/types";
 
 export const LOAN_TYPES = ["SECURED", "UNSECURED"] as const;
 
@@ -253,6 +253,13 @@ export interface Loan {
   balanceBifurcation: BalanceBifurcation | null;
   /** Every money figure about the loan, read off its ledger. */
   snapshot: LoanSnapshot;
+  /**
+   * Interest earned through today, posted and not yet posted together, with
+   * the breakdown behind it. Computed by the backend from the same interest
+   * engine a month-end posting uses. Only present on the single-loan detail
+   * response, not the list.
+   */
+  interestAccrual?: InterestAccrual | null;
   /**
    * Annualized IRR from this loan's realized cash flows (disbursements out, actual
    * payments in) plus its current outstanding principal as a final notional inflow.

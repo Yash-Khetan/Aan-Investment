@@ -101,6 +101,11 @@ export function DashboardPage() {
             },
             { label: FIGURE.received, value: formatCurrency(t.totalReceived) },
             { label: FIGURE.principalOutstanding, value: formatCurrency(t.totalOutstanding) },
+            {
+              label: FIGURE.interestAccrued,
+              value: formatCurrency(t.totalInterestAccrued),
+              note: "Earned, before TDS",
+            },
             { label: FIGURE.interestDue, value: formatCurrency(t.totalInterestDue), note: "After TDS" },
             { label: FIGURE.totalPayable, value: formatCurrency(t.totalPayable) },
             {

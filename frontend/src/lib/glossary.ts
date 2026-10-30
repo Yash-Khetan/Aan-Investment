@@ -9,6 +9,7 @@ export const FIGURE = {
   received: "Received",
   principalOutstanding: "Principal outstanding",
   interestDue: "Interest due",
+  interestAccrued: "Interest accrued till today",
   totalPayable: "Total payable",
   overdue: "Overdue",
   dpd: "DPD",

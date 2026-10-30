@@ -5,6 +5,7 @@ import { borrowers, ledgerEntries, loans } from "../../db/schema/index.js";
 import { xirr, xmirr } from "../../common/finance/xirr.js";
 import { getPortfolioCashFlows } from "../loan/loan.irr.js";
 import type { LoanClassification } from "../ledger/dpd.js";
+import { getLoanLedgerFigures } from "../ledger/accrual.service.js";
 import { getLoanSnapshots, todayIso } from "../ledger/snapshot.service.js";
 import { getCurrentRates } from "../interest/interest.repository.js";
 
@@ -35,7 +36,12 @@ export async function getPortfolioSummary() {
         .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
         .where(isNull(loans.deletedAt));
 
-    const snapshots = await getLoanSnapshots(loanRows.map((l) => l.id));
+    // Snapshot and accrued interest for every loan, off one read of the
+    // ledgers. Each loan is accrued on its own — two loans of the same
+    // borrower are independent here, as they are everywhere else — and the
+    // portfolio figure is the sum of those, so no month is counted twice.
+    const figures = await getLoanLedgerFigures(loanRows.map((l) => l.id));
+    const snapshots = new Map([...figures].map(([id, f]) => [id, f.snapshot]));
 
     // Every loan with money already past due, worst first: most days past
     // due, then the largest amount.
@@ -68,6 +74,7 @@ export async function getPortfolioSummary() {
         totalReceived: 0,
         totalOutstanding: 0,
         totalInterestDue: 0,
+        totalInterestAccrued: 0,
         totalPayable: 0,
         totalOverdue: 0,
         loansOverdue: 0,
@@ -80,6 +87,7 @@ export async function getPortfolioSummary() {
         totals.totalReceived += s.totalReceived;
         totals.totalOutstanding += s.principalOutstanding;
         totals.totalInterestDue += s.interestOutstanding;
+        totals.totalInterestAccrued += figures.get(loan.id)!.accrual.interestAccruedTillToday;
         totals.totalPayable += s.totalPayable;
         totals.totalOverdue += s.amountOverdue;
         if (s.dpd > 0) totals.loansOverdue += 1;
@@ -98,6 +106,7 @@ export async function getPortfolioSummary() {
             totalReceived: round2(totals.totalReceived),
             totalOutstanding: round2(totals.totalOutstanding),
             totalInterestDue: round2(totals.totalInterestDue),
+            totalInterestAccrued: round2(totals.totalInterestAccrued),
             totalPayable: round2(totals.totalPayable),
             totalOverdue: round2(totals.totalOverdue),
         },

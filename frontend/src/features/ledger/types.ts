@@ -166,3 +166,65 @@ export interface LoanSnapshot {
   firstDisbursementDate: string | null;
   lastReceiptDate: string | null;
 }
+
+/* ------------------------------------------------------------------ */
+/* Interest accrued till today                                         */
+/*                                                                     */
+/* Interest the loan has earned through the as-of date, posted and     */
+/* not yet posted together. The ledger posts interest only at          */
+/* month-end, so on any other day part of what has been earned has no  */
+/* Journal row yet; the backend walks it with the same interest engine */
+/* a real posting uses (modules/ledger/accrual.ts) and sends the       */
+/* figure here. Nothing is recalculated in the browser.                */
+/*                                                                     */
+/* Three different figures, never to be read as one:                   */
+/*   accrued - earned through today, posted or not.                    */
+/*   due     - posted, net of TDS, and still unpaid.                   */
+/*   overdue - due, and already past its due date.                     */
+/* ------------------------------------------------------------------ */
+
+/** One month with no interest journal yet, as the backend accrued it. */
+export interface UnpostedAccrualMonth {
+  /** First of the accrual month, YYYY-MM-DD. */
+  month: string;
+  /** Where the accrual stops: the month's end, or the as-of date for the month in progress. */
+  accruedThrough: string;
+  interestAmount: number;
+  tdsAmount: number;
+  interestRatePercent: number;
+  interestBasis: string;
+  includeOpeningClosingDays: boolean;
+  /** False for the month in progress, whose figure is still moving. */
+  isComplete: boolean;
+}
+
+export interface InterestAccrual {
+  asOf: string;
+  /** First day of the earliest month the loan accrues for. Null while there is nothing to accrue on. */
+  accrualStartDate: string | null;
+  /** Interest earned through `asOf`, gross of TDS. */
+  interestAccruedTillToday: number;
+  /** The part of it carried by posted Journal Interest rows. */
+  postedInterest: number;
+  /** The part accrued since the last posted month, with no journal yet. */
+  unpostedInterest: number;
+  unpostedTds: number;
+  /** First day of the unposted stretch. Null when nothing is accruing beyond what is posted. */
+  unpostedFrom: string | null;
+  unpostedMonths: UnpostedAccrualMonth[];
+  /** Entry date of the latest interest journal posted on or before `asOf`. */
+  lastPostedAccrualDate: string | null;
+  lastPostedAccrualMonth: string | null;
+  /** TDS deducted at source on accrued interest. */
+  tdsAdjusted: number;
+  /** Interest settled by receipts, as the appropriation waterfall allocated them. */
+  interestPaid: number;
+  /** Posted interest, net of TDS, still unpaid — the snapshot's `interestOutstanding`. */
+  interestDue: number;
+  /** Of `interestDue`, the part already past its due date. */
+  interestOverdue: number;
+  /** The rate and day-count the accrual ran at. Null when the loan has never accrued and is not accruing. */
+  interestRatePercent: number | null;
+  interestBasis: string | null;
+  includeOpeningClosingDays: boolean | null;
+}

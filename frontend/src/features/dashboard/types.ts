@@ -18,6 +18,13 @@ export interface PortfolioSummary {
     totalOutstanding: number;
     /** Interest posted (net of TDS) and not yet received. */
     totalInterestDue: number;
+    /**
+     * Interest earned across the portfolio through today, gross of TDS,
+     * including the month in progress that no journal shows yet. Summed from
+     * each loan's own accrual, so no month is counted twice. Not the same
+     * figure as `totalInterestDue`, and never a substitute for it.
+     */
+    totalInterestAccrued: number;
     /** Principal plus unpaid interest. */
     totalPayable: number;
     /** Unpaid interest already past due. */

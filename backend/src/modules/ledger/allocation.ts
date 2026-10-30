@@ -36,8 +36,14 @@ export interface InterestObligation {
   month: string;
   /** The day the month's Interest journal was posted — when it fell due. */
   dueDate: string;
+  /** Gross interest posted for the month, before TDS. */
+  grossAmount: number;
+  /** TDS applied to this month — deducted at source, so never owed to us. */
+  tdsAmount: number;
   /** Interest net of its TDS: what the borrower has to remit for the month. */
   netAmount: number;
+  /** Settled out of this month by the receipts appropriated to it. */
+  paidAmount: number;
   /** Still unpaid on it. */
   remaining: number;
 }
@@ -144,7 +150,10 @@ export function allocateLedger(entries: LedgerEntryRow[]): LedgerAllocation {
   const obligations = sortedBuckets().map((b) => ({
     month: b.month,
     dueDate: b.dueDate,
+    grossAmount: round2(b.gross),
+    tdsAmount: round2(b.tds),
     netAmount: round2(b.gross - b.tds),
+    paidAmount: round2(b.paid),
     remaining: remainingOf(b),
   }));
 

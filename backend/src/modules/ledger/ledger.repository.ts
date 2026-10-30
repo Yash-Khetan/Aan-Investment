@@ -376,6 +376,24 @@ export async function getHistoryCutoff(
   return { lastEntryDate: row?.lastEntryDate ?? null, lastInterestMonth: row?.lastInterestMonth ?? null };
 }
 
+/**
+ * Several loans' lifecycle statuses in one read, keyed by loan id — for list
+ * views that must not fire one query per loan. A loan id that does not exist
+ * is simply absent, rather than throwing as the single-loan read does.
+ */
+export async function getLoanStatuses(loanIds: string[]): Promise<Map<string, string | null>> {
+  const result = new Map<string, string | null>();
+  if (loanIds.length === 0) return result;
+
+  const rows = await db
+    .select({ id: loans.id, status: loans.status })
+    .from(loans)
+    .where(inArray(loans.id, loanIds));
+
+  for (const row of rows) result.set(row.id, row.status);
+  return result;
+}
+
 /** The loan's lifecycle status. Throws when the loan does not exist. */
 export async function getLoanStatus(loanId: string): Promise<string | null> {
   const [row] = await db.select({ status: loans.status }).from(loans).where(eq(loans.id, loanId)).limit(1);

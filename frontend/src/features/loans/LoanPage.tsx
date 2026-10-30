@@ -31,14 +31,21 @@ const TABS: TabDef<TabKey>[] = [
   { key: "history", label: "Imported history" },
 ];
 
-/** The loan's headline figures — the same six, in the same words, on every tab. */
+/** The loan's headline figures — the same seven, in the same words, on every tab. */
 function loanFigures(loan: Loan): MoneyFigure[] {
   const s = loan.snapshot;
+  const accrual = loan.interestAccrual ?? null;
   const isOverdue = s.amountOverdue > 0;
   return [
     { label: FIGURE.disbursed, value: formatCurrency(s.totalDisbursed), note: s.firstDisbursementDate ? `First on ${formatDate(s.firstDisbursementDate)}` : "Nothing yet" },
     { label: FIGURE.received, value: formatCurrency(s.totalReceived), note: s.lastReceiptDate ? `Last on ${formatDate(s.lastReceiptDate)}` : "Nothing yet" },
     { label: FIGURE.principalOutstanding, value: formatCurrency(s.principalOutstanding) },
+    {
+      label: FIGURE.interestAccrued,
+      value: accrual ? formatCurrency(accrual.interestAccruedTillToday) : "—",
+      tone: accrual ? "default" : "muted",
+      note: accrual ? `Earned to ${formatDate(accrual.asOf)}, before TDS` : "Not available",
+    },
     { label: FIGURE.interestDue, value: formatCurrency(s.interestOutstanding), note: "After TDS" },
     { label: FIGURE.totalPayable, value: formatCurrency(s.totalPayable), note: "Principal + interest due" },
     {

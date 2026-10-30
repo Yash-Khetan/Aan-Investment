@@ -3,6 +3,7 @@ import { Panel as Section, Facts } from "../../../components/ui/Facts";
 import { formatAccrualMonth, formatCurrency, formatDate, formatPercent } from "../../../lib/format";
 import { FIGURE } from "../../../lib/glossary";
 import { labelOf } from "../../ledger/components/codedLabel";
+import type { InterestAccrual } from "../../ledger/types";
 import { INTEREST_BASIS_OPTIONS } from "../interestConfig";
 import {
   ASSET_CLASSIFICATIONS,
@@ -15,8 +16,82 @@ import {
 import type { Loan } from "../types";
 
 /**
+ * How the loan's interest accrued till today is arrived at: where accrual
+ * starts, the rate and day-count it runs at, what has been settled against
+ * it, and what of it is due and overdue.
+ *
+ * Every figure comes from the backend's one accrual calculation
+ * (modules/ledger/accrual.ts) — nothing here recomputes money. A value the
+ * loan's data does not support is left as a dash rather than guessed at.
+ */
+function InterestBreakdown({ accrual }: { accrual: InterestAccrual | null }) {
+  if (!accrual) {
+    return (
+      <Section title="Interest breakdown">
+        <p className="text-sm text-slate-500">
+          No interest accrual is available for this loan yet.
+        </p>
+      </Section>
+    );
+  }
+
+  const basisLabel = INTEREST_BASIS_OPTIONS.find((o) => o.value === accrual.interestBasis)?.label ?? accrual.interestBasis;
+  const dayCount =
+    accrual.interestBasis === null
+      ? null
+      : `${basisLabel}${accrual.includeOpeningClosingDays ? ", counting first and last day" : ""}`;
+
+  const accruedValue = (
+    <span className="text-base font-semibold text-slate-900">
+      {formatCurrency(accrual.interestAccruedTillToday, 2)}
+    </span>
+  );
+  const overdueValue =
+    accrual.interestOverdue > 0 ? (
+      <span className="text-dr">{formatCurrency(accrual.interestOverdue, 2)}</span>
+    ) : (
+      formatCurrency(0, 2)
+    );
+
+  return (
+    <Section
+      title="Interest breakdown"
+      aside={<span className="text-xs text-slate-500">As of {formatDate(accrual.asOf)}</span>}
+    >
+      <Facts
+        rows={[
+          ["Accrual starts", formatDate(accrual.accrualStartDate)],
+          ["Calculated as of", formatDate(accrual.asOf)],
+          [FIGURE.rate, accrual.interestRatePercent === null ? null : `${accrual.interestRatePercent.toFixed(2)}% a year`],
+          ["Day count", dayCount],
+          [FIGURE.interestAccrued, accruedValue],
+          ["Posted at month-end", formatCurrency(accrual.postedInterest, 2)],
+          [
+            accrual.unpostedFrom
+              ? `Accruing since ${formatAccrualMonth(accrual.unpostedFrom)}, not yet posted`
+              : "Not yet posted",
+            formatCurrency(accrual.unpostedInterest, 2),
+          ],
+          ["Interest received", formatCurrency(accrual.interestPaid, 2)],
+          ["TDS deducted at source", formatCurrency(accrual.tdsAdjusted, 2)],
+          [FIGURE.interestDue, formatCurrency(accrual.interestDue, 2)],
+          [FIGURE.overdue, overdueValue],
+          ["Last posted accrual", formatDate(accrual.lastPostedAccrualDate)],
+        ]}
+      />
+      <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        Accrued is what the loan has earned to date, interest for the month in progress included. Interest due is what
+        has been posted at month-end, net of TDS, and is still unpaid; overdue is the part of that past its due date.
+        They are three different figures.
+      </p>
+    </Section>
+  );
+}
+
+/**
  * What the loan's total payable is made of — principal, then each month whose
- * interest is still unpaid, oldest first — and the terms it runs on.
+ * interest is still unpaid, oldest first — the interest accrued behind it,
+ * and the terms it runs on.
  */
 export function LoanOverviewTab({ loan }: { loan: Loan }) {
   const [showCibil, setShowCibil] = useState(false);
@@ -26,7 +101,7 @@ export function LoanOverviewTab({ loan }: { loan: Loan }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-      <div className="lg:col-span-2">
+      <div className="flex flex-col gap-6 lg:col-span-2">
         <Section title="What is owed" aside={<span className="text-xs text-slate-500">As of {formatDate(s.asOf)}</span>}>
           {!s.hasEntries ? (
             <p className="text-sm text-slate-500">
@@ -59,6 +134,8 @@ export function LoanOverviewTab({ loan }: { loan: Loan }) {
             </table>
           )}
         </Section>
+
+        <InterestBreakdown accrual={loan.interestAccrual ?? null} />
       </div>
 
       <div className="flex flex-col gap-6 lg:col-span-3">
