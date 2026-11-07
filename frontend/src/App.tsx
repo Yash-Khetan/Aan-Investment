@@ -21,6 +21,9 @@ import { EditLoanPage } from "./features/loans/EditLoanPage";
 import { UsersPage } from "./features/admin/UsersPage";
 import { CreateUserPage } from "./features/admin/CreateUserPage";
 import { NotificationsPage } from "./features/notifications/NotificationsPage";
+import { ApprovalsPage } from "./features/change-requests/ApprovalsPage";
+import { MyApprovalsPage } from "./features/change-requests/MyApprovalsPage";
+import { AuditLogPage } from "./features/audit-log/AuditLogPage";
 
 export default function App() {
   return (
@@ -48,10 +51,13 @@ export default function App() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/collateral" element={<Navigate to="/loans" replace />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/my-approvals" element={<MyApprovalsPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/admin/notifications" element={<NotificationsPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/users/new" element={<CreateUserPage />} />
+            <Route path="/admin/approvals" element={<ApprovalsPage />} />
+            <Route path="/admin/audit-log" element={<AuditLogPage />} />
           </Route>
         </Route>
       </Route>

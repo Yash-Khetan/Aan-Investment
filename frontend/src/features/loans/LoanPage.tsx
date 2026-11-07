@@ -9,6 +9,7 @@ import { ErrorState, LoadingState } from "../../components/ui/States";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { FIGURE } from "../../lib/glossary";
+import { listPendingLoanIds } from "../change-requests/api";
 import { deleteLoan, getLoan } from "./api";
 import { LoanOverviewTab } from "./components/LoanOverviewTab";
 import { LoanLedgerTab } from "./components/LoanLedgerTab";
@@ -74,6 +75,12 @@ export function LoanPage() {
     queryFn: () => getLoan(loanId),
   });
 
+  const { data: pendingLoanIds } = useQuery({
+    queryKey: ["change-requests", "pending-loan-ids"],
+    queryFn: listPendingLoanIds,
+  });
+  const hasPendingApproval = (pendingLoanIds ?? []).includes(loanId);
+
   const remove = useMutation({
     mutationFn: () => deleteLoan(loanId),
     onSuccess: () => {
@@ -97,6 +104,7 @@ export function LoanPage() {
           <>
             <Badge status={loan.classification} />
             <Badge status={loan.status} />
+            {hasPendingApproval && <Badge status="PENDING" label="Approval pending" />}
           </>
         }
         description={

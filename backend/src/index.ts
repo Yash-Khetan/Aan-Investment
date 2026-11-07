@@ -25,6 +25,8 @@ import apiRouter from "./routes/index";
 import { ledgerRouter } from "./modules/ledger/ledger.routes";
 import { kpiLedgerRouter } from "./modules/kpi-ledger/kpi-ledger.routes";
 import { notificationRouter, initNotificationScheduler } from "./modules/notifications";
+import { changeRequestRouter } from "./modules/change-request";
+import { auditRouter } from "./modules/audit";
 
 
 /**
@@ -93,6 +95,8 @@ function createApp(): Application {
 
     app.use("/ledger", ledgerRouter); //  GET /:loanId, POST /:loanId/entries, GET /:loanId/settings, GET /:loanId/dpd — the only way money enters a loan
     app.use("/kpi-ledger", kpiLedgerRouter); //  a loan's imported history: preview / post / list / remove imports, read imported rows
+    app.use("/change-requests", changeRequestRouter); //  GET /, GET /mine, GET /pending-loan-ids, POST /:id/approve|reject, POST /bulk-approve|reject, POST /approve-all|reject-all
+    app.use("/audit-logs", auditRouter); //  GET / (admin-only)
 
     app.use("/documents", documentRouter);
     app.use("/ocr", ocrRouter); //  POST /extract

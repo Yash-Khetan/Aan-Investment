@@ -65,6 +65,8 @@ const ADMIN_PERMISSIONS = [
     "user:update",
     "user:activate",
     "user:deactivate",
+    "change-request:review",
+    "audit:read",
 ];
 
 /** The canonical permission catalogue (RBAC). Keys are "resource:action". */
@@ -78,6 +80,8 @@ const PERMISSIONS: { name: string; description: string }[] = [
     { name: "loan:create", description: "Create loans." },
     { name: "loan:update", description: "Edit a loan after creation." },
     { name: "borrower:update", description: "Edit a borrower after creation." },
+    { name: "change-request:review", description: "Approve or reject a pending money-related change." },
+    { name: "audit:read", description: "View the audit trail of every change made in the system." },
 ];
 
 /**

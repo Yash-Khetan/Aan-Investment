@@ -1,4 +1,10 @@
-import { insertAuditLog, type AuditDbOrTx, type AuditLogRow } from "./audit.repository";
+import {
+    insertAuditLog,
+    listAuditLogs as listAuditLogRows,
+    type AuditDbOrTx,
+    type AuditLogRow,
+    type ListAuditLogsFilters,
+} from "./audit.repository";
 import type { AuditRecordInput } from "./audit.types";
 
 /**
@@ -80,4 +86,8 @@ export async function recordAudit(input: AuditRecordInput, tx?: AuditDbOrTx): Pr
         },
         tx,
     );
+}
+
+export async function listAuditLogs(filters: ListAuditLogsFilters): Promise<AuditLogRow[]> {
+    return listAuditLogRows(filters);
 }

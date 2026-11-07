@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 
 import { BadRequestError } from "../../common/errors";
+import { actorFrom } from "../../common/http/actor";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
+import { recordAudit } from "../audit/audit.service";
 import * as identityDocumentService from "./identity-document.service";
 import { isIdentityDocumentKind } from "./identity-document.service";
 
@@ -26,6 +29,14 @@ export async function uploadIdentityDocument(req: Request, res: Response): Promi
         size: req.file.size,
     }, req.user?.id);
 
+    await recordAudit({
+        actor: actorFrom(req),
+        action: "CREATE",
+        entityType: AUDIT_ENTITY.BORROWER,
+        entityId: String(req.params.id),
+        newValues: { kind, fileName: req.file.originalname },
+    });
+
     res.status(201).json({ success: true, data: result });
 }
 
@@ -48,5 +59,14 @@ export async function downloadIdentityDocument(req: Request, res: Response): Pro
 export async function deleteIdentityDocument(req: Request, res: Response): Promise<void> {
     const kind = requireKind(req);
     await identityDocumentService.remove(String(req.params.id), kind);
+
+    await recordAudit({
+        actor: actorFrom(req),
+        action: "DELETE",
+        entityType: AUDIT_ENTITY.BORROWER,
+        entityId: String(req.params.id),
+        oldValues: { kind },
+    });
+
     res.status(204).send();
 }

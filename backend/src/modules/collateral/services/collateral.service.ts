@@ -1,6 +1,11 @@
 import { and, eq, isNull, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { collaterals, collateralInsurance, loans } from "../../../db/schema";
+import type { RequestActor } from "../../../common/http/actor";
+import { AUDIT_ENTITY } from "../../audit/audit.constants";
+import { recordAudit } from "../../audit/audit.service";
+import { registerApplier, submitChangeRequest } from "../../change-request/change-request.service";
+import { CHANGE_REQUEST_ENTITY } from "../../change-request/change-request.constants";
 
 import {
     assertValidUuid,
@@ -383,6 +388,199 @@ export class CollateralService {
         }
     }
 
+    /* ────────────────────────────────────────────────────────
+       APPROVAL GATE
+
+       Editing a collateral's valuation or insurance moves the
+       figures a loan's LTV and risk exposure are read off. An
+       employee's request on those fields is held as a PENDING
+       change request instead of applying; an admin's request, or
+       anything outside this list, applies immediately as before.
+    ──────────────────────────────────────────────────────── */
+
+    private static readonly FINANCIAL_COLLATERAL_FIELDS = [
+        "estimatedValue",
+        "valuationDate",
+        "valuationBy",
+    ] as const satisfies readonly (keyof UpdateCollateralInput)[];
+
+    private static splitCollateralInput(
+        input: UpdateCollateralInput,
+    ): { financial: Partial<UpdateCollateralInput>; nonFinancial: Partial<UpdateCollateralInput> } {
+        const financial: Partial<UpdateCollateralInput> = {};
+        const nonFinancial: Partial<UpdateCollateralInput> = {};
+
+        for (const key of Object.keys(input) as (keyof UpdateCollateralInput)[]) {
+            if ((CollateralService.FINANCIAL_COLLATERAL_FIELDS as readonly string[]).includes(key)) {
+                (financial as Record<string, unknown>)[key] = input[key];
+            } else {
+                (nonFinancial as Record<string, unknown>)[key] = input[key];
+            }
+        }
+
+        return { financial, nonFinancial };
+    }
+
+    private static pickExisting(existing: CollateralRow, keys: readonly string[]): Record<string, unknown> {
+        const picked: Record<string, unknown> = {};
+        for (const key of keys) picked[key] = (existing as Record<string, unknown>)[key];
+        return picked;
+    }
+
+    static async requestUpdateCollateral(
+        id: string,
+        input: UpdateCollateralInput,
+        actor: RequestActor,
+    ): Promise<{ collateral: CollateralRecord; pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null }> {
+        const existing = await this.getActiveCollateralRowOrThrow(id);
+
+        if (actor.isAdmin) {
+            const collateral = await this.updateCollateral(id, input);
+            await recordAudit({
+                actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+                action: "UPDATE",
+                entityType: AUDIT_ENTITY.COLLATERAL,
+                entityId: id,
+                oldValues: this.pickExisting(existing, Object.keys(input)),
+                newValues: input,
+            });
+            return { collateral, pendingChangeRequest: null };
+        }
+
+        const { financial, nonFinancial } = this.splitCollateralInput(input);
+
+        let collateral = await this.getCollateral(id);
+        if (Object.keys(nonFinancial).length > 0) {
+            collateral = await this.updateCollateral(id, nonFinancial);
+            await recordAudit({
+                actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+                action: "UPDATE",
+                entityType: AUDIT_ENTITY.COLLATERAL,
+                entityId: id,
+                oldValues: this.pickExisting(existing, Object.keys(nonFinancial)),
+                newValues: nonFinancial,
+            });
+        }
+
+        let pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null = null;
+        if (Object.keys(financial).length > 0) {
+            pendingChangeRequest = await submitChangeRequest({
+                entityType: CHANGE_REQUEST_ENTITY.COLLATERAL,
+                entityId: id,
+                action: "UPDATE",
+                payload: financial,
+                previousValues: this.pickExisting(existing, Object.keys(financial)),
+                loanId: existing.loanId,
+                requestedBy: actor.userId,
+            });
+        }
+
+        return { collateral, pendingChangeRequest };
+    }
+
+    static async requestDeleteCollateral(
+        id: string,
+        actor: RequestActor,
+    ): Promise<{ deleted: boolean; pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null }> {
+        const existing = await this.getActiveCollateralRowOrThrow(id);
+
+        if (actor.isAdmin) {
+            await this.deleteCollateral(id);
+            await recordAudit({
+                actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+                action: "DELETE",
+                entityType: AUDIT_ENTITY.COLLATERAL,
+                entityId: id,
+                oldValues: existing,
+            });
+            return { deleted: true, pendingChangeRequest: null };
+        }
+
+        const pendingChangeRequest = await submitChangeRequest({
+            entityType: CHANGE_REQUEST_ENTITY.COLLATERAL,
+            entityId: id,
+            action: "DELETE",
+            payload: null,
+            previousValues: existing,
+            loanId: existing.loanId,
+            requestedBy: actor.userId,
+        });
+
+        return { deleted: false, pendingChangeRequest };
+    }
+
+    /** `updateValuation` is wholly financial (a single-purpose endpoint already) — no split needed. */
+    static async requestUpdateValuation(
+        id: string,
+        input: UpdateValuationInput,
+        actor: RequestActor,
+    ): Promise<{ collateral: CollateralRecord; pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null }> {
+        const existing = await this.getActiveCollateralRowOrThrow(id);
+
+        if (actor.isAdmin) {
+            const collateral = await this.updateValuation(id, input);
+            await recordAudit({
+                actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+                action: "UPDATE",
+                entityType: AUDIT_ENTITY.COLLATERAL,
+                entityId: id,
+                oldValues: this.pickExisting(existing, ["estimatedValue", "valuationDate", "valuationBy"]),
+                newValues: input,
+            });
+            return { collateral, pendingChangeRequest: null };
+        }
+
+        const pendingChangeRequest = await submitChangeRequest({
+            entityType: CHANGE_REQUEST_ENTITY.COLLATERAL,
+            entityId: id,
+            action: "UPDATE",
+            payload: input,
+            previousValues: this.pickExisting(existing, ["estimatedValue", "valuationDate", "valuationBy"]),
+            loanId: existing.loanId,
+            requestedBy: actor.userId,
+        });
+
+        return { collateral: await this.getCollateral(id), pendingChangeRequest };
+    }
+
+    /** `updateInsurance` writes a different table than `updateCollateral` — its own entity type. */
+    static async requestUpdateInsurance(
+        collateralId: string,
+        input: UpdateInsuranceInput,
+        actor: RequestActor,
+    ): Promise<{ insurance: InsuranceRecord | null; pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null }> {
+        const existingCollateral = await this.getActiveCollateralRowOrThrow(collateralId);
+        const existingInsurance = await this.getActiveInsuranceForCollateral(collateralId);
+
+        if (actor.isAdmin) {
+            const insurance = await this.updateInsurance(collateralId, input);
+            await recordAudit({
+                actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+                action: "UPDATE",
+                entityType: AUDIT_ENTITY.COLLATERAL_INSURANCE,
+                entityId: collateralId,
+                oldValues: existingInsurance ? toInsuranceRecord(existingInsurance) : null,
+                newValues: input,
+            });
+            return { insurance, pendingChangeRequest: null };
+        }
+
+        const pendingChangeRequest = await submitChangeRequest({
+            entityType: CHANGE_REQUEST_ENTITY.COLLATERAL_INSURANCE,
+            entityId: collateralId,
+            action: "UPDATE",
+            payload: input,
+            previousValues: existingInsurance ? toInsuranceRecord(existingInsurance) : null,
+            loanId: existingCollateral.loanId,
+            requestedBy: actor.userId,
+        });
+
+        return {
+            insurance: existingInsurance ? toInsuranceRecord(existingInsurance) : null,
+            pendingChangeRequest,
+        };
+    }
+
     /** The collateral's LTV as of now. Read-only: LTV is never stored. */
     static async calculateLTV(collateralId: string): Promise<LtvResult> {
         assertValidUuid(collateralId, "id");
@@ -481,3 +679,18 @@ export class CollateralService {
         return rows.reduce((latest, current) => (this.isNewer(current, latest) ? current : latest));
     }
 }
+
+// Approving a pending COLLATERAL/COLLATERAL_INSURANCE change calls the exact
+// same functions an admin's own direct edit would — registered once, at
+// module load, so the generic change-request module never has to import
+// this one.
+registerApplier(CHANGE_REQUEST_ENTITY.COLLATERAL, "UPDATE", (payload, entityId) =>
+    CollateralService.updateCollateral(entityId!, payload as UpdateCollateralInput),
+);
+registerApplier(CHANGE_REQUEST_ENTITY.COLLATERAL, "DELETE", async (_payload, entityId) => {
+    await CollateralService.deleteCollateral(entityId!);
+    return { id: entityId! };
+});
+registerApplier(CHANGE_REQUEST_ENTITY.COLLATERAL_INSURANCE, "UPDATE", (payload, entityId) =>
+    CollateralService.updateInsurance(entityId!, payload as UpdateInsuranceInput),
+);

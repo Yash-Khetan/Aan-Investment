@@ -16,6 +16,9 @@ const PALETTE: Record<string, string> = {
   PARTIAL: "bg-amber-100 text-amber-800",
   FAILED: "bg-red-100 text-red-800",
   CANCELLED: "bg-slate-100 text-slate-700",
+  // change-request review status
+  APPROVED: "bg-emerald-100 text-emerald-800",
+  REJECTED: "bg-red-100 text-red-800",
   // collection status
   OPEN: "bg-blue-100 text-blue-800",
   PROMISE_TO_PAY: "bg-purple-100 text-purple-800",

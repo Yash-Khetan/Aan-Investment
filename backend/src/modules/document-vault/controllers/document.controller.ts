@@ -3,6 +3,9 @@ import { DocumentService } from "../services/document.service";
 import { mapErrorToHttpResponse } from "../utils/http-error-mapper";
 import { MissingFileError } from "../utils/errors";
 import { DEFAULT_SIGNED_URL_EXPIRY_SECONDS } from "../constants/document.constants";
+import { actorFrom } from "../../../common/http/actor";
+import { AUDIT_ENTITY } from "../../audit/audit.constants";
+import { recordAudit } from "../../audit/audit.service";
 
 export async function uploadDocument(req: Request, res: Response): Promise<void> {
     try {
@@ -29,6 +32,14 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
             },
         });
 
+        await recordAudit({
+            actor: actorFrom(req),
+            action: "CREATE",
+            entityType: AUDIT_ENTITY.DOCUMENT,
+            entityId: metadata.id,
+            newValues: { entityType, entityId, documentType, name },
+        });
+
         res.status(201).json(metadata);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
@@ -50,6 +61,14 @@ export async function downloadDocument(req: Request, res: Response): Promise<voi
 export async function deleteDocument(req: Request, res: Response): Promise<void> {
     try {
         await DocumentService.delete(String(req.params.id));
+
+        await recordAudit({
+            actor: actorFrom(req),
+            action: "DELETE",
+            entityType: AUDIT_ENTITY.DOCUMENT,
+            entityId: String(req.params.id),
+        });
+
         res.status(204).send();
     } catch (error) {
         mapErrorToHttpResponse(res, error);

@@ -1,7 +1,12 @@
 import { BadRequestError } from "../../common/errors";
-import { AUDIT_ENTITY, recordAudit, type AuditActor } from "../audit";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
+import { recordAudit } from "../audit/audit.service";
+import type { AuditActor } from "../audit/audit.types";
 import { recomputeMonthsFrom } from "../ledger/ledger.service";
 import { syncLoanStatusWithLedger } from "../ledger/loanStatus";
+import type { RequestActor } from "../../common/http/actor";
+import { registerApplier, submitChangeRequest } from "../change-request/change-request.service";
+import { CHANGE_REQUEST_ENTITY } from "../change-request/change-request.constants";
 import {
   assertLoanExists,
   deleteImport,
@@ -150,6 +155,94 @@ export async function removeImport(
   const loanStatus = await syncLoanStatusWithLedger(loanId);
   return { loanStatus };
 }
+
+/* ────────────────────────────────────────────────────────
+   APPROVAL GATE
+
+   Posting or removing an import moves a whole block of ledger
+   history — there's no split: an employee's request is held
+   whole as a PENDING change request; an admin's applies
+   immediately as before. `postImport`/`removeImport` already
+   write their own audit entry (above), so their appliers are
+   registered with `selfAudits: true` to avoid logging twice.
+──────────────────────────────────────────────────────── */
+
+export interface RequestPostImportResult {
+  result: Awaited<ReturnType<typeof postImport>> | null;
+  pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export async function requestPostImport(
+  loanId: string,
+  sheet: ImportSheetInput,
+  actor: RequestActor,
+): Promise<RequestPostImportResult> {
+  if (actor.isAdmin) {
+    const result = await postImport(loanId, sheet, actor);
+    return { result, pendingChangeRequest: null };
+  }
+
+  const pendingChangeRequest = await submitChangeRequest({
+    entityType: CHANGE_REQUEST_ENTITY.LEDGER_IMPORT,
+    entityId: null,
+    action: "CREATE",
+    payload: { loanId, sheet, requestedBy: actor.userId },
+    loanId,
+    requestedBy: actor.userId,
+  });
+
+  return { result: null, pendingChangeRequest };
+}
+
+export interface RequestRemoveImportResult {
+  removed: boolean;
+  pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export async function requestRemoveImport(
+  loanId: string,
+  importId: string,
+  actor: RequestActor,
+): Promise<RequestRemoveImportResult> {
+  if (actor.isAdmin) {
+    await removeImport(loanId, importId, actor);
+    return { removed: true, pendingChangeRequest: null };
+  }
+
+  const pendingChangeRequest = await submitChangeRequest({
+    entityType: CHANGE_REQUEST_ENTITY.LEDGER_IMPORT,
+    entityId: importId,
+    action: "DELETE",
+    payload: { loanId, requestedBy: actor.userId },
+    loanId,
+    requestedBy: actor.userId,
+  });
+
+  return { removed: false, pendingChangeRequest };
+}
+
+// Approving a pending LEDGER_IMPORT change calls the exact same functions
+// an admin's own direct action would — registered once, at module load, so
+// the generic change-request module never has to import this one.
+registerApplier(
+  CHANGE_REQUEST_ENTITY.LEDGER_IMPORT,
+  "CREATE",
+  async (payload) => {
+    const { loanId, sheet, requestedBy } = payload as { loanId: string; sheet: ImportSheetInput; requestedBy: string };
+    const result = await postImport(loanId, sheet, { userId: requestedBy });
+    return { id: result.importId, ...result };
+  },
+  { selfAudits: true },
+);
+registerApplier(
+  CHANGE_REQUEST_ENTITY.LEDGER_IMPORT,
+  "DELETE",
+  async (payload, entityId) => {
+    const { loanId, requestedBy } = payload as { loanId: string; requestedBy: string };
+    return removeImport(loanId, entityId!, { userId: requestedBy });
+  },
+  { selfAudits: true },
+);
 
 export async function getImports(loanId: string): Promise<LedgerImportSummary[]> {
   await assertLoanExists(loanId);

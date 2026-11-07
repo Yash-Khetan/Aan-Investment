@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 import { CollateralService } from "../services/collateral.service";
 import { mapErrorToHttpResponse } from "../utils/http-error-mapper";
+import { actorFrom } from "../../../common/http/actor";
+import { AUDIT_ENTITY } from "../../audit/audit.constants";
+import { recordAudit } from "../../audit/audit.service";
 import type {
     CreateCollateralInput,
     UpdateCollateralInput,
@@ -12,6 +15,15 @@ export async function createCollateral(req: Request, res: Response): Promise<voi
     try {
         const input = req.body as CreateCollateralInput;
         const collateral = await CollateralService.createCollateral(input);
+
+        await recordAudit({
+            actor: actorFrom(req),
+            action: "CREATE",
+            entityType: AUDIT_ENTITY.COLLATERAL,
+            entityId: collateral.id,
+            newValues: input,
+        });
+
         res.status(201).json(collateral);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
@@ -21,8 +33,8 @@ export async function createCollateral(req: Request, res: Response): Promise<voi
 export async function updateCollateral(req: Request, res: Response): Promise<void> {
     try {
         const input = req.body as UpdateCollateralInput;
-        const collateral = await CollateralService.updateCollateral(String(req.params.id), input);
-        res.status(200).json(collateral);
+        const result = await CollateralService.requestUpdateCollateral(String(req.params.id), input, actorFrom(req));
+        res.status(200).json(result);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
     }
@@ -30,8 +42,8 @@ export async function updateCollateral(req: Request, res: Response): Promise<voi
 
 export async function deleteCollateral(req: Request, res: Response): Promise<void> {
     try {
-        await CollateralService.deleteCollateral(String(req.params.id));
-        res.status(204).send();
+        const result = await CollateralService.requestDeleteCollateral(String(req.params.id), actorFrom(req));
+        res.status(200).json(result);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
     }
@@ -58,8 +70,8 @@ export async function getLoanCollaterals(req: Request, res: Response): Promise<v
 export async function updateValuation(req: Request, res: Response): Promise<void> {
     try {
         const input = req.body as UpdateValuationInput;
-        const collateral = await CollateralService.updateValuation(String(req.params.id), input);
-        res.status(200).json(collateral);
+        const result = await CollateralService.requestUpdateValuation(String(req.params.id), input, actorFrom(req));
+        res.status(200).json(result);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
     }
@@ -68,8 +80,8 @@ export async function updateValuation(req: Request, res: Response): Promise<void
 export async function updateInsurance(req: Request, res: Response): Promise<void> {
     try {
         const input = req.body as UpdateInsuranceInput;
-        const insurance = await CollateralService.updateInsurance(String(req.params.id), input);
-        res.status(200).json(insurance);
+        const result = await CollateralService.requestUpdateInsurance(String(req.params.id), input, actorFrom(req));
+        res.status(200).json(result);
     } catch (error) {
         mapErrorToHttpResponse(res, error);
     }

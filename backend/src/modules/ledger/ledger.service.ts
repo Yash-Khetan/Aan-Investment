@@ -1,5 +1,6 @@
 import { BadRequestError, ForbiddenError, NotFoundError } from "../../common/errors";
-import { AUDIT_ENTITY, recordAudit } from "../audit";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
+import { recordAudit } from "../audit/audit.service";
 import { firstSystemAccrualMonth } from "../kpi-ledger/sheet";
 import { getDailyRateFraction } from "../interest/dailyRate";
 import { calculateRunningBalanceInterest } from "../interest/runningBalance";
@@ -32,6 +33,10 @@ import {
 } from "./ledger.types";
 import { allocateLedger } from "./allocation";
 import { describeEntry, diffFields, entryFields, patchFields, toRowValues } from "./entryRules";
+import { syncLoanStatusWithLedger } from "./loanStatus";
+import type { RequestActor } from "../../common/http/actor";
+import { registerApplier, submitChangeRequest } from "../change-request/change-request.service";
+import { CHANGE_REQUEST_ENTITY } from "../change-request/change-request.constants";
 
 /**
  * What a Journal row posted before the basis was snapshotted per row reads
@@ -465,6 +470,143 @@ export async function deleteLedgerEntry(input: DeleteLedgerEntryInput): Promise<
 
   return removed;
 }
+
+/* ────────────────────────────────────────────────────────
+   APPROVAL GATE
+
+   A Payment or Receipt entry *is* the money movement — there's
+   no split: an employee's request is held whole as a PENDING
+   change request; an admin's applies immediately as before,
+   including the loan-status sync a real post always triggers.
+
+   `updateLedgerEntry`/`deleteLedgerEntry` already write their own
+   audit entry (above); the generic change-request approval would
+   otherwise log the same action a second time, so their appliers
+   are registered with `selfAudits: true`.
+──────────────────────────────────────────────────────── */
+
+export interface RequestRecordPaymentOrReceiptResult {
+  entry: LedgerEntryRow | null;
+  pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export async function requestRecordPaymentOrReceipt(
+  input: CreateLedgerEntryInput,
+  actor: RequestActor,
+): Promise<RequestRecordPaymentOrReceiptResult> {
+  if (actor.isAdmin) {
+    const entry = await recordPaymentOrReceipt(input);
+    await recordAudit({
+      actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+      action: "CREATE",
+      entityType: AUDIT_ENTITY.LEDGER_ENTRY,
+      entityId: entry.id,
+      newValues: input,
+    });
+    await syncLoanStatusWithLedger(input.loanId);
+    return { entry, pendingChangeRequest: null };
+  }
+
+  const pendingChangeRequest = await submitChangeRequest({
+    entityType: CHANGE_REQUEST_ENTITY.LEDGER_ENTRY,
+    entityId: null,
+    action: "CREATE",
+    payload: input,
+    loanId: input.loanId,
+    requestedBy: actor.userId,
+  });
+
+  return { entry: null, pendingChangeRequest };
+}
+
+export interface RequestUpdateLedgerEntryResult {
+  entry: LedgerEntryRow | null;
+  pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export async function requestUpdateLedgerEntry(
+  loanId: string,
+  entryId: string,
+  patch: UpdateLedgerEntryInput["patch"],
+  actor: RequestActor,
+): Promise<RequestUpdateLedgerEntryResult> {
+  if (actor.isAdmin) {
+    const entry = await updateLedgerEntry({ loanId, entryId, patch, actor });
+    await syncLoanStatusWithLedger(loanId);
+    return { entry, pendingChangeRequest: null };
+  }
+
+  const pendingChangeRequest = await submitChangeRequest({
+    entityType: CHANGE_REQUEST_ENTITY.LEDGER_ENTRY,
+    entityId: entryId,
+    action: "UPDATE",
+    payload: { loanId, patch, requestedBy: actor.userId },
+    loanId,
+    requestedBy: actor.userId,
+  });
+
+  return { entry: null, pendingChangeRequest };
+}
+
+export interface RequestDeleteLedgerEntryResult {
+  deleted: boolean;
+  pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export async function requestDeleteLedgerEntry(
+  loanId: string,
+  entryId: string,
+  actor: RequestActor,
+): Promise<RequestDeleteLedgerEntryResult> {
+  if (actor.isAdmin) {
+    await deleteLedgerEntry({ loanId, entryId, actor });
+    await syncLoanStatusWithLedger(loanId);
+    return { deleted: true, pendingChangeRequest: null };
+  }
+
+  const pendingChangeRequest = await submitChangeRequest({
+    entityType: CHANGE_REQUEST_ENTITY.LEDGER_ENTRY,
+    entityId: entryId,
+    action: "DELETE",
+    payload: { loanId, requestedBy: actor.userId },
+    loanId,
+    requestedBy: actor.userId,
+  });
+
+  return { deleted: false, pendingChangeRequest };
+}
+
+// Approving a pending LEDGER_ENTRY change calls the exact same functions an
+// admin's own direct edit would — registered once, at module load, so the
+// generic change-request module never has to import this one.
+registerApplier(CHANGE_REQUEST_ENTITY.LEDGER_ENTRY, "CREATE", async (payload) => {
+  const input = payload as CreateLedgerEntryInput;
+  const entry = await recordPaymentOrReceipt(input);
+  await syncLoanStatusWithLedger(input.loanId);
+  return entry;
+});
+registerApplier(
+  CHANGE_REQUEST_ENTITY.LEDGER_ENTRY,
+  "UPDATE",
+  async (payload, entityId) => {
+    const { loanId, patch, requestedBy } = payload as { loanId: string; patch: UpdateLedgerEntryInput["patch"]; requestedBy: string };
+    const entry = await updateLedgerEntry({ loanId, entryId: entityId!, patch, actor: { userId: requestedBy } });
+    await syncLoanStatusWithLedger(loanId);
+    return entry;
+  },
+  { selfAudits: true },
+);
+registerApplier(
+  CHANGE_REQUEST_ENTITY.LEDGER_ENTRY,
+  "DELETE",
+  async (payload, entityId) => {
+    const { loanId, requestedBy } = payload as { loanId: string; requestedBy: string };
+    const entry = await deleteLedgerEntry({ loanId, entryId: entityId!, actor: { userId: requestedBy } });
+    await syncLoanStatusWithLedger(loanId);
+    return entry;
+  },
+  { selfAudits: true },
+);
 
 /**
  * The configuration this ledger is currently accruing at, for display only.

@@ -2,6 +2,9 @@ import type { Request, Response } from "express";
 
 import { sendCreated, sendSuccess } from "../../common/http/apiResponse";
 import { getValidated } from "../../common/middleware/validate";
+import { actorFrom } from "../../common/http/actor";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
+import { recordAudit } from "../audit/audit.service";
 import * as loanService from "./loan.service";
 import type {
     createLoanSchema,
@@ -15,9 +18,18 @@ import type {
  * the service, shape the response. No business rules or DB access here.
  */
 
-export const createLoan = async (_req: Request, res: Response): Promise<void> => {
+export const createLoan = async (req: Request, res: Response): Promise<void> => {
     const input = getValidated<typeof createLoanSchema>(res, "body");
     const loan = await loanService.createLoan(input);
+
+    await recordAudit({
+        actor: actorFrom(req),
+        action: "CREATE",
+        entityType: AUDIT_ENTITY.LOAN,
+        entityId: loan.id,
+        newValues: input,
+    });
+
     sendCreated(res, loan);
 };
 
@@ -36,18 +48,18 @@ export const getLoanById = async (
     sendSuccess(res, loan);
 };
 
-export const updateLoan = async (_req: Request, res: Response): Promise<void> => {
+export const updateLoan = async (req: Request, res: Response): Promise<void> => {
     const { id } = getValidated<typeof loanIdParamSchema>(res, "params");
     const input = getValidated<typeof updateLoanSchema>(res, "body");
-    const loan = await loanService.updateLoan(id, input);
-    sendSuccess(res, loan);
+    const { loan, pendingChangeRequest } = await loanService.requestUpdateLoan(id, input, actorFrom(req));
+    sendSuccess(res, { loan, pendingChangeRequest });
 };
 
 export const deleteLoan = async (
-    _req: Request,
+    req: Request,
     res: Response,
 ): Promise<void> => {
     const { id } = getValidated<typeof loanIdParamSchema>(res, "params");
-    await loanService.deleteLoan(id);
-    sendSuccess(res, { id, deleted: true });
+    const { deleted, pendingChangeRequest } = await loanService.requestDeleteLoan(id, actorFrom(req));
+    sendSuccess(res, { id, deleted, pendingChangeRequest });
 };

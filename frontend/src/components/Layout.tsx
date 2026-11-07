@@ -18,12 +18,17 @@ const NAV_ITEMS = [
 const ADMIN_NAV_ITEMS = [
   { to: "/admin/notifications", label: "Notifications" },
   { to: "/admin/users", label: "Users" },
+  { to: "/admin/approvals", label: "Approvals" },
+  { to: "/admin/audit-log", label: "Audit Log" },
 ];
+
+const EMPLOYEE_NAV_ITEMS = [{ to: "/my-approvals", label: "My Approvals" }];
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const navItems = user?.roles.includes("ADMIN") ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS;
+  const isAdmin = user?.roles.includes("ADMIN");
+  const navItems = isAdmin ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : [...NAV_ITEMS, ...EMPLOYEE_NAV_ITEMS];
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   async function handleLogout() {

@@ -23,6 +23,11 @@ import {
     getCurrentInterestConfig,
 } from "../interest/interest.repository";
 import type { InterestBasis } from "../interest/interest.types";
+import type { RequestActor } from "../../common/http/actor";
+import { AUDIT_ENTITY } from "../audit/audit.constants";
+import { recordAudit } from "../audit/audit.service";
+import { registerApplier, submitChangeRequest } from "../change-request/change-request.service";
+import { CHANGE_REQUEST_ENTITY } from "../change-request/change-request.constants";
 import type {
     CreateLoanInput,
     ListLoansQuery,
@@ -429,3 +434,172 @@ export const deleteLoan = async (id: string): Promise<void> => {
     const deleted = await loanRepository.softDelete(id);
     if (!deleted) throw new NotFoundError(`Loan '${id}' not found`);
 };
+
+/* ────────────────────────────────────────────────────────
+   APPROVAL GATE
+
+   Editing or deleting a loan can move money — the sanctioned
+   amount, the rate/TDS/day-count (which the ledger accrues at),
+   the EMI/collateral figures, and `status`, since writing a loan
+   off (status WRITTEN_OFF) has no action of its own on this
+   branch — it happens through this same general-purpose editor.
+   An employee's request on any of those fields is held as a
+   PENDING change request instead of applying; an admin's request,
+   or anything outside this list, applies immediately as before.
+
+   `updateLoan`/`deleteLoan` are never changed by this — both the
+   immediate-apply path below and the change-request module's
+   later approval call them exactly as an admin's own edit would.
+──────────────────────────────────────────────────────── */
+
+const FINANCIAL_LOAN_FIELDS = [
+    "sanctionedAmount",
+    "interestRate",
+    "tdsRatePercent",
+    "interestBasis",
+    "includeOpeningClosingDays",
+    "interestEffectiveFrom",
+    "emiAmount",
+    "collateralType",
+    "collateralValue",
+    "status",
+] as const satisfies readonly (keyof UpdateLoanInput)[];
+
+type FinancialLoanField = (typeof FINANCIAL_LOAN_FIELDS)[number];
+
+const splitLoanInput = (
+    input: UpdateLoanInput,
+): { financial: Partial<UpdateLoanInput>; nonFinancial: Partial<UpdateLoanInput> } => {
+    const financial: Partial<UpdateLoanInput> = {};
+    const nonFinancial: Partial<UpdateLoanInput> = {};
+
+    for (const key of Object.keys(input) as (keyof UpdateLoanInput)[]) {
+        if ((FINANCIAL_LOAN_FIELDS as readonly string[]).includes(key)) {
+            (financial as Record<string, unknown>)[key] = input[key];
+        } else {
+            (nonFinancial as Record<string, unknown>)[key] = input[key];
+        }
+    }
+
+    return { financial, nonFinancial };
+};
+
+/** Picks just the given keys off a loan row — for the pending request's "before" snapshot. */
+const pickExisting = (
+    existing: LoanWithBorrower,
+    keys: readonly string[],
+): Record<string, unknown> => {
+    const picked: Record<string, unknown> = {};
+    for (const key of keys) picked[key] = (existing as Record<string, unknown>)[key];
+    return picked;
+};
+
+export interface RequestUpdateLoanResult {
+    loan: LoanWithBorrower;
+    pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+/**
+ * The gated entry point `updateLoan` should be called through from the HTTP
+ * layer. Splits the request: non-money fields apply now (and are logged);
+ * money fields either apply now (admin) or wait for approval (employee).
+ */
+export const requestUpdateLoan = async (
+    id: string,
+    input: UpdateLoanInput,
+    actor: RequestActor,
+): Promise<RequestUpdateLoanResult> => {
+    const existing = await loanRepository.findById(id);
+    if (!existing) throw new NotFoundError(`Loan '${id}' not found`);
+
+    if (actor.isAdmin) {
+        const loan = await updateLoan(id, input);
+        await recordAudit({
+            actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+            action: "UPDATE",
+            entityType: AUDIT_ENTITY.LOAN,
+            entityId: id,
+            oldValues: pickExisting(existing, Object.keys(input)),
+            newValues: input,
+        });
+        return { loan, pendingChangeRequest: null };
+    }
+
+    const { financial, nonFinancial } = splitLoanInput(input);
+
+    let loan = existing;
+    if (Object.keys(nonFinancial).length > 0) {
+        loan = await updateLoan(id, nonFinancial);
+        await recordAudit({
+            actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+            action: "UPDATE",
+            entityType: AUDIT_ENTITY.LOAN,
+            entityId: id,
+            oldValues: pickExisting(existing, Object.keys(nonFinancial)),
+            newValues: nonFinancial,
+        });
+    }
+
+    let pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null = null;
+    if (Object.keys(financial).length > 0) {
+        pendingChangeRequest = await submitChangeRequest({
+            entityType: CHANGE_REQUEST_ENTITY.LOAN,
+            entityId: id,
+            action: "UPDATE",
+            payload: financial,
+            previousValues: pickExisting(existing, Object.keys(financial) as FinancialLoanField[]),
+            loanId: id,
+            requestedBy: actor.userId,
+        });
+    }
+
+    return { loan, pendingChangeRequest };
+};
+
+export interface RequestDeleteLoanResult {
+    deleted: boolean;
+    pendingChangeRequest: Awaited<ReturnType<typeof submitChangeRequest>> | null;
+}
+
+export const requestDeleteLoan = async (
+    id: string,
+    actor: RequestActor,
+): Promise<RequestDeleteLoanResult> => {
+    const existing = await loanRepository.findById(id);
+    if (!existing) throw new NotFoundError(`Loan '${id}' not found`);
+
+    if (actor.isAdmin) {
+        await deleteLoan(id);
+        await recordAudit({
+            actor: { userId: actor.userId, ipAddress: actor.ipAddress, userAgent: actor.userAgent },
+            action: "DELETE",
+            entityType: AUDIT_ENTITY.LOAN,
+            entityId: id,
+            oldValues: existing,
+        });
+        return { deleted: true, pendingChangeRequest: null };
+    }
+
+    const pendingChangeRequest = await submitChangeRequest({
+        entityType: CHANGE_REQUEST_ENTITY.LOAN,
+        entityId: id,
+        action: "DELETE",
+        payload: null,
+        previousValues: existing,
+        loanId: id,
+        requestedBy: actor.userId,
+    });
+
+    return { deleted: false, pendingChangeRequest };
+};
+
+// Approving a pending LOAN change calls the exact same functions an admin's
+// own direct edit would — registered once, at module load, so the generic
+// change-request module never has to import this one.
+registerApplier(CHANGE_REQUEST_ENTITY.LOAN, "UPDATE", (payload, entityId) =>
+    updateLoan(entityId!, payload as UpdateLoanInput),
+);
+registerApplier(CHANGE_REQUEST_ENTITY.LOAN, "DELETE", async (_payload, entityId) => {
+    await deleteLoan(entityId!);
+    return { id: entityId! };
+});

@@ -1,23 +1,15 @@
-import type { Request, RequestHandler } from "express";
-import { UnauthorizedError } from "../../common/errors";
-import type { AuditActor } from "../audit";
+import type { RequestHandler } from "express";
+import { actorFrom } from "../../common/http/actor";
 import {
-  deleteLedgerEntry,
   getLoanLedger,
-  recordPaymentOrReceipt,
   getSettings,
-  updateLedgerEntry,
+  requestDeleteLedgerEntry,
+  requestRecordPaymentOrReceipt,
+  requestUpdateLedgerEntry,
 } from "./ledger.service";
 import { getDpdGrid } from "./dpd.service";
-import { syncLoanStatusWithLedger } from "./loanStatus";
 import { notifyPaymentReceipt } from "../notifications/services/event-notifications";
 import type { EntryPatch } from "./entryRules";
-
-/** Who is making the change and from where — recorded on the entry's audit trail entry. */
-function auditActor(req: Request): AuditActor & { userId: string } {
-  if (!req.user) throw new UnauthorizedError("Not authenticated");
-  return { userId: req.user.id, ipAddress: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
-}
 
 export const getLedger: RequestHandler = async (req, res, next) => {
   try {
@@ -38,21 +30,21 @@ export const createEntry: RequestHandler = async (req, res, next) => {
       amount: number;
       narration?: string;
     };
-    const entry = await recordPaymentOrReceipt({ loanId, ...body });
-    // A receipt that clears the loan closes it; a disbursement on a closed loan reopens it.
-    await syncLoanStatusWithLedger(loanId);
+    const result = await requestRecordPaymentOrReceipt({ loanId, ...body }, actorFrom(req));
 
-    // Fire payment receipt notification asynchronously to borrower
-    if (body.vchType === "RECEIPT") {
+    // Only fire the borrower notification once the entry has actually been
+    // posted — an employee's request pending approval has not moved any
+    // money yet.
+    if (result.entry && body.vchType === "RECEIPT") {
       notifyPaymentReceipt({
         loanId,
         amount: body.amount,
         paymentDate: body.entryDate,
-        receiptNumber: entry.id.slice(0, 8).toUpperCase(),
+        receiptNumber: result.entry.id.slice(0, 8).toUpperCase(),
       }).catch(() => {});
     }
 
-    res.status(201).json({ success: true, data: entry });
+    res.status(201).json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -66,16 +58,8 @@ export const createEntry: RequestHandler = async (req, res, next) => {
 export const updateEntry: RequestHandler = async (req, res, next) => {
   try {
     const { loanId, entryId } = req.valid!.params as { loanId: string; entryId: string };
-    const entry = await updateLedgerEntry({
-      loanId,
-      entryId,
-      patch: req.valid!.body as EntryPatch,
-      actor: auditActor(req),
-    });
-    // The edit can settle the loan or reopen it, exactly as recording one can.
-    await syncLoanStatusWithLedger(loanId);
-
-    res.json({ success: true, data: entry });
+    const result = await requestUpdateLedgerEntry(loanId, entryId, req.valid!.body as EntryPatch, actorFrom(req));
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -85,10 +69,8 @@ export const updateEntry: RequestHandler = async (req, res, next) => {
 export const deleteEntry: RequestHandler = async (req, res, next) => {
   try {
     const { loanId, entryId } = req.valid!.params as { loanId: string; entryId: string };
-    const entry = await deleteLedgerEntry({ loanId, entryId, actor: auditActor(req) });
-    await syncLoanStatusWithLedger(loanId);
-
-    res.json({ success: true, data: entry });
+    const result = await requestDeleteLedgerEntry(loanId, entryId, actorFrom(req));
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

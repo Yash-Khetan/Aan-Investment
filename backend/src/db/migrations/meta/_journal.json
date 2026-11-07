@@ -29,6 +29,13 @@
       "when": 1792839794479,
       "tag": "0003_ledger_entry_locking_and_audit_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794051837377,
+      "tag": "0004_small_gauntlet",
+      "breakpoints": true
     }
   ]
 }

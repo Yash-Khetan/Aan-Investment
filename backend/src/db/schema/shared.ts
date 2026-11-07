@@ -478,3 +478,25 @@ export const auditActionEnum = pgEnum("audit_action", [
     "LOGIN",
     "LOGOUT",
 ]);
+
+/* ============================================================
+   CHANGE REQUEST STATUS / ACTION
+
+   A money-related change an employee makes does not write to its
+   table directly — it is held here until an admin approves it.
+   ACTION is CREATE only for a record that does not exist yet at
+   request time (e.g. a new ledger entry); UPDATE/DELETE act on an
+   existing one.
+============================================================ */
+
+export const changeRequestStatusEnum = pgEnum("change_request_status", [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+]);
+
+export const changeRequestActionEnum = pgEnum("change_request_action", [
+    "CREATE",
+    "UPDATE",
+    "DELETE",
+]);

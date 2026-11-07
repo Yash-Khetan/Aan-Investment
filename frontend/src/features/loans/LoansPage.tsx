@@ -8,6 +8,7 @@ import { Table, type Column } from "../../components/ui/Table";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/States";
 import { formatCurrency } from "../../lib/format";
 import { FIGURE } from "../../lib/glossary";
+import { listPendingLoanIds } from "../change-requests/api";
 import { listLoans } from "./api";
 import type { Loan } from "./types";
 
@@ -30,6 +31,12 @@ export function LoansPage() {
     placeholderData: keepPreviousData,
   });
 
+  const { data: pendingLoanIds } = useQuery({
+    queryKey: ["change-requests", "pending-loan-ids"],
+    queryFn: listPendingLoanIds,
+  });
+  const pendingLoanIdSet = new Set(pendingLoanIds ?? []);
+
   const rows = data?.data ?? [];
 
   const columns: Column<Loan>[] = [
@@ -38,7 +45,10 @@ export function LoansPage() {
       header: "Loan",
       render: (l) => (
         <div>
-          <div className="font-semibold text-slate-900">{l.loanAccountNumber}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-900">{l.loanAccountNumber}</span>
+            {pendingLoanIdSet.has(l.id) && <Badge status="PENDING" label="Approval pending" />}
+          </div>
           <div className="text-xs text-slate-500">{l.borrowerName ?? "—"}</div>
         </div>
       ),
